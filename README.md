@@ -41,7 +41,7 @@ Here is a description of each line:
 | 4 | initial timestep and total timestep |
 | 5 | artificial viscosity values |
 | 6 | external force (not default) <br/> equation of state option <br/> if > 1, include core mass |
-| 7 | delp (not default) <br/> nups - number of steps per luminosity output <br/> damping term <br/> damping zones below this number |
+| 7 | # of cells in the grid *(hint: copy it from `./a.out` output's last line)* <br/> delp (not default) <br/> nups - number of steps per luminosity output <br/> damping term <br/> damping zones below this number |
 | 8 | iflxlm - flux limiter option <br/> capture rate option <br/> changing the nuclear potential energy - shouldn't be altered <br/> yefact - not used|
 
 ## [Notes](https://www.overleaf.com/read/pgsnmxgdjkrq)
