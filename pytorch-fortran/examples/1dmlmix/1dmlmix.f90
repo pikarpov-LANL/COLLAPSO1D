@@ -7,8 +7,8 @@
 !                                                      *                
 !*******************************************************                
 !
-      !use torch_ftn
-      !use iso_fortran_env
+      use torch_ftn
+      use iso_fortran_env
       implicit double precision (a-h,o-z) 
 !                                                                       
 !--ntstep counts the number of timesteps                                
@@ -245,7 +245,7 @@
       call nupress(ncell,rho,unue,unueb,unux) 
 !                                                                       
 !--turbulence contribution to pressure via ML 
-      !call testml
+      call testml
       call turbpress(ncell,rho) 
 !                                                                       
 !--e+/e- capture                                                        
@@ -329,7 +329,40 @@
       END                                           
 !              
 
+      subroutine testml
+      use torch_ftn
+      use iso_fortran_env
+      integer :: n           
+      type(torch_module) :: torch_mod
+      type(torch_tensor) :: in_tensor, out_tensor   
 
+      real(real32) :: input(224, 224, 3, 10)
+      real(real32), pointer :: output(:, :)
+      real(real32), allocatable :: output_h(:, :)
+
+      character(:), allocatable :: filename
+      integer :: arglen, stat
+
+      if (command_argument_count() /= 1) then
+         print *, "Need to pass a single argument: Pytorch model file name"
+         stop
+      end if
+
+      call get_command_argument(number=1, length=arglen)
+      allocate(character(arglen) :: filename)
+      call get_command_argument(number=1, value=filename, status=stat)
+
+      input = 1.0
+      call in_tensor%from_array(input)
+      call torch_mod%load(filename)
+      call torch_mod%forward(in_tensor, out_tensor)
+      call out_tensor%to_array(output)
+      output_h = output
+
+      print *, output_h(1:5, 1)
+      print*, '--->>> Hi from ML'      
+      call EXIT(0)
+      end
 
 
       subroutine artvis(ncell,x,rho,v,q) 
