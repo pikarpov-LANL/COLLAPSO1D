@@ -1,15 +1,16 @@
       program lahyc
-c*******************************************************            
+c*******************************************************
 c                                                      *
 c  This is a Lagrangian 1D hydrodynamics code.         *
 c  adds particles                                      *
 c  this is the main driver of the integration.         *
 c                                                      *
 c*******************************************************
-
+c
       implicit double precision (a-h,o-z)
 c
-      integer jtrape,jtrapb,jtrapx
+c--ntstep counts the number of timesteps
+      integer jtrape,jtrapb,jtrapx,ntstep
 c
       parameter (idim=4000)
       parameter (idim1=idim+1)
@@ -38,7 +39,7 @@ c
       common /tempe/ temp(idim)
       common /therm/ xmu(idim)
       common /timej / time, dt
-      logical trapnue, trapnueb, trapnux
+      logical trapnue, trapnueb, trapnux, print_nuloss
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim)
       common /typef/ iextf, ieos
       common /units/ umass, udist, udens, utime, uergg, uergcc
@@ -58,38 +59,50 @@ c--set all quantities needed for run
 c
       call preset
 c
-c--main loop
+c--main loop to save the dump file
 c
+c--nstep is a counter for dump fiels
+c--ntstep is the number of timesteps
       nstep = 0
- 42   continue
+      ntstep = 1
+
+      do while (time.lt.tmax)
+!42   continue
 c
-      nstep = nstep + 1
+        nstep = nstep + 1
 c
 c--step runs the runge-kutta operator
 c
-      call step
+        call step(ntstep)
 c
 c--produce output if desired
 c
-      lu=61
-      call printout(lu)
-      print *, 'savetime=',time
+        lu=61
+        call printout(lu)
+        print*,' '
+        print*,' ********'
+        print*,' savetime = ',time
+        print*,' ********'
+        print*,' '
 c      if (time.gt.4.0) dtime = .0001
 c
 c--check if simulation is finished
 c
-      print *,time,tmax
-      if(time.gt.tmax) go to 90
+        !print *,time,tmax
+        !if(time.gt.tmax) go to 90
 c
-      go to 42
+        !go to 42
+      end do
 c
-   90 call printout(lu)
+      !90 call printout(lu)
+      call printout(lu)
       stop
       end
       subroutine hydro(time,ncell,x,v,
-     1           u,rho,ye,f,du,dye,q,
+     1           u,rho,ye,f,du,dye,q,fmix,
      2           ynue,ynueb,ynux,dynue,dynueb,dynux,
-     3           unue,unueb,unux,dunue,dunueb,dunux)
+     3           unue,unueb,unux,dunue,dunueb,dunux,
+     4           print_nuloss)
 c
 c****************************************************************
 c                                                               *
@@ -130,12 +143,12 @@ c
       implicit double precision (a-h,o-z)
 c
       integer jtrape,jtrapb,jtrapx
-c
       parameter (idim=4000)
       parameter (idim1=idim+1)
       parameter (tiny=-1e-5)
 c
       dimension x(0:idim), v(0:idim), f(0:idim)
+      dimension fmix(idim)
       dimension u(idim), rho(idim), ye(idim)
       dimension dye(idim), du(idim), q(idim)
       dimension ynue(idim),ynueb(idim),ynux(idim)
@@ -161,7 +174,7 @@ c
       common /swesty/ xpf(idim), pvar2(idim), pvar3(idim), pvar4(idim)
       common /tempe/ temp(idim)
       common /therm/ xmu(idim)
-      logical trapnue, trapnueb, trapnux
+      logical trapnue, trapnueb, trapnux, print_nuloss
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim)
       common /typef/ iextf, ieos
       common /units/ umass, udist, udens, utime, uergg, uergcc
@@ -182,7 +195,7 @@ c  ----------------------------------
 c  (this allows the use of simple eos)
 c  (ieos=3 or 4 calls for the sophisticated eos's)
 c
-      print *, 'time=',time,ieos
+      !print *, '[time] ',time,ieos
       if(ieos.eq.1)call eospg(ncell,rho,u)
       if(ieos.eq.2)call eospgr(ncell,rho,u)
       if(ieos.eq.3.or.ieos.eq.4)call eos3(ncell,rho,u,ye)
@@ -210,13 +223,13 @@ c  ----------------
 c         if (ye(k).gt.0.51) print *,'ye>0.51, k=',k,ye(k)
          if (ynue(k).lt.tiny) print *,'yne<0, k=',k,ynue(k),
      1                               trapnue(k),ebetaeq(k)
-       
+
          if (ynux(k).lt.tiny) print*,'ynux<0, k=',k,ynux(k)
       enddo
-      write(*,200)'hydro: yemn,ynuemx,ynuebmx,ynuxmx',
-     1                   yemn,ynuemx,ynuebmx,ynuxmx
+c      write(*,200)'hydro: yemn,ynuemx,ynuebmx,ynuxmx',
+c     1                   yemn,ynuemx,ynuebmx,ynuxmx
   200 format(A33,4(1x,1pe10.3))
-c 
+c
 c-- initialize
 c--skip neutrino physics
 c      goto 90
@@ -228,6 +241,9 @@ c
 c-- nu contribution to pressure
 c
       call nupress(ncell,rho,unue,unueb,unux)
+c
+c--turbulence contribution to pressure via ML
+      call turbpress(ncell,rho)
 c
 c--e+/e- capture
 c
@@ -258,7 +274,7 @@ c
 c--fold-in neutrino background luminosity from the core
 c--and normalize energy sums
 c
-      call nulum
+      call nulum(print_nuloss)
 c
 c--neutrino absorption
 c
@@ -276,6 +292,11 @@ c
      1            dynue,dynueb,dunue,dunueb)
 c
  90   continue
+c
+c--compute turbulence parameters
+c
+      call turbulence(ncell,x,f,q,v,rho,fmix)
+c
 c--compute q values
 c
       call artvis(ncell,x,rho,v,q)
@@ -287,7 +308,7 @@ c
 c--flux limited diffusion
 c--skip neutrino
       call nudiff(ncell,x,rho,time,ye,
-     1    ynue,ynueb,ynux,dynue,dynueb,dynux,  
+     1    ynue,ynueb,ynux,dynue,dynueb,dynux,
      2    dunue,dunueb,dunux)
 c
 c--compute energy derivative
@@ -360,16 +381,16 @@ c
       subroutine coulomb(rhok,zbar,ye,ucoul,pcoul)
 c***********************************************************
 c
-c  compute Coulomb corrections as given in Shapiro 
+c  compute Coulomb corrections as given in Shapiro
 c  and Teukolsky. p. 31 (2.4.9) and (2.4.11)
 c  in cgs:
 c        ucoul=-1.45079*e**2*avo**4/3*ye**4/3*rho**1/3*Z**2/3
 c             =-1.70e13 Ye**4/3 * rho**1/3 * Z**2/3
-c  code units: mulitply by udens**1/3 / uergg 
+c  code units: mulitply by udens**1/3 / uergg
 c
 c        pcoul=-0.4836*e**2*avo**4/3*Ye**4/3*rho**4/3*Z**2/3
 c             =-5.67e12 Ye**4/3 * rho**4/3 * Z**2/3
-c  code units: mulitply by udens**4/3 / uergcc 
+c  code units: mulitply by udens**4/3 / uergcc
 c
 c***********************************************************
 c
@@ -377,11 +398,11 @@ c
 c
       parameter(ufac=-0.214d0)
       parameter(pfac=-0.0714d0)
-c    
+c
       rho13=rhok**0.333333333333d0
       rho43=rho13*rhok
       ye2=ye*ye
-      y43z23=(ye2*zbar)**0.66666666666d0 
+      y43z23=(ye2*zbar)**0.66666666666d0
       ucoul=ufac*rho13*y43z23
       pcoul=pfac*rho43*y43z23
 c
@@ -443,6 +464,7 @@ c
       common /units/ umass, udist, udens, utime, uergg, uergcc
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg
       common /carac/ deltam(idim), abar(idim)
+      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
       double precision dupp
 c
       data pi4/12.566371/
@@ -450,14 +472,16 @@ c
 c--compute change in specific internal energy
 c
 c--entropy conversion factor
-      sfac=avokb*utemp/uergg      
+      sfac=avokb*utemp/uergg
 c
       do kp05=1,ncell
          k=kp05-1
          k1=kp05
+         vturbk=dsqrt(vturb2(kp05))
          akp1=pi4*x(k1)*x(k1)
          akp=pi4*x(k)*x(k)
-         pdv=pr(kp05)*(akp1*v(k1)-akp*v(k))/deltam(kp05)
+         pdv=(pr(kp05)+rho(kp05)*vturb2(kp05))*
+     $        (akp1*v(k1)-akp*v(k))/deltam(kp05)
 c
          dupp=0.0
          if (temp(kp05).lt.6.and.rho(kp05).lt.1000.) then
@@ -466,7 +490,8 @@ c
          if (ifleos(kp05).ne.3) then
 c-- we subtract the energy added to the neutrino field
 c no shock heating
-            du(kp05)=-pdv+0.5*dq(kp05)-dunu(kp05)-dupp
+            du(kp05)=-pdv+0.5*dq(kp05)-dunu(kp05)-dupp+
+     $           rho(kp05)*vturbk**3/dmix(kp05)
             if (rho(kp05+1).gt.0.1.and.kp05.lt.1) then
                xp05=.5d0*(x(k)+x(k1))
                xp15=.5d0*(x(k1)+x(k1+1))
@@ -523,7 +548,7 @@ c
 c
       subroutine eosflg(ncell,rho,ye,u,dye,du)
 c****************************************************************
-c     
+c
 c this subroutine determines what kind of eos to use:
 c       eosflg = 1: freeze-out, just Ocean's eos + Coul corr.
 c       eosflg = 2: NSE with Raph's routines, + Ocean eos + Coul
@@ -581,7 +606,7 @@ c
       t9freeze=t9nse-1.5
 c
 c--entropy conversion factor
-      sfac=avokb*utemp/uergg      
+      sfac=avokb*utemp/uergg
 c
       do k=1,ncell
          tempk=temp(k)
@@ -644,7 +669,7 @@ c
 cifleos(k).eq.2.and.rho(k).gt.rhoswe) then
             ifleos(k)=3
             kount23=kount23+1
-c--make call to sleos to get the entropy or intenal energy 
+c--make call to sleos to get the entropy or intenal energy
 c--at present rho, ye, T
             brydns=rho(k)*uslrho
             pprev=xpf(k)
@@ -702,17 +727,17 @@ c--recalculate du if needed
 c-- we subtract the energy added to the neutrino field
                du(k)=-pdv/deltam(k) + 0.5*dq(k) - dunu(k)
             endif
-            print *,'change occured at cell',k,ifleos(k)
+            !print *,'change occured at cell',k,ifleos(k)
          endif
 c
       enddo
 c      write(*,100) rhomax,kount12,kount21,kount23,kount32
-c  100 format('eosflg: rhomax, 1->2, 2->1, 2->3, 3->2',1pe10.2,4(1x,I4)) 
+c  100 format('eosflg: rhomax, 1->2, 2->1, 2->3, 3->2',1pe10.2,4(1x,I4))
 c
       return
       end
 c
-      subroutine eospg(ncell,rho,u)     
+      subroutine eospg(ncell,rho,u)
 cc************************************************************
 c                                                           *
 c  This subroutine computes the pressure and sound speed    *
@@ -834,7 +859,7 @@ c
       subroutine eos3(ncell,rho,u,ye)
 c*************************************************************
 c
-c     compute pressures and temperatures with the    
+c     compute pressures and temperatures with the
 c     Ocean eos assuming NSE
 c
 c************************************************************
@@ -845,7 +870,7 @@ c
       parameter (idim1=idim+1)
 c
       double precision umass
-      double precision rhok, uk, tempk, yek, ptot, cs, etak, 
+      double precision rhok, uk, tempk, yek, ptot, cs, etak,
      1                 abark, xpk, xnk, xak, xhk, yehk, rholdk,
      2                 yeoldk,xpfk, p2k, p3k, p4k, xmuhk, stot
 c
@@ -960,13 +985,83 @@ c
          vsmax=dmax1(vsmax,vsound(k))
          tempmx=dmax1(tempmx,temp(k))
          tempmn=dmin1(tempmn,temp(k))
-c         
+c
       enddo
-      print *,'eos3: tempmn, tempmx',tempmn,tempmx
-      print *,'eta(1),ifleos(1),temp(1):',eta(1),ifleos(1),temp(1)
+      !print *,'eos3: tempmn, tempmx',tempmn,tempmx
+      !print *,'eta(1),ifleos(1),temp(1):',eta(1),ifleos(1),temp(1)
       return
       end
 c
+
+
+      subroutine turbulence(ncell,x,f,q,v,rho,fmix)
+c****************************************************************
+c                                                               *
+c  This subroutine computes the turbulence parameters to be     *
+c  in the momentum and energy equations.    It evolves the      *
+c  turbulent velocity following Couch et al. 1902.01340         *
+c                                                               *
+c****************************************************************
+c
+      implicit double precision (a-h,o-z)
+c
+      parameter (idim=4000)
+      parameter (idim1=idim+1)
+c
+      dimension x(0:idim),f(0:idim),v(0:idim)
+      dimension fmix(idim)
+      dimension q(idim),rho(idim)
+c
+      common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax
+      common /fturb/ geff(idim), fmix1(idim), fmix2(idim)
+      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
+c
+      alpha(1)=1.d0/6.d0
+      alpha(2)=1.d0/6.d0
+      alpha(3)=1.d0/6.d0
+      alpha(4)=1.d0/6.d0
+
+      do k=1,ncell
+         dx=x(k)-x(k-1)
+         dv=v(k)-v(k-1)
+         geff(k)=geff(k)+v(k)*dv/dx
+         vturbk=dsqrt(vturb2(k))
+         if (k.eq.1) then
+            bvf(k)=(rho(k+1)-rho(k))/dx/rho(k)-
+     $           (pr(k+1)-pr(k))/dx/rho(k)/vsound(k)**2
+         else
+            bvf(k)=(rho(k+1)-rho(k))/dx/rho(k)-
+     $           (pr(k+1)-pr(k))/dx/rho(k)/vsound(k)**2
+         end if
+         bvf(k)=-geff(k)*bvf(k)
+         dmix(k)=alpha(1)*pr(k)/rho(k)/geff(k)
+         dk=alpha(2)*dmix(k)*vturbk
+         if (k.eq.1) then
+            dvt=dsqrt(vturb2(k+1))-vturbk
+            dturb=1/x(k)**2/dx*(x(k)**2*rho(k+1)*
+     $           vturb2(k+1)*(v(k)-dmix(k+1)*alpha(2)*
+     $           dvt/dx) -
+     $           x(k-1)**2*rho(k)*vturb2(k)*(v(k-1)-
+     $           dmix(k)*alpha(2)*dvt/dx))
+         else
+            dvt=vturbk-dsqrt(vturb2(k-1))
+            dturb=1/x(k)**2/dx*(x(k)**2*rho(k)*
+     $           vturb2(k)*(v(k)-dmix(k)*alpha(2)*
+     $           dvt/dx) -
+     $           x(k-1)**2*rho(k-1)*vturb2(k-1)*(v(k-1)-
+     $           dmix(k-1)*alpha(2)*dvt/dx))
+         end if
+c
+c-- I'm doing a bit of a cheat here by assuming drho/dt=0.
+c
+         fmix(k)=-dturb/rho(k)-vturb2(k)*dvt+
+     $        vturbk*bvf(k)**2*dmix(k)-
+     $        vturbk**3/dmix(k)
+      end do
+      return
+      end
+
+
       subroutine forces(ncell,x,f,q,v,rho)
 c****************************************************************
 c                                                               *
@@ -988,6 +1083,7 @@ c
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax
       common /carac/ deltam(idim), abar(idim)
       common /damping/ damp, dcell
+      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
 c
       data pi4/12.56637d0/
 c
@@ -997,14 +1093,14 @@ c
       prnu(ncell+1)=0.d0
       do k=1,ncell
          km05=k
-         kp05=k+1 
+         kp05=k+1
          ak=pi4*x(k)*x(k)
          xk3=(.5d0*(x(k-1)+x(k)))**2.5
          xkp3=(.5d0*(x(k)+x(k+1)))**2.5
-     akp1=pi4*x(k+1)*x(k+1)
-     akm1=pi4*x(k-1)*x(k-1)
-     akp05=0.5d0*(akp1+ak)
-     akm05=0.5d0*(ak+akm1)
+         akp1=pi4*x(k+1)*x(k+1)
+         akm1=pi4*x(k-1)*x(k-1)
+         akp05=0.5d0*(akp1+ak)
+         akm05=0.5d0*(ak+akm1)
 c         deltamk=0.5d0*(deltam(km05)+deltam(kp05))
 c
 c--pressure gradients
@@ -1018,15 +1114,17 @@ c
          end if
          pressm = pr(km05) + prnu(km05)
          gradp=ak*(pressp - pressm)
+         gradpt=ak*(rho(kp05)*vturb2(kp05)-
+     $        rho(km05)*vturb2(km05))
 c
 c--artificial viscosity pressure
 c
-         gradq=0.5d0*q(kp05)*(3.d0*akp05-ak) - 
+         gradq=0.5d0*q(kp05)*(3.d0*akp05-ak) -
      1         0.5d0*q(km05)*(3.d0*akm05-ak)
 c
 c         write (99,199) k,x(k),f(k),
 c     $        gradp/deltam(km05),gradq/deltam(km05)
-         f(k)=f(k)-(gradp+gradq)/deltam(km05)
+         f(k)=f(k)-(gradp+gradq+gradpt)/deltam(km05)
 c
 c--damping
 c
@@ -1038,7 +1136,7 @@ c 199  format(I4,4(1x,1pe12.4))
 c
       return
       end
-c 
+c
       subroutine gravity(ncell,deltam,x,f)
 c****************************************************************
 c                                                               *
@@ -1056,6 +1154,7 @@ c
       dimension gpot(idim),deltam(idim)
       dimension xmi(0:idim)
 c
+      common /fturb/ geff(idim), fmix1(idim), fmix2(idim)
       common /core / dcore, xmcore
       common /rshift/ gshift(idim)
       common /const/ gg, clight, arad, bigr, xsecnn, xsecne
@@ -1075,9 +1174,10 @@ c
          xmi(k)=xmi(k-1)+deltam(k)
          r2=x(k)**2
          f(k)=-gg*xmi(k)/r2
+         geff(k)=-gg*xmi(k)/r2
       enddo
 c
-c--calculate gravitational potential     
+c--calculate gravitational potential
 c
       const=gg/(clight*clight)
       r=x(ncell)
@@ -1235,7 +1335,7 @@ c
    70 Continue
    90 format(A25,3(1pe12.4),I3)
 c
-c--solve for actual rho and Ye, calcuate binding energy, average A and Z 
+c--solve for actual rho and Ye, calcuate binding energy, average A and Z
 c
       ider=2
       call nsesolv(ider,t9,rho,ye,yp,yn,kit,kmax,ubind,
@@ -1360,7 +1460,7 @@ c
       call nsesolv(ider,t9,rho,ye,yp,yn,kit,kmax,ubind,
      &                   xa,xh,yeh,zbar,abar)
       If(kit.ge.kmax) Then
-          write(*,*) 'NSEtemp failed for final T9, particle',k 
+          write(*,*) 'NSEtemp failed for final T9, particle',k
           write(*,*) kit,t9,t9tmp
           STOP
       Endif
@@ -1407,7 +1507,7 @@ c****************************************************
 c
 c this subroutine computes the neutrino absorption
 c by nucleons.
-c Note: all neutrino energies are in MeV          
+c Note: all neutrino energies are in MeV
 c
 c****************************************************
 c
@@ -1424,7 +1524,7 @@ c
       dimension ctnue(0:idim),ctnueb(0:idim)
       dimension rho(idim), dye(idim), x(0:idim)
       dimension ynue(idim),ynueb(idim)
-      dimension dynue(idim), dynueb(idim), 
+      dimension dynue(idim), dynueb(idim),
      1          dunue(idim),dunueb(idim)
 c
       logical trapnue, trapnueb, trapnux
@@ -1441,7 +1541,7 @@ c
       common /carac/ deltam(idim), abar(idim)
       common /ener1/ dq(idim), dunu(idim)
       common /tempe/ temp(idim)
-      common /timei/ istep(idim),t0(idim),steps(idim), 
+      common /timei/ istep(idim),t0(idim),steps(idim),
      1               dum2v(idim)
       common /nuout/ rlumnue, rlumnueb, rlumnux,
      1               enue, enueb, enux, e2nue, e2nueb, e2nux
@@ -1483,7 +1583,7 @@ c--e neutrino absorption by neutrons
 c  ---------------------------------
 c
 c-- if beta equilibrium declared, set all changes to zero
-c-- particle will be taken care of in nubeta 
+c-- particle will be taken care of in nubeta
             if (ebetaeq(i)) then
                facn=0.
             else
@@ -1580,28 +1680,28 @@ c
       enddo
 c
       fo=ufoe/utime
-      print *, 'denue, denueb, fo', denue, denueb,fo
-      print*,'  e-neutrino absorption:',denue*fo,' foes/s'
-      print*,'e-neutrino bar absorption:',denueb*fo,' foes/s'
+      !print *, 'denue, denueb, fo', denue, denueb,fo
+      !print*,'  e-neutrino absorption:',denue*fo,' foes/s'
+      !print*,'e-neutrino bar absorption:',denueb*fo,' foes/s'
 c
 c--check if denue larger than 0.25*rlumnue
 c
 c--change this back to .25
       if (denue.gt.0.10*rlumnue) then
          jtrape=1
-         print*,'nuabs: nue absorption/emission=',
-     1              denue/rlumnue
+c         print*,'nuabs: nue absorption/emission=',
+c     1              denue/rlumnue
       elseif (denue.lt.0.05*rlumnue.or.denue.lt.1.d-8) then
          jtrape=-1
       else
          jtrape=0
       endif
 c
-c --change this back to .25     
+c --change this back to .25
       if (denueb.gt.0.10*rlumnueb) then
          jtrapb=1
-         print*,'nuabs: nueb absorption/emission=',
-     1            denueb/rlumnueb
+c         print*,'nuabs: nueb absorption/emission=',
+c     1            denueb/rlumnueb
       elseif (denueb.lt.0.05*rlumnueb.or.denueb.lt.1.d-8) then
          jtrapb=-1
       else
@@ -1729,7 +1829,7 @@ c
       common /cpots/ xmue(idim), xmuhat(idim)
       common /enus/ enuet(idim),enuebt(idim),enuxt(idim)
       common /ener1/ dq(idim), dunu(idim)
-      common /timei/ istep(idim),t0(idim),steps(idim), 
+      common /timei/ istep(idim),t0(idim),steps(idim),
      1               dum2v(idim)
       common /tempe/ temp(idim)
       double precision umass
@@ -1763,9 +1863,9 @@ c-- time scale to eq. = 10 sound crossing time
             dubeta=(unuebeta-unue(i))*deltinv
             dunue(i)=dunue(i)+dubeta
             dunu(i)=dunu(i)+dubeta
-            if (i.eq.1) print*,'nubeta: ye(1),dye(1),ynue(1)'
-     $           ,ye(1),dye(1),ynue(1)
-         endif        
+c            if (i.eq.1) print*,'nubeta: ye(1),dye(1),ynue(1)'
+c     $           ,ye(1),dye(1),ynue(1)
+         endif
          if (pbetaeq(i)) then
             etabeta=xmuhat(i)/temp(i)-eta(i)
             call integrals(etabeta,f0,f1,f2,f3,f4,f5,0,df2,df3)
@@ -1781,12 +1881,12 @@ c-- time scale to eq. = 10 sound crossing time
             dubeta=(unuebeta-unueb(i))*deltinv
             dunueb(i)=dunueb(i)+dubeta
             dunu(i)=dunu(i)+dubeta
-            if (i.eq.1) print*,'nubeta: ye(1),dye,ynueb(1)'
-     $           ,ye(1),dye(1),ynueb(1)
+c            if (i.eq.1) print*,'nubeta: ye(1),dye,ynueb(1)'
+c     $           ,ye(1),dye(1),ynueb(1)
             kountp=kountp+1
-         endif 
+         endif
       enddo
-      print *,'nubeta: kounte,kountp,ye(1)',kounte,kountp,ye(1)
+      !print *,'nubeta: kounte,kountp,ye(1)',kounte,kountp,ye(1)
 c
       return
       end
@@ -1795,10 +1895,10 @@ c
      1            ynue,ynueb,ynux,unue,unueb,unux)
 c*************************************************************
 c
-c  
-c  This routine determines trapping status by computing opacities 
+c
+c  This routine determines trapping status by computing opacities
 c  and diffusion coefficients. Also mops up residual neutrinos
-c  from untrapped particles if they are present in tiny 
+c  from untrapped particles if they are present in tiny
 c  quantities
 c
 c*************************************************************
@@ -1850,9 +1950,9 @@ c
       if (jtrape.eq.-1.and.ftrape.ge.1.05) ftrape=ftrape*0.97
       if (jtrapb.eq.-1.and.ftrapb.ge.1.05) ftrapb=ftrapb*0.97
       if (jtrapx.eq.-1.and.ftrapx.ge.1.05) ftrapx=ftrapx*0.97
-      print *, 'jtrape, ftrape', jtrape, ftrape
-c      
-      write(*,5)'nucheck: ftrape,ftrapb,ftrapx',ftrape,ftrapb,ftrapx
+      !print *, 'jtrape, ftrape', jtrape, ftrape
+c
+c      write(*,5)'nucheck: ftrape,ftrapb,ftrapx',ftrape,ftrapb,ftrapx
    5  format(A30,3(1x,1g10.3))
       do k=1,ncell
          km1=k-1
@@ -1927,12 +2027,12 @@ c
             emop=emop+unux(i)*deltam(i)
             unux(i)=0.
          endif
-      enddo 
-      if (emop.ne.0.0) print *,'nucheck: mopped up',emop/50.,'  foes'
+      enddo
+c      if (emop.ne.0.0) print *,'nucheck: mopped up',emop/50.,'  foes'
 c
-      write(*,110) rnumx, kountnue,kountnueb,kountnux
+c      write(*,110) rnumx, kountnue,kountnueb,kountnux
   110 format('nucheck: rnumx,nue trap,nueb trap,nux trap',
-     1       1(1pe10.2), 3(1x,I4)) 
+     1       1(1pe10.2), 3(1x,I4))
 c--total lepton number
       tlept=0.0
       do i=1,ncell
@@ -1941,12 +2041,12 @@ c            print *, i,(ye(i)+ynue(i)-ynueb(i)),trapnue(i)
 c         end if
          tlept=tlept+deltam(i)*(ye(i)+ynue(i)-ynueb(i))
       enddo
-      print *,'nucheck: total lepton number:',tlept
+      !print *,'nucheck: total lepton number:',tlept
 c
 c--write nu emission to a file
 c
 c      f=ufoe/utime
-c      write(59,120)t,f*rlumnue,enue,f*rlumnueb,enueb,f*rlumnux,enux     
+c      write(59,120)t,f*rlumnue,enue,f*rlumnueb,enueb,f*rlumnux,enux
 c  120 format((1pe12.5),6(1x,1pe10.2))
 c
 c--write boundary position to a file
@@ -2105,7 +2205,7 @@ c
       end
 c
       subroutine nudiff(ncell,x,rho,time,ye,
-     $                 ynue,ynueb,ynux,dynue,dynueb,dynux,  
+     $                 ynue,ynueb,ynux,dynue,dynueb,dynux,
      $                 dunue,dunueb,dunux)
 c***************************************************************
 c                                                              *
@@ -2119,13 +2219,13 @@ c
       integer ncell
       parameter (tiny=1.d-10)
       parameter (idim=4000)
-c     
+c
       dimension x(0:idim), rho(idim), ye(idim)
       dimension dynue(idim),dynueb(idim),dynux(idim),
      1          dunue(idim),dunueb(idim),dunux(idim),
      2          ynue(idim),ynueb(idim),ynux(idim)
 c
-      common /timei/ istep(idim),t0(idim),steps(idim), 
+      common /timei/ istep(idim),t0(idim),steps(idim),
      1               dum2v(idim)
       logical trapnue, trapnueb, trapnux
       common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim)
@@ -2266,7 +2366,7 @@ c--   Marc's "flux limiter" takes the minimum of these two
                dlamr=1.d0/(3.d0+rflx*sigr)
                tnueij = 3.d0*dnueij*dlamr*ai/voli
 c               write (42,*) 'bwflx',i,tnueij,dlamr,dnueij
-            else if (iflxlm.eq.3) then 
+            else if (iflxlm.eq.3) then
                if (dnuae(i).lt.tiny) then
                   dome = 1.d0
                else
@@ -2377,7 +2477,7 @@ c--total change in concentration and energy
                else
                   dcnueb=-dcout
                   denueb=-dcout*enuebi
-               endif               
+               endif
             endif
          endif
 c
@@ -2402,7 +2502,7 @@ c               write (42,*) 'mflx',i,tnuxij,wnuij,dnueij
                dlamr=1.d0/(3.d0+rflx*sigr)
                tnuxij = 3.d0*dnuxij*dlamr*ai/voli
 c               write (42,*) 'bwflx',i,tnuxij,dlamr,dnueij
-            else if (iflxlm.eq.3) then 
+            else if (iflxlm.eq.3) then
                dome=1.d0
                rflx=rflx/dome
                dlamr=(2.d0+rflx)/
@@ -2484,14 +2584,14 @@ c--total lepton number
          dynuebtot=dynuebtot+deltam(i)*dynueb(i)
          dynuxtot=dynuxtot+deltam(i)*dynux(i)
       enddo
-      print *, 'total ne',knetot,'ne sat',knesat
-      print *, 'total neb',knebtot,'neb sat',knebsat
-      print *, 'total nx',knxtot,'nx sat',knxsat
+      !print *, 'total ne',knetot,'ne sat',knesat
+      !print *, 'total neb',knebtot,'neb sat',knebsat
+      !print *, 'total nx',knxtot,'nx sat',knxsat
       if (dble(knesat)/dble(max(1,knetot)).gt.0.3.or.
      $     dble(knebsat)/dble(max(1,knebtot)).gt.0.3.or.
      $     dble(knxsat)/dble(max(1,knxtot)).gt.0.3) satc=satc+1.d0
 c      if (dble(knesat+knebsat+knxsat).lt.1) satc=satc-.5d0
-      print *, 'isat=',satc
+      !print *, 'isat=',satc
       return
 c
       end
@@ -2502,7 +2602,7 @@ c****************************************************
 c
 c this subroutine computes the neutrino production
 c by e+/e- capture on nucleons
-c Note: all neutrino energies are in MeV          
+c Note: all neutrino energies are in MeV
 c
 c****************************************************
 c
@@ -2532,7 +2632,7 @@ c
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax
       common /carac/ deltam(idim), abar(idim)
       common /tempe/ temp(idim)
-      common /timei/ istep(idim),t0(idim),steps(idim), 
+      common /timei/ istep(idim),t0(idim),steps(idim),
      1               dum2v(idim)
       common /units/ umass, udist, udens, utime, uergg, uergcc
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg
@@ -2607,7 +2707,7 @@ c               tmev2=tmev*tmev
 c               tmev3=tmev2*tmev
 c              yel=yfac*tmev3*f2/rho(i)
 c-- if rate*(9 time steps) is larger than the e- abundance
-c-- beta eq. is declared, nuecap zeroed-out, 
+c-- beta eq. is declared, nuecap zeroed-out,
 c-- will be taken care of in nubeta
 c              if (erate*dt9.gt.yel.and.trapnue(i)) then
                if (facp*dt9.gt.ye(i).and.trapnue(i)) then
@@ -2666,7 +2766,7 @@ c--weigh the mean energy sums by luminosity
          endif
       enddo
 c
-      return 
+      return
       end
 c
       subroutine nuinit(ncell,rho,x,ye,dye,
@@ -2676,7 +2776,7 @@ c*************************************************************
 c
 c  This subroutine zeroes out whatever is necessary for the
 c  neutrino physics and computes the MeV mean energies
-c  Note that ynux is the abundance of any single specie of 
+c  Note that ynux is the abundance of any single specie of
 c  tau, mu, antineutrino or neutrino, but unux is the total
 c  energy in all 4 fields
 c  We also compute opacities, diffusion coefficients and
@@ -2702,7 +2802,7 @@ c--hbar*c/kb in fermi*Kelvin: why a cap for Kelvin and not for fermi?
       parameter(facdeb=2.3e12)
 c--e**2/kb/(1fm)
       parameter(gamfac=1.67e10)
-c--nucleon elastic xsection from Bowers and Wilson 1982, ApJSup 50        
+c--nucleon elastic xsection from Bowers and Wilson 1982, ApJSup 50
       parameter(sigpel=1.79)
       parameter(signel=1.64)
 c--Mayle's thesis for alpha/nu elastic scattering
@@ -2793,8 +2893,8 @@ c
          endif
       enddo
 c
-      write(*,115)'nuinit: max; enue,enueb,enux',
-     1            enuemx,enuebmx,enuxmx
+c      write(*,115)'nuinit: max; enue,enueb,enux',
+c     1            enuemx,enuebmx,enuxmx
   115 format(A30,3(1x,1pe12.4))
 c
       fac=avosig*udens*udist
@@ -2848,7 +2948,7 @@ c--compute local electron energies
             yemean=ye(i)*elmean
          endif
          if (enuet(i).gt.1.) then
-c--figure out neutrino degeneracy 
+c--figure out neutrino degeneracy
             etanu=etanue(i)
             call rooteta(i,tmev,rho(i),ynue(i),unue(i),etanu,tempnu)
             etanue(i)=etanu
@@ -2977,7 +3077,7 @@ c--fix rnue to 1.
                trapnux(i)=.true.
                cmaxnux=dmax1(cmaxnux,ai)
             endif
-         enddo 
+         enddo
 c
 c--do 2nd pass to pickup transparent particles behind the nusphere
 c
@@ -2998,12 +3098,12 @@ c
 c         write(*,110) kountnue,kountnueb,kountnux
       endif
 c  110 format('nuinit: nue trapped, nueb trapped, nux trapped',
-c     1           3(1x,I4)) 
+c     1           3(1x,I4))
 c
       return
       end
 c
-      subroutine nulum
+      subroutine nulum(print_nuloss)
 c****************************************************
 c
 c This subroutine adds the core luminosity to the
@@ -3017,6 +3117,7 @@ c
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg
       common /nuout/ rlumnue, rlumnueb, rlumnux,
      1               enue, enueb, enux, e2nue, e2nueb, e2nux
+      logical print_nuloss
 c
 c--normalize the energy sums
 c
@@ -3043,9 +3144,13 @@ c--this should be 1.
       rlumnux=rlumnux
 c
       f=ufoe/utime
-      print*,' nue loss:',rlumnue*f,' foes/s at <E> (MeV)',enue
-      print*,'nueb loss:',rlumnueb*f,' foes/s at <E> (MeV)',enueb
-      print*,' nux loss:',rlumnux*f,' foes/s at <E> (MeV)',enux
+      if (print_nuloss.eqv..true.) then
+        write(*,510)'[nue loss, foes/s (MeV)]',rlumnue*f,
+     $  '               ',enue
+510     format(A,1p,E10.3,A,E10.3)
+        !print*,'nueb loss:',rlumnueb*f,' foes/s at <E> (MeV)',enueb
+        !print*,' nux loss:',rlumnux*f,' foes/s at <E> (MeV)',enux
+      endif
 c
       return
       end
@@ -3056,7 +3161,7 @@ c****************************************************
 c
 c this subroutine computes the neutrino production
 c by e+/e- capture on nucleons
-c Note: all neutrino energies are in MeV          
+c Note: all neutrino energies are in MeV
 c
 c****************************************************
 c
@@ -3083,7 +3188,7 @@ c
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg
       common /nuout/ rlumnue, rlumnueb, rlumnux,
      1               enue, enueb, enux, e2nue, e2nueb, e2nux
-c     
+c
       data avo/6.022d23/
 c
       ugserg=dble(utime/uergg)
@@ -3162,7 +3267,7 @@ c-- 0.25 to divide the production among 4 nu species
          endif
       enddo
 c
-      return 
+      return
       end
 c
       subroutine nupress(ncell,rho,unue,unueb,unux)
@@ -3200,28 +3305,61 @@ c--gamma=4/3 since nus are always relativistic
          prnu(i)=prnui
          etanuemx=dmax1(etanuemx,etanue(i))
       enddo
-      print *,'nupress: maximum prnu/pr,etanuemx',ratmax,etanuemx
+      !print *,'nupress: maximum prnu/pr,etanuemx',ratmax,etanuemx
 c
       return
       end
 c
+      subroutine turbpress(ncell,rho)
+c*******************************************************
+c
+c This subroutine passes the grid to a trained PyTorch model
+c that predicts pressure due to turbulence
+c
+c******************************************************
+c
+      implicit double precision (a-h,o-z)
+c
+      parameter(idim=4000)
+      parameter (idim1=idim+1)
+c
+      dimension rho(idim)
+      dimension unue(idim),unueb(idim),unux(idim)
+c
+      logical trapnue, trapnueb, trapnux
+      common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim)
+      common /etnus/ etanue(idim),etanueb(idim),etanux(idim)
+      common /eosnu/ prnu(idim1)
+      common /turb/ prturb(idim1)
+      common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax
+c
+      pturb = 1
+      !do i=1,ncell
+      !  prturb(i)=
+      !enddo
+      !print *,'nupress: maximum prnu/pr,etanuemx',ratmax,etanuemx
+c
+      return
+      end
+c
+
       subroutine nuscat(ncell,rho,x,ynue,ynueb,ynux,
      1          dunue,dunueb,dunux)
 c****************************************************
 c
 c this subroutine computes the neutrino scatterings
-c by electron and positrons. 
+c by electron and positrons.
 c Total cross sections from Mandl and Shaw, Quantum Field
 c Theory, p.313. I have further assumed that the mean
 c energy transfer is 0.25*(Enu-Ee)
 c Note that NES is the only process which differentiates
 c populations of nux and nuxb because of the difference
 c in electron and positron number. I have not taken that
-c into account and instead I have used fnuxm as an average 
+c into account and instead I have used fnuxm as an average
 c efficiency.
 c I require the temperature to be over 6e9 K because the
 c fermi integrals are invalid below that
-c Note: all neutrino energies are in MeV          
+c Note: all neutrino energies are in MeV
 c
 c****************************************************
 c
@@ -3232,7 +3370,7 @@ c
       parameter(sinw2=0.23)
       parameter(ga=-0.5)
       parameter(gv=2*sinw2-0.5)
-c--factor for (numu,nutau) + e- and (numub,nutaub) + e+      
+c--factor for (numu,nutau) + e- and (numub,nutaub) + e+
       parameter(fnux=gv*gv+ga*gv+ga*ga)
 c--factor for (numub,nutaub) + e- and (numu,nutau) + e+
       parameter(fnuxb=gv*gv-gv*ga+ga*ga)
@@ -3358,7 +3496,7 @@ c-- electron-neutrino scattering
      1                         etai,50.d0))
 c--bel: electron end-state blocking
                bel=expon/(1.+expon)
-               blocke=bel 
+               blocke=bel
                due=fac*.25*prefacx*(ce2nux*f3-cenux*tmev*f4)*blocke
 c-- positron-neutrino scattering
 c-- no blocking because positrons never degenerate
@@ -3456,7 +3594,7 @@ c--bel: electron end-state blocking
                blocke=bel
                due=fac*.25*(fnueb*ratioeb*(ce2nueb*f3-
      1                                     cenueb*tmev*f4))*blocke
-c-- positron neutrino scattering         
+c-- positron neutrino scattering
                dup=fac*.25*(fnue*ratioeb*(ce2nueb*g3-cenueb*tmev*g4))
                denueb=deltami*due*shift+deltami*dup*shift
                dee=dee+deltami*due*shift
@@ -3466,22 +3604,22 @@ c-- positron neutrino scattering
          endif
       enddo
 c
-      print*,'e- neutrino scattering:',dee*f,' foes/s'
-      print*,'e+ neutrino scattering:',dep*f,' foes/s'
-c         
+      !print*,'e- neutrino scattering:',dee*f,' foes/s'
+      !print*,'e+ neutrino scattering:',dep*f,' foes/s'
+c
 c
 c--check if dex larger than 0.25*rlumnux
 c
       if (dex.gt.0.15*rlumnux) then
          jtrapx=1
-         print*,'nuscat: nux scattering=',
-     1              dex/rlumnux
+c         print*,'nuscat: nux scattering=',
+c     1              dex/rlumnux
       elseif (dex.lt.0.05*rlumnux.or.dex.lt.1.d-8) then
          jtrapx=-1
       else
          jtrapx=0
       endif
-c     
+c
       return
       end
 
@@ -3524,7 +3662,7 @@ c
       common /units/ umass, udist, udens, utime, uergg, uergcc
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg
       common /const/ gg, clight, arad, bigr, xsecnn, xsecne
-      common /timei/ istep(idim),t0(idim),steps(idim), 
+      common /timei/ istep(idim),t0(idim),steps(idim),
      $               dum2v(idim)
       common /rshift/ gshift(idim)
       common /nuout/ rlumnue, rlumnueb, rlumnux,
@@ -3612,10 +3750,10 @@ c
       enuebs=enuebs/(deeb+1e-20)
       enuxs=enuxs/(dex+1e-20)
 c
-      print *,kount,'  fast loss cells out of',nkount
-      print *,'nusphere nue  losses:',dee*f,'  foes/s at',enues
-      print *,'nusphere nueb losses:',deeb*f,'  foes/s at',enuebs
-      print *,'nusphere nux  losses:',dex*f,'  foes/s at',enuxs
+      !print *,kount,'  fast loss cells out of',nkount
+      !print *,'nusphere nue  losses:',dee*f,'  foes/s at',enues
+      !print *,'nusphere nueb losses:',deeb*f,'  foes/s at',enuebs
+      !print *,'nusphere nux  losses:',dex*f,'  foes/s at',enuxs
 c
       return
       end
@@ -3716,7 +3854,7 @@ c--temp in Mev
 c--electron chemical potential in MeV
       emumev=eta*tmev
 c
-c-- pairs 
+c-- pairs
 c
       if (temp.ge.1d10) then
          fpair=dexp(-4.9924d0*xsi)*
@@ -3740,7 +3878,7 @@ c--I don't know where 6 comes from (process heavily weighted towards
 c--high energies). 0.75 because <Kinetic E of el>=3/4efermi
       epair2=epair*epair
 c
-c-- plasma 
+c-- plasma
 c
       fplas=dexp(-0.56457d0*xsi)*
      1      (2.32d-7 + 8.449d-8*xsi + 1.787d-8*xsi2)/
@@ -3870,7 +4008,7 @@ c
      2              xnold(idim), xpold(idim)
       common /carac/ deltam(idim), abar(idim)
       common /tempe/ temp(idim)
-      common /timei/ istep(idim),t0(idim),steps(idim), 
+      common /timei/ istep(idim),t0(idim),steps(idim),
      1               dum2v(idim)
       common /cases/ t9nse, rhoswe, rhonue, rhonux
       common /core / dcore, xmcore
@@ -3896,7 +4034,7 @@ c
             tempold(i)=tempold(i+1)
             yeold(i)=yeold(i+1)
             xnold(i)=xnold(i+1)
-            xpold(i)=xpold(i+1) 
+            xpold(i)=xpold(i+1)
             rho(i)=rho(i+1)
             ye(i)=ye(i+1)
             xn(i)=xn(i+1)
@@ -3980,7 +4118,7 @@ c
      2              xnold(idim), xpold(idim)
       common /carac/ deltam(idim), abar(idim)
       common /tempe/ temp(idim)
-      common /timei/ istep(idim),t0(idim),steps(idim), 
+      common /timei/ istep(idim),t0(idim),steps(idim),
      1               dum2v(idim)
       common /cases/ t9nse, rhoswe, rhonue, rhonux
       common /core / dcore, xmcore
@@ -4003,7 +4141,7 @@ c      do j=ncr,ncr+3
             xvalf=xval
          end if
       end do
-      if (xvalf.gt.xvcrit) then 
+      if (xvalf.gt.xvcrit) then
          ncell=ncell+1
          pr(ncell+1)=pr(ncell)
          idiv=jf
@@ -4014,15 +4152,15 @@ c      do j=ncr,ncr+3
             rhold(i)=rhold(i-1)
             yeold(i)=yeold(i-1)
             xnold(i)=xnold(i-1)
-            xpold(i)=xpold(i-1) 
+            xpold(i)=xpold(i-1)
             rho(i)=rho(i-1)
             x(i)=x(i-1)
-            if (i.eq.idiv+1) then 
+            if (i.eq.idiv+1) then
                deltam(i)=pi43*rho(i)*(x(i)**3-xj**3)
                tempold(i)=.9*tempold(i-1)
                temp(i)=.95*temp(i-1)
                u(i)=.95*u(i-1)
-            else 
+            else
                deltam(i)=deltam(i-1)
                tempold(i)=tempold(i-1)
                temp(i)=temp(i-1)
@@ -4063,7 +4201,7 @@ c                                                              *
 c***************************************************************
       implicit double precision (a-h,o-z)
 c
-      data itmax/80/ , tol/1.d-2/ 
+      data itmax/80/ , tol/1.d-2/
 c
 c--find root allowing a maximum of itmax iteration
 c
@@ -4128,7 +4266,7 @@ c--compute zbar from abar and ye
 c
       zbar=yei*abar
 c
-c--compute coulomb correction (since coulomb corr. not dependant 
+c--compute coulomb correction (since coulomb corr. not dependant
 c  on T, and freeze-out is assumed call only once)
 c
       call coulomb(rhoi,zbar,yei,ucoul,pcoul)
@@ -4171,7 +4309,7 @@ c      print *,'rootemp2: no convergence for part. i,rho(cgs)',
 c     1         i,rhoi
       stop
 c
-c--iteration sucessful, transform back in code units 
+c--iteration sucessful, transform back in code units
 c
    20 continue
       tempi=t9*uotemp
@@ -4272,7 +4410,7 @@ c-- dediss can be too small
             stop
          endif
 c
-c--solve nse 
+c--solve nse
 c
          call nsetemp(k,t9old,rhocgs,yek,t9,yp,yn,
      1                xa,xh,yeh,zbar,abar,ubind,dubind)
@@ -4306,7 +4444,7 @@ c
      1         k,rhok
       stop
 c
-c--iteration sucessful, transform back in code units 
+c--iteration sucessful, transform back in code units
 c
    20 continue
       tempk=t9*uotemp
@@ -4390,8 +4528,8 @@ c-- convert back to code units
 c--xmuhat is eta*T with T in code units
       xmuhk=xmuh/utmev
       stot=u2sl/u2slu
-      if(k.eq.1)write(*,100)'root4(1):gamma,s,xh,yeh,abar',
-     1                            gamsl,usl,xh,yeh,abar
+c      if(k.eq.1)write(*,100)'root4(1):gamma,s,xh,yeh,abar',
+c     1                            gamsl,usl,xh,yeh,abar
   100 format(A28,5(1g10.3))
       return
       end
@@ -4568,6 +4706,7 @@ c
       common /ufactor/ ufact,yefact
       logical ifign
       common /ign  / ifign(idim)
+      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
 c
       character*9 filin,filout
       data pi4/12.56637d0/
@@ -4591,7 +4730,7 @@ c
 c
 c--open binary file containing initial conditions
 c
-     
+
       open(60,file=filin,form='unformatted')
       open(61,file=filout,form='unformatted')
 c
@@ -4600,7 +4739,7 @@ c
       do i=1,idump-1
          read(60) idummy
       enddo
-c     
+c
 c--read data
 c
       nqn=17
@@ -4614,6 +4753,7 @@ c
      6      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),
      7      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),
      8      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
+     $     (vturb2(i),i=1,nc),
      $     ((ycc(i,j),j=1,nqn),i=1,nc)
 c
       time = t
@@ -4717,6 +4857,7 @@ c
       common /jtrap/ jtrape,jtrapb,jtrapx
       common /carac/ deltam(idim), abar(idim)
       common /ener2/ tkin, tterm
+      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
       logical te(idim), teb(idim), tx(idim)
       dimension uint(idim), s(idim)
       equivalence(trapnue,te)
@@ -4756,9 +4897,9 @@ c
      6      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),
      7      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),
      8     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
-     $     (vsound(i),i=1,nc),
+     $     (vturb2(i),i=1,nc),
      $     ((ycc(i,j),j=1,nqn),i=1,nc)
-      print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx
+      !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx
 c
       return
 c
@@ -4894,7 +5035,7 @@ c-- Cooperstein, Van den Horn, Baron method
          erate=fe4
       end if
       erate=c2cu*erate/beta5
-c 
+c
 c--e+ + n -> p + nubar rate / nucleon
 c
       if (icvb.eq.1) then
@@ -4937,7 +5078,7 @@ c
       return
       end
 c
-      subroutine step
+      subroutine step(ntstep)
 c************************************************************
 c                                                           *
 c  This subroutine integrates the system of equations using *
@@ -4950,7 +5091,7 @@ c************************************************************
 c
       implicit double precision (a-h,o-z)
 c
-      integer jtrape,jtrapb,jtrapx
+      integer jtrape,jtrapb,jtrapx, ntstep
 c
       parameter (idim=4000)
       parameter (idim1=idim+1)
@@ -4985,7 +5126,7 @@ c
       common /tempe/ temp(idim)
       common /therm/ xmu(idim)
       common /timej / time, dt
-      logical trapnue, trapnueb, trapnux
+      logical trapnue, trapnueb, trapnux, print_nuloss
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim)
       common /typef/ iextf, ieos
       common /units/ umass, udist, udens, utime, uergg, uergcc
@@ -4996,6 +5137,9 @@ c
      1               dumunue(idim),dumunueb(idim),dumunux(idim)
       common /f1   / f1v(0:idim),f1u(idim),f1ye(idim)
       common /f2   / f2v(0:idim),f2u(idim),f2ye(idim)
+      common /fturb/ geff(idim), fmix1(idim), fmix2(idim)
+      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
+      common /dturb/ dumvt2(idim)
       common /f1nu / f1ynue(idim),f1ynueb(idim),f1ynux(idim),
      1               f1unue(idim),f1unueb(idim),f1unux(idim)
       common /f2nu / f2ynue(idim),f2ynueb(idim),f2ynux(idim),
@@ -5003,7 +5147,7 @@ c
       common /nuout/ rlumnue, rlumnueb, rlumnux,
      1               enue, enueb, enux, e2nue, e2nueb, e2nux
 c
-      common /timei/ istep(idim),t0(idim),steps(idim), 
+      common /timei/ istep(idim),t0(idim),steps(idim),
      1               dum2v(idim)
       common /propt/ dtime,tmax
       common /nsat/ satc,xtime
@@ -5044,10 +5188,12 @@ c
             xpold(i)=xp(i)
          enddo
          print *, 'calling hydro first'
+         print_nuloss=.false.
          call hydro(time,ncell,x,v,
-     1           u,rho,ye,f1v,f1u,f1ye,q,
+     1           u,rho,ye,f1v,f1u,f1ye,q,fmix1,
      2           ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,
-     3           unue,unueb,unux,f1unue,f1unueb,f1unux)
+     3           unue,unueb,unux,f1unue,f1unueb,f1unux,
+     4           print_nuloss)
       end if
 c
 c--set step counter
@@ -5066,17 +5212,18 @@ c
       if(ivar.eq.0) then
 c
 c--get predictions at half time step
+c--start of the new time step - essentially this is the main loop
 c
  99      continue
-c 
+c
 c--gas particles
 c
-         print *, '*****steps****',steps(1),x(0),x(1)
+         !print *, '[steps] ',steps(1),x(0),x(1)
          do i=1,ncell
             dtf11=f11*steps(i)
             dumx(i)=x(i) + dtf11*v(i)
             dumv(i)=v(i) + dtf11*f1v(i)
-            if (time.lt.0.02.and.rho(i).lt.5.d6) 
+            if (time.lt.0.02.and.rho(i).lt.5.d6)
      $           dumv(i)=min(dumv(i),-0.1)
             dumu(i)=u(i) + dtf11*f1u(i)
             dumye(i)=ye(i) + dtf11*f1ye(i)
@@ -5086,6 +5233,7 @@ c
             dumunue(i)=unue(i) + dtf11*f1unue(i)
             dumunueb(i)=unueb(i) + dtf11*f1unueb(i)
             dumunux(i)=unux(i) + dtf11*f1unux(i)
+            dumvt2(i)=vturb2(i) + dtf11*fmix1(i)
             reset(i)=.false.
             if (dumye(i).lt.0.02) then
                dumye(i)=.02
@@ -5095,10 +5243,12 @@ c
 c--get forces at half the time step, using predictions
 c
          thalf=time + f11*steps(1)
+         print_nuloss=.true.
          call hydro(thalf,ncell,dumx,dumv,
-     $         dumu,rho,dumye,f2v,f2u,f2ye,q,
+     $         dumu,rho,dumye,f2v,f2u,f2ye,q,fmix2,
      $         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,
-     $         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux)
+     $         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,
+     $         print_nuloss)
 c
 c--advance all the gas particles
 c
@@ -5107,7 +5257,7 @@ c
             dtf22=f22*steps(i)
             dumx(i)=x(i) + dtf21*v(i) + dtf22*dumv(i)
             dumv(i)=v(i) + dtf21*f1v(i) + dtf22*f2v(i)
-            if (time.lt.0.02.and.rho(i).lt.5.d6) 
+            if (time.lt.0.02.and.rho(i).lt.5.d6)
      $           dumv(i)=min(dumv(i),-0.1)
             dumu(i)=u(i) + dtf21*f1u(i) + dtf22*f2u(i)
             dumye(i)=ye(i) + dtf21*f1ye(i) + dtf22*f2ye(i)
@@ -5117,6 +5267,7 @@ c
             dumunue(i)=unue(i) + dtf21*f1unue(i) + dtf22*f2unue(i)
             dumunueb(i)=unueb(i) + dtf21*f1unueb(i) + dtf22*f2unueb(i)
             dumunux(i)=unux(i) + dtf21*f1unux(i) + dtf22*f2unux(i)
+            dumvt2(i)=vturb2(i) + dtf21*fmix1(i) + dtf22*fmix2(i)
             if (dumye(i).lt.0.02) then
                dumye(i)=.02
             end if
@@ -5128,16 +5279,18 @@ c
 c--get forces at end of time step
 c
          tfull=time + steps(1)
+         print_nuloss=.false.
          call hydro(tfull,ncell,dumx,dumv,
-     $         dumu,rho,dumye,f2v,f2u,f2ye,q,
+     $         dumu,rho,dumye,f2v,f2u,f2ye,q,fmix2,
      $         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,
-     $         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux)
+     $         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,
+     $         print_nuloss)
 c
 c--estimate integration error and set time step. If reduction
 c  the maximum time step is set to dtime.
 c  Error checking is supressed for particles having been
 c  reset.
-c 
+c
          rapmax=0.
          ermax=-1.e10
          stepmin=1.e30
@@ -5166,8 +5319,8 @@ c--so take energy with respect to iron
                   else
 c--variable of state is entropy
                      usi=u(i)*temp(i)
-                  endif   
-               endif 
+                  endif
+               endif
                erx=abs(dumv(i))/dxi
                erv=abs(f1v(i)-f2v(i))/(abs(v(i))+vsi)
                eru=abs(f1u(i)-f2u(i))/u(i)
@@ -5207,7 +5360,7 @@ c
                   endif
                   imax=i
                   ermax=erm
-               endif 
+               endif
                rap=steps(i)*erm*e1/tol + tiny
                rapmax=dmax1(rapmax,rap)
                rmod=min(2.0d0,1./dsqrt(rap))
@@ -5219,22 +5372,22 @@ c               end if
                denmax=max(rho(i),denmax)
             end if
          enddo
-         write(*,*)'max error flag: ',ierr,imax,ebetaeq(imax)
-         write(*,*)'temp,x',temp(imax),dumx(imax),dumx(imax-1)
-         write(*,*)'max temperature, max density', tempmax,denmax
-         write(*,*)'v,rho',dumv(imax),rho(imax)
-         write(*,*)'u,ye',u(imax),ye(imax)
-         write(*,*)'new: u,ye',dumu(imax),dumye(imax)
-         write(*,*)'fx',f2v(imax)
-         write(*,*)'du,dye',f2u(imax),f2ye(imax)
-         write(*,*)'ynue,ynueb,ynux',
-     1              dumynue(imax),dumynueb(imax),dumynux(imax)
-         write(*,*)'dynue,dynueb,dynux',
-     1              f2ynue(imax),f2ynueb(imax),f2ynux(imax)
-         write(*,*)'unue,unueb,unux',
-     1              dumunue(imax),dumunueb(imax),dumunux(imax)
-         write(*,*)'dunue,dunueb,dunux',
-     1              f2unue(imax),f2unueb(imax),f2unux(imax)
+c         write(*,*)'max error flag: ',ierr,imax,ebetaeq(imax)
+c         write(*,*)'temp,x',temp(imax),dumx(imax),dumx(imax-1)
+c         write(*,*)'max temperature, max density', tempmax,denmax
+c         write(*,*)'v,rho',dumv(imax),rho(imax)
+c         write(*,*)'u,ye',u(imax),ye(imax)
+c         write(*,*)'new: u,ye',dumu(imax),dumye(imax)
+c         write(*,*)'fx',f2v(imax)
+c         write(*,*)'du,dye',f2u(imax),f2ye(imax)
+c         write(*,*)'ynue,ynueb,ynux',
+c     1              dumynue(imax),dumynueb(imax),dumynux(imax)
+c         write(*,*)'dynue,dynueb,dynux',
+c     1              f2ynue(imax),f2ynueb(imax),f2ynux(imax)
+c         write(*,*)'unue,unueb,unux',
+c     1              dumunue(imax),dumunueb(imax),dumunux(imax)
+c         write(*,*)'dunue,dunueb,dunux',
+c     1              f2unue(imax),f2unueb(imax),f2unux(imax)
 c
 c--find minimum time step
 c
@@ -5245,27 +5398,27 @@ c
             stepmin=dmin1(stepmin,steps(i))
          enddo
          xtime=xtime*0.8d0**satc
-         print *,'xtime=',xtime,'satc=',satc
+         !print *,'xtime=',xtime,'satc=',satc
          do i=1,ncell
             steps(i)=min(dtmin,xtime)
             if (time.lt.1.d-7) then
                steps(i)=min(steps(i),1.d-9)
             end if
          enddo
-         write(*,110)'step:t,dt,rapmax,nreset', tfull,dtmin,rapmax,
-     1             nreset
+c         write(*,110)'step:t,dt,rapmax,nreset', tfull,dtmin,rapmax,
+c     1             nreset
   110    format(A30,3(1g12.5,1x),I3)
 c
 c--check for rejection
 c
-         print *, 'XXXXXXXXXX rapmax',rapmax
+         !print *, 'XXXXXXXXXX rapmax',rapmax
          if(rapmax.gt.1.5)then
             go to 99
          end if
 c
 c--update system
 c
-         print *, 'XXXXXXXXXXXXXXXXXXXX update system'
+         !print *, 'XXXXXXXXXXXXXXXXXXXX update system'
          do i=1,ncell
             x(i)=dumx(i)
             v(i)=dumv(i)
@@ -5283,11 +5436,12 @@ c
             unue(i)=dumunue(i)
             unueb(i)=dumunueb(i)
             unux(i)=dumunux(i)
+            vturb2(i)=dumvt2(i)
             f1unue(i)=f2unue(i)
             f1unueb(i)=f2unueb(i)
             f1unux(i)=f2unux(i)
          enddo
-         if (x(ncell).gt.rout) then 
+         if (x(ncell).gt.rout) then
             pr(ncell+1)=2.*p1out
          else
             pr(ncell+1)=0.1*p1out
@@ -5296,11 +5450,11 @@ c
 c--burning
 c
          iburn=0
-         print *, 'xxxxxx',iburn
+         !print *, 'xxxxxx',iburn
          if(iburn.eq.1)then
             iflg=0
-            print *, 'call burn - time',time,steps(1)
-            call burn(ncell,iflg,tfull,steps(1)) 
+            !print *, 'call burn - time',time,steps(1)
+            call burn(ncell,iflg,tfull,steps(1))
             if(iflg.eq.1)then
                call eosflg(ncell,rho,ye,u,f1ye,f1u)
                do i=1,ncell
@@ -5311,9 +5465,10 @@ c
                   xpold(i)=xp(i)
                end do
                call hydro(tfull,ncell,x,v,
-     $              u,rho,ye,f1v,f1u,f1ye,q,
+     $              u,rho,ye,f1v,f1u,f1ye,q,fmix1,
      $              ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,
-     $              unue,unueb,unux,f1unue,f1unueb,f1unux)
+     $              unue,unueb,unux,f1unue,f1unueb,f1unux,
+     $              print_nuloss)
             endif
          endif
          time=tfull
@@ -5330,7 +5485,7 @@ c         end if
 c         print *,'rmp',xmcore,ncell,rb,tacr
 c         if (nrem.gt.0)then
 c            call hydro(tfull,ncell,x,v,
-c     $           u,rho,ye,f1v,f1u,f1ye,q,
+c     $           u,rho,ye,f1v,f1u,f1ye,q,fmix1,
 c     $           ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,
 c     $           unue,unueb,unux,f1unue,f1unueb,f1unux)
 c            do i=1,ncell
@@ -5368,7 +5523,7 @@ c         end if
                   ke=ke+deltam(i)*v(i)**2
                end if
             end do
-            write(58,120) time*10., ke*2.d-2
+c            write(58,120) time*10., ke*2.d-2
 c            write(90,120)time,x(1),x(2),x(3),x(4),x(5),x(6)
 c            write(91,120)time,x(7),x(8),x(9),x(10),x(11),x(12)
 c            write(92,120)time,x(13),x(14),x(15),x(16),x(17),x(18)
@@ -5386,13 +5541,20 @@ c
 c--start new time step
 c
          if(time.lt.tnext)then
-            print *, '****time*****',time
+            !print *, '****time*****',time
+  520       format(A,I12,A)
+            print 520,'<',ntstep,
+     $      '          > ----------------------------------'
+            write(*,500)'[    time/tmax, dt     ]',
+     $           time,'/',tmax,steps(1)
+  500       format(A,1p,E10.3,A,E9.3,E15.3)
             if (mod(nupk,nups).eq.0) then
                lu=72
                open(lu,file='1dtmp',form='unformatted')
                call printout(lu)
                close (lu)
             end if
+            ntstep=ntstep+1
             go to 99
          end if
          return
@@ -5523,9 +5685,9 @@ c
 
 c
 c--3b) Conversion to the Swesty-Lattimer units from code units:
-c     
+c
       usltemp=utemp*boltzmev
-      uslrho=ud1*avo*fermi**3      
+      uslrho=ud1*avo*fermi**3
       uslp=uec1*fermi**3/1.602d-6
       if (ieos.eq.3) then
 c--if u is internal energy
@@ -5557,7 +5719,7 @@ c 4e) Mev to errgs times avogadro's number
 c
       umeverg=avo*1.602e-6
 c
-c--5) epcapture betafac, c2, and c3. 
+c--5) epcapture betafac, c2, and c3.
 c
       betafac=emssmev/utmev
       c2cu=c2cgs*utime
@@ -5569,7 +5731,7 @@ c
    99 return
       end
 
-      subroutine burn(ncell,iflg,time,deltat) 
+      subroutine burn(ncell,iflg,time,deltat)
 c*****************************************************************
 c                                                                *
 c  Nuclear network subroutine.                                   *
@@ -5763,7 +5925,7 @@ c
             tburn=tburn+dtburn
             call epsb(yold,ya,nel,enrg)
 c
-c--if energy has been generated, compute new T 
+c--if energy has been generated, compute new T
 c
             ui = ui + enrg
             uit=ui/uergg
@@ -5823,7 +5985,7 @@ c
       write(80,*)time,stepnuc
       call flush(80)
 c
-      return  
+      return
       end
       double precision function accur(y,n)
       implicit double precision (a-h,o-z)
@@ -5875,22 +6037,22 @@ c-----------------------------------------------------------------
       end
       subroutine epsb(yold,y,n,enrg)
 c--------------------------------------------------------------
-c change of total nuclear binding energy/mass                   
-c       units erg/g                                              
-c................................................................ 
+c change of total nuclear binding energy/mass
+c       units erg/g
+c................................................................
       implicit double precision (a-h,o-z)
-      dimension yold(15),y(15),amex(14)                            
-      common /mass/ amex                                        
+      dimension yold(15),y(15),amex(14)
+      common /mass/ amex
       data amex /2.425, 0.0, -4.737, -7.046, -13.933, -21.492,
      *           -26.016, -30.231, -34.845, -37.549, -42.818,
      *           -48.331, -53.902, -54.185/
-      enrg=0.0                                                           
-      do 10 i=1,n                                                       
-   10 enrg=enrg-(y(i)-yold(i))*amex(i)                                
-      enrg=9.616221376d17*enrg                                      
-      if(abs(enrg).lt.1.d4) enrg=0.                               
-      return                                                     
-      end                                                      
+      enrg=0.0
+      do 10 i=1,n
+   10 enrg=enrg-(y(i)-yold(i))*amex(i)
+      enrg=9.616221376d17*enrg
+      if(abs(enrg).lt.1.d4) enrg=0.
+      return
+      end
       subroutine genpar(rho,t9,a,z,y,ye,ar,ar11,coefg,coeft)
 c*************************************************************
 c                                                            *
@@ -5906,7 +6068,7 @@ c
       do 20 i=1,14
       ye=ye+z(i)*y(i)
    20 continue
-      coefa=7.345889d-9*(rho*ye)**(0.33333333333) 
+      coefa=7.345889d-9*(rho*ye)**(0.33333333333)
       do 30 i=1,14
       ar(i)=coefa*z(i)**(0.3333333333)
    30 continue
@@ -6151,9 +6313,9 @@ c      write(*,1000)string
       double precision function scrng(z1,z2,a1,a2,ar1,
      1                 ar2,ye,coefg,coeft)
       implicit double precision (a-h,o-z)
-      gamma=coefg*z1*z2*2./(ar1+ar2) 
+      gamma=coefg*z1*z2*2./(ar1+ar2)
       tau=coeft*(a1*a2/(a1+a2)*z1**2*z2**2)**(0.33333333333)
-      scrng=dexp(1.25*gamma-0.0975*tau*(3.*gamma/tau)**2) 
+      scrng=dexp(1.25*gamma-0.0975*tau*(3.*gamma/tau)**2)
       return
       end
       function rk(p,t91,t92,t93,t94,t95,t96)

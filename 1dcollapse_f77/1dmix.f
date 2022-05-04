@@ -1082,10 +1082,10 @@ c
          ak=pi4*x(k)*x(k)
          xk3=(.5d0*(x(k-1)+x(k)))**2.5
          xkp3=(.5d0*(x(k)+x(k+1)))**2.5
-	 akp1=pi4*x(k+1)*x(k+1)
-	 akm1=pi4*x(k-1)*x(k-1)
-	 akp05=0.5d0*(akp1+ak)
-	 akm05=0.5d0*(ak+akm1)
+     akp1=pi4*x(k+1)*x(k+1)
+     akm1=pi4*x(k-1)*x(k-1)
+     akp05=0.5d0*(akp1+ak)
+     akm05=0.5d0*(ak+akm1)
 c         deltamk=0.5d0*(deltam(km05)+deltam(kp05))
 c
 c--pressure gradients
