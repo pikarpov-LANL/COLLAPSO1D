@@ -325,25 +325,25 @@
  1000 FORMAT(3x,d9.2,6x,d9.2)                                           
  1100 FORMAT(5x,d11.4,8x,d10.3,5x,i3,8x,i3)                             
  1200 FORMAT(4x,d13.6,5x,d13.6,4x,d11.4)                                
- 1300 FORMAT(5x,d9.2,5x,i3,4x,f4.1,4x,f4.1,4x,f4.1,4x,f4.2,4x,f4.2,   &     
-     &4x,f4.2)                                                          
+ 1300 FORMAT(5x,d9.2,5x,i3,4x,f4.1,4x,f4.1,4x,f4.1,4x,f4.2,4x,f4.2,     &
+     4x,f4.2)                                                          
  2000 FORMAT (4(1pd15.7))                                               
  2050 Format(i2,3(1x,1pd10.3))                                          
  2100 FORMAT(1x,'Mass Conserv=',1pd15.7,' and Ye=',1pd15.7)             
  2200 Format(1x,6d11.3)                                                 
  2300 Format(a5,1x,d9.2,1x,a5,d9.2,1x,a5,d9.2,1x,a5,1x,d9.2)            
- 3000 FORMAT(1x,'Convergence failure; Det=0 in step',I3,' at T9=',   &      
-     &1pd9.2,' and density=',1pd9.2)                                    
- 3100 FORMAT(1x,'Conv successful for T9=',1pd11.4,   &                      
-     &' rho=',1pd11.4,' ye=',1pd11.4)                                   
- 3200 FORMAT(1x,'Convergence failure; does not converge in',I3,   &         
-     &' steps at T9=',1pd9.2,' and density=',1pd9.2)                    
+ 3000 FORMAT(1x,'Convergence failure; Det=0 in step',I3,' at T9=',      &
+     1pd9.2,' and density=',1pd9.2)                                    
+ 3100 FORMAT(1x,'Conv successful for T9=',1pd11.4,                      &
+     ' rho=',1pd11.4,' ye=',1pd11.4)                                   
+ 3200 FORMAT(1x,'Convergence failure; does not converge in',I3,         &
+     ' steps at T9=',1pd9.2,' and density=',1pd9.2)                    
  4000 FORMAT(1x,'k=',i3,' yp=',1pd16.8,' yn=',1pd16.8)                  
  4100 Format(1x,' delyp=',1pd13.6,' delyn=',1pd13.6,' det=',1pd13.6)    
- 4200 Format(1x,' dfp=',1pd11.4,' dfn=',1pd11.4,' dgp=',1pd11.4,' dgn=',   &
-     & 1pd11.4)                                                         
- 4250 Format(1x,' dfp2=',1pd11.4,' dfn2=',1pd11.4,' dgp2=',1pd11.4,   &  
-     & ' dgn2=',1pd11.4)                                                
+ 4200 Format(1x,' dfp=',1pd11.4,' dfn=',1pd11.4,' dgp=',1pd11.4,' dgn=',&
+      1pd11.4)                                                         
+ 4250 Format(1x,' dfp2=',1pd11.4,' dfn2=',1pd11.4,' dgp2=',1pd11.4,     &
+      ' dgn2=',1pd11.4)                                                
  4300 format(1x,'f=',1pd11.4,'g=',1pd11.4)                              
  4400 Format(1x,f4.1,1x,f4.1,1x,f7.4,1x,1pd10.3,1x,'scr')               
       END                                           

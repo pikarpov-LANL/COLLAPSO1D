@@ -6,8 +6,7 @@
 !  this is the main driver of the integration.         *                
 !                                                      *                
 !*******************************************************                
-      
-      use sleos
+                                                                        
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
@@ -86,9 +85,7 @@
 !                                                                       
    90 call printout(lu) 
       stop 
-      END       
-      
-      
+      END                                           
       subroutine hydro(time,ncell,x,v,                                  &
      &           u,rho,ye,f,du,dye,q,                                   &
      &           ynue,ynueb,ynux,dynue,dynueb,dynux,                    &
@@ -886,7 +883,6 @@
             print *,'k,yek',k,yek 
             stop 
          endif 
-                                                                        
 !                                                                       
 !--assume chemical freeze-out                                           
 !                                                                       
@@ -981,7 +977,7 @@
 !****************************************************************       
 !                                                                       
       implicit double precision (a-h,o-z) 
-!     
+!                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
@@ -1003,12 +999,12 @@
          km05=k 
          kp05=k+1 
          ak=pi4*x(k)*x(k) 
-         xk3=(0.5d0*(x(k-1)+x(k)))**2.5 
-         xkp3=(0.5d0*(x(k)+x(k+1)))**2.5      
-         akp1=pi4*x(k+1)*x(k+1)                                    
-         akm1=pi4*x(k-1)*x(k-1)                                             
-         akp05=0.5d0*(akp1+ak)                                              
-         akm05=0.5d0*(ak+akm1)                                              
+         xk3=(.5d0*(x(k-1)+x(k)))**2.5 
+         xkp3=(.5d0*(x(k)+x(k+1)))**2.5                                 &
+     &kp1=pi4*x(k+1)*x(k+1)                                             &
+     &km1=pi4*x(k-1)*x(k-1)                                             &
+     &kp05=0.5d0*(akp1+ak)                                              &
+     &km05=0.5d0*(ak+akm1)                                              
 !         deltamk=0.5d0*(deltam(km05)+deltam(kp05))                     
 !                                                                       
 !--pressure gradients                                                   
@@ -4355,7 +4351,6 @@
       inpvar(4)=p4k 
       pprev=xpfk 
       brydns=rhok*uslrho 
-                                                                        
       call slwrap(k,inpvar,yek,brydns,pprev,                            &
      &      psl,usl,dusl,gamsl,eta,yp,yn,xa,xh,yeh,abar,xmuh,u2sl)      
       ures=usl-u 
@@ -6169,5 +6164,3 @@
       rk=dexp(rk) 
       return 
       END                                           
-
-

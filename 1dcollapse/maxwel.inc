@@ -1,3 +1,4 @@
+!23456789012345678901234567890123456789012345678901234567890123456789012
 !***********************************************************************
 !                                                                       
 !    MODULE:       MAXWEL.INC                                           
@@ -98,4 +99,7 @@
       DOUBLE PRECISION PHASEF 
 !                                                                       
 !                                                                       
-      END                                           
+      COMMON /MAXCOM/ T_LOW,T_HI,Y_LOW,Y_HI,           &
+     &       BRYLOW,BRYHI,LBOUND,UBOUND,T_H,D_H,       &
+     &       LOWDNS,HIDNS,TCHK_N,TCHK_B,T_MXWL,D_MXWL, &
+     &       DNL_DT,DNH_DT,DNL_DY,DNH_DY

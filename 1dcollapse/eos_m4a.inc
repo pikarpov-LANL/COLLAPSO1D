@@ -1,3 +1,4 @@
+!23456789012345678901234567890123456789012345678901234567890123456789012
 !***********************************************************************
 !                                                                       
 !    MODULE:       EOS_M4A.INC                                          
@@ -614,4 +615,5 @@
       COMMON /QCHECK/ A1,A2,A3 
 !                                                                       
       double precision ncomp 
-      END                                           
+      COMMON /DTEST/ DFDOM, DFDL_1,DFDL_2,DFDL_3,DNA_DT,DNA_DN,DNA_DY, &
+     & ncomp                                        
