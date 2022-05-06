@@ -2,6 +2,8 @@
 Test
 <Output File>    
 TestOut
+<Input PyTorch Model>
+traced_model.pt
 <Dump # to read>
 1
 <Initial dt>

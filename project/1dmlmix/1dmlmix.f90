@@ -6,13 +6,12 @@
 !  this is the main driver of the integration.         *                
 !                                                      *                
 !*******************************************************                
-!
-      use torch_ftn
-      use iso_fortran_env
+!      
       implicit double precision (a-h,o-z) 
 !                                                                       
 !--ntstep counts the number of timesteps                                
-      integer jtrape,jtrapb,jtrapx,ntstep 
+      integer jtrape,jtrapb,jtrapx,ntstep
+      character*30 mlmodel
 !                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
@@ -46,12 +45,13 @@
       common /typef/ iextf, ieos 
       common /units/ umass, udist, udens, utime, uergg, uergcc 
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
-      common/uocean/ uopr, uotemp, uorho1, uotemp1, uou1 
-      common/uswest/ usltemp, uslrho, uslu, uslp, u2slu 
+      common /uocean/ uopr, uotemp, uorho1, uotemp1, uou1 
+      common /uswest/ usltemp, uslrho, uslu, uslp, u2slu
+      common /mlmod/ mlmodel      
 !                                                                       
-!--read initial condition                                               
-!                                                                       
-      call readini 
+!--read initial condition   
+!
+      call readini
 !                                                                       
 !--define code's units                                                  
 !                                                                       
@@ -144,7 +144,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      integer jtrape,jtrapb,jtrapx 
+      integer jtrape,jtrapb,jtrapx
+      character*30 mlmodel
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (tiny=-1e-5) 
@@ -182,7 +183,8 @@
       common /units/ umass, udist, udens, utime, uergg, uergcc 
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
       common/uocean/ uopr, uotemp, uorho1, uotemp1, uou1 
-      common/uswest/ usltemp, uslrho, uslu, uslp, u2slu 
+      common/uswest/ usltemp, uslrho, uslu, uslp, u2slu
+      common /mlmod/ mlmodel
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !                                                                       
@@ -245,7 +247,7 @@
       call nupress(ncell,rho,unue,unueb,unux) 
 !                                                                       
 !--turbulence contribution to pressure via ML 
-      call testml
+      !call testml
       call turbpress(ncell,rho) 
 !                                                                       
 !--e+/e- capture                                                        
@@ -332,25 +334,22 @@
       subroutine testml
       use torch_ftn
       use iso_fortran_env
+      
       integer :: n           
       type(torch_module) :: torch_mod
-      type(torch_tensor) :: in_tensor, out_tensor   
-
-      real(real32) :: input(224, 224, 3, 10)
-      real(real32), pointer :: output(:, :)
-      real(real32), allocatable :: output_h(:, :)
+      type(torch_tensor) :: in_tensor, out_tensor
+      
+      character*30 mlmodel
+      common /mlmod/ mlmodel          
+      
+      real(kind=4):: input(224, 224, 3, 10)
+      real(kind=4), pointer :: output(:, :)
+      real(kind=4), allocatable :: output_h(:, :)
 
       character(:), allocatable :: filename
-      integer :: arglen, stat
-
-      if (command_argument_count() /= 1) then
-         print *, "Need to pass a single argument: Pytorch model file name"
-         stop
-      end if
-
-      call get_command_argument(number=1, length=arglen)
-      allocate(character(arglen) :: filename)
-      call get_command_argument(number=1, value=filename, status=stat)
+      integer :: stat
+      
+      filename = trim(adjustl(mlmodel))
 
       input = 1.0
       call in_tensor%from_array(input)
@@ -4695,7 +4694,7 @@
       return 
       END                                           
 !                                                                       
-      subroutine readini 
+      subroutine readini
 !*************************************************************          
 !                                                                       
 !     reads initial conditions                                          
@@ -4709,7 +4708,8 @@
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
-      real ycc,yccave 
+      real ycc,yccave
+      character*30 mlmodel
 !                                                                       
       common /cc   / ycc(idim,iqn), yccave(iqn) 
       common /ener1/ dq(idim), dunu(idim) 
@@ -4746,9 +4746,11 @@
       common /ufactor/ ufact,yefact 
       logical ifign 
       common /ign  / ifign(idim) 
-      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
+      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
+      common /mlmod/ mlmodel
 !                                                                       
       character*9 filin,filout 
+
       data pi4/12.56637d0/ 
       gg=13.34 
       tacr=1.d2 
@@ -4760,6 +4762,8 @@
       read(11,10) filin 
       read(11,*)
       read(11,10) filout 
+      read(11,*)
+      read(11,10) mlmodel   
    10 format(A) 
       read(11,*)
       read(11,*) idump 
@@ -5171,7 +5175,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      integer jtrape,jtrapb,jtrapx, ntstep 
+      integer jtrape,jtrapb,jtrapx, ntstep
+      character*30 mlmodel
 !                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
@@ -5232,7 +5237,8 @@
       common /propt/ dtime,tmax 
       common /nsat/ satc,xtime 
       common /nuprint/ nups,nupk,tacr 
-      common /outp/ rout, p1out, p2out 
+      common /outp/ rout, p1out, p2out
+      common /mlmod/ mlmodel
 !                                                                       
       save ifirst 
       data ifirst/.true./ 
