@@ -43,7 +43,8 @@ make project
 ```
 Lastly to run:
 ```shell
-./project/1dmlmix/1dmlmix
+cd project/1dmlmix
+./1dmlmix
 ```
 ---
 ### Make Commands
@@ -59,9 +60,13 @@ Combined data prep and model compilation:
 ```shell
 make
 ```
-Lastly you can prepare examples:
+In addition, you can prepare examples:
 ```shell
 make examples
+```
+Lastly, clean up everything:
+```shell
+make clean
 ```
 
 ## [Notes](https://www.overleaf.com/read/pgsnmxgdjkrq)
