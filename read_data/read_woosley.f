@@ -43,7 +43,8 @@ c      parameter (nkep=1067)
       double precision mcut
       integer max,j,i,izone
 c
-      character*9 filout
+      character*9 filin,filout
+      character setup_par
       character*1 ajunk
 c
 c      print *, 'mass cut'
@@ -52,9 +53,22 @@ c      read *, mcut
       max=0
       maxrad = 8.0e4
       open (42,file='mess2')
-c      open(11,file='s20presn')
-      open(11,file='s15presn')
-c      open(11,file='s25presn')
+c      
+c--read options
+c      
+
+      open(521,file='setup')
+      read(521,*)
+      read(521,522) filin
+      read(521,*)
+      read(521,*)
+      read(521,522) filout      
+      read(521,*)
+      read(521,*)
+      read(521,*) deltam(1)
+  522 format(A)      
+c
+      open(11,file=filin)
       do i=1,22
          read(11,*)ajunk
          print *, ajunk
@@ -99,7 +113,7 @@ c        end if
       end do
       print *, dmtot,rold
       print *, 'initial cell mass?'
-      read(*,*) deltam(1)
+c      read(*,*) deltam(1)
       print *, totalmass, deltam(1)
 c
 c--nucdata is in nse5.f
@@ -292,12 +306,12 @@ c
  102  format(20(1pe9.2))
  103  format(3(1pe16.8))
  115  format(I5,1pe13.4)
-      print *, ncell
-      print *,'What is the output file name?'
-      read(*,99) filout
-   99 format(A9)   
       open (29,file=filout,form='unformatted')
       call wdump
+      print *,'-----------------------------------'
+      print *,'  Number of cells:  ', ncell
+      print *,'  Output file name:         ', filout 
+      print *,'-----------------------------------'
       stop
       end
 c

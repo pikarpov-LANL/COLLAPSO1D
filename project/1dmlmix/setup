@@ -1,0 +1,38 @@
+<Input File>
+Test
+<Output File>    
+TestOut
+<Dump # to read>
+1
+<Initial dt>
+.0001 
+<Max dt>
+1.
+<Artificial Viscocity #1>
+1.0
+<Artificial Viscocity #2>
+.25
+<External Force (not default)>
+1
+<EoS option>
+4
+<If > 1, include core mass>
+2.d0
+<Number of Cells (from Data)>
+1207
+<delp (not default)>
+1.d-5
+<Number of steps per luminosity output>
+1
+<Damping Term>
+0.01
+<Damping zones below this number>
+1
+<Flux limiter option>
+1
+<Capture rate option>
+1
+<Changing the nuclear potential energy (don't touch!)>
+1.0
+<yefact (not used)>
+1.0

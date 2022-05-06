@@ -21,8 +21,8 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-# The Fortran example programs, use the compiled wrapper library
-project(PyTorch-FortranExamples LANGUAGES Fortran)
+# The Fortran project programs, use the compiled wrapper library
+project(PyTorch-FortranProject LANGUAGES Fortran)
 find_package(pytorch_proxy REQUIRED)
 find_package(pytorch_fort_proxy REQUIRED)
 #set(PYTORCH_FORT "/" CACHE PATH "Install prefix of Pytorch fort lib")

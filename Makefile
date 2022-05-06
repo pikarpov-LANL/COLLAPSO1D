@@ -7,16 +7,20 @@ TORCH_CUDA_ARCH_LIST:=7.0
 
 WORKDIR:=$(shell pwd -P)
 INST:=$(WORKDIR)/install
+PROJECT_NAME:=1dmlmix
 PROJECT_DIR:=$(WORKDIR)/project
 EXAMPLES_DIR:=$(WORKDIR)/examples
+DATA_DIR:=$(WORKDIR)/read_data
+DATA_FILE:=$(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup)
 
-.PHONY: all examples clean
+.PHONY: all project examples data clean
 
 all:
 	mkdir -p build/proxy build/fortproxy build/projectproxy
 	make cpp_wrappers
 	make fort_bindings
 	make fort_project
+	make data
 
 cpp_wrappers:	
 	@echo INST $(INST)
@@ -37,8 +41,13 @@ fort_project:
 	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=nvfortran -DCMAKE_INSTALL_PREFIX=$(INST) $(PROJECT_DIR) && \
 	cmake --build . && \
 	make install
-	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do mv $(INST)/bin/$${f%%/} $(PROJECT_DIR)/$${f}; done
-	rm -rf install
+	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(PROJECT_DIR)/$${f}; done
+
+project:
+	mkdir -p build/proxy build/fortproxy build/projectproxy
+	make cpp_wrappers
+	make fort_bindings
+	make fort_project
 
 examples:
 	mkdir -p build/proxy build/fortproxy build/examplesproxy
@@ -48,8 +57,15 @@ examples:
 	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=nvfortran -DCMAKE_INSTALL_PREFIX=$(INST) $(EXAMPLES_DIR) && \
 	cmake --build .  && \
 	make install	
-	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do mv $(INST)/bin/$${f%%/} $(EXAMPLES_DIR)/$${f}; done
-	rm -rf install
+	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(EXAMPLES_DIR)/$${f}; done
+
+data:
+	@echo "=== Using read_data/setup ==="
+	cd read_data && \
+	gfortran read_woosley.f -o a.out && \
+	./a.out
+	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
+	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="
 
 clean:
 	rm -rf build/ install/ CMakeFiles/

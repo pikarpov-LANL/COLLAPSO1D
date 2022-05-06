@@ -4755,18 +4755,58 @@
 !                                                                       
 !--read options                                                         
 !                                                                       
-      open(11,file='inlahyc') 
+      open(11,file='setup') 
+      read(11,*)
       read(11,10) filin 
+      read(11,*)
       read(11,10) filout 
    10 format(A) 
+      read(11,*)
       read(11,*) idump 
-      read(11,*) dtime,tmax 
-      read(11,*) cq,cl 
-      read(11,*) iextf,ieos,dcore 
-      read(11,*) ncell,delp,nups,damp,dcell 
-      read(11,*) iflxlm, icvb, ufact, yefact 
-      print *,'cq,cl',cq,cl 
-      print *,'iextf,ieos',iextf,ieos 
+      read(11,*)
+      read(11,*) dtime
+      read(11,*)
+      read(11,*) tmax 
+      read(11,*)
+      read(11,*) cq
+      read(11,*)
+      read(11,*) cl 
+      read(11,*)
+      read(11,*) iextf
+      read(11,*)
+      read(11,*) ieos
+      read(11,*)
+      read(11,*) dcore 
+      read(11,*)
+      read(11,*) ncell
+      read(11,*)
+      read(11,*) delp
+      read(11,*)
+      read(11,*) nups
+      read(11,*)
+      read(11,*) damp
+      read(11,*)
+      read(11,*) dcell 
+      read(11,*)
+      read(11,*) iflxlm
+      read(11,*)
+      read(11,*) icvb
+      read(11,*)
+      read(11,*) ufact
+      read(11,*)
+      read(11,*) yefact 
+      !print *,'cq,cl',cq,cl 
+      !print *,'iextf,ieos',iextf,ieos 
+      !print*,'======================='
+      !print*, filin
+      !print*, filout
+      !print*, idump
+      !print*, dtime,tmax
+      !print*, cq,cl
+      !print*, iextf,ieos,dcore
+      !print*, ncell,delp,nups,damp,dcell
+      !print*, iflxlm, icvb, ufact, yefact
+      !print*,'======================='
 !                                                                       
 !--open binary file containing initial conditions                       
 !                                                                       
