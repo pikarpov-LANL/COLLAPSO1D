@@ -1,34 +1,32 @@
+# 1D Core-Collapse Supernovae Code (Legacy)
 
-General:
+This is a 1D lagrangian code to explore CCSN modeling. For progenitors, it takes KEPLER generated [data](https://2sn.org/stellarevolution/) of Alex Heger & Stan Woosley.
 
-netwinv4, *.atb, #.inc are all eos/nse files
+Turbulence is treated through mixing length theory (MLT), BHR, and Machine Learning (ML) based models.
 
-Note that there are some warnings in the code.  Most due to one of the old EOSs used that Nadyozhin and Blinnikov developed.
+## Quick Start
+First we need to compile a script to read the stellar progenitor data. In our case, we are using Stan Woosley's datasets:
+```shell
+cd ../read_data
+gfortran read_woosley.f -o a.out
+```
+when running `a.out`, it will ask for the innermost zone mass and then evolves the masses based on prescriptions that worked well a long time ago. Zone mass should be <1. Lastly, it will ask for the final binary file name that will be used as an input for the simulation. The name of the input and output files should not contain <ins>underscores</ins>.
+```shell
+./a.out
+mv InputName ../legacy/1dcollapse/
+```
 
-Setup Code
-readalexnew.f 
-compile gfortran readalexnew.f -o a.out
-When it runs, it asks for the innermost zone mass and then evolves the masses based on prescriptions that worked well a long time ago.  
+Next we need to compile the code itself, including the EOS:
+```shell
+cd legacy/1dcollapse
+gfortran -O 1dmlmix.f90 ocean.f90 nse4c.f90 sleos.f90 -o model
+```
 
-run15f1:
-Core-Collapse Code:
-1dburn.f is the main core-collapse code
-ocean.f is the low-density eos
-nse4c.f is the nse code
-sleos.f is the Swesty-Lattimer EOS
+Lastly, update `inlahyc` input file to read `InputName` and run the model:
+```shell
+./model
+```
 
-to compile:
-gfortran -O 1dburn.f ocean.f nse4c.f sleos.f -o goodname
+## [Notes](https://www.overleaf.com/read/pgsnmxgdjkrq)
 
-It reads inlahyc that has the 
-input file
-output file
-dump number to read the input file
-initial timestep and total timestep
-artificial viscosity values
-options: external force (not used in this code), equation of state option, if >1, include core mass
-number of zones, delp (not used in current version), nups (number of steps per luminosity output), damping term, damping zones below this number
-iflxlm (flux limiter option), capture rate option, changing the nuclear potential energy (why?), yefact (not used)
-
-readoutput codes read the binary output and put into ascii
-
+Notes on ML subgrid turbulence model implementation within this code can be found on [Overleaf](https://www.overleaf.com/read/pgsnmxgdjkrq).
