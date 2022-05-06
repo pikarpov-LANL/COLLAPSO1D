@@ -1,7 +1,7 @@
 <Input File>
-Test
+Data
 <Output File>    
-TestOut
+DataOut
 <Input PyTorch Model>
 traced_model.pt
 <Dump # to read>

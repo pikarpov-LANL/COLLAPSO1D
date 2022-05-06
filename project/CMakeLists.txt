@@ -54,5 +54,4 @@ set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} ${dialect} ${bounds}
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${dialect}")
 
 SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-# add_subdirectory(testnet/)
 add_subdirectory(1dmlmix/)
