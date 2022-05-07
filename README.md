@@ -1,5 +1,10 @@
 # 1D Core-Collapse Supernovae Code
 
+1. [Dependencies](README.md#dependencies)
+2. [Quick Start](README.md#quick-start)
+3. [Setup Details](README.md#setup-details)
+4. [Make Commands](README.md#make-commands)
+
 This is a 1D lagrangian code to explore CCSN modeling. For progenitors, it takes KEPLER generated [data](https://2sn.org/stellarevolution/) of Alex Heger & Stan Woosley.
 
 Turbulence is treated through mixing length theory (MLT) and Machine Learning (ML) based models.
