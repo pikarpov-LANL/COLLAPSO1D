@@ -32,21 +32,37 @@
       character*5 dumpn 
       character(:), allocatable :: outname
       character*30 infile 
-      integer iskip 
+      integer iskip, ndump
 !                                                                       
       double precision dm,press,enue,enueb,ks,ka,ksb,kab,               &
      &     ksx                                                          
-!    
-      open(11,file='setup_readout') 
-      read(11,*)
-      read(11,10) infile
-      read(11,*)
-      read(11,*)
-      read(11,*) ndump 
-      read(11,*)
-      read(11,*)
-      read(11,10) basename   
+!   
+       if (command_argument_count() == 2) then
+           print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
+           call EXIT(0)
+       else if (command_argument_count() == 1) then
+           print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
+           call EXIT(0)
+       else if (command_argument_count() == 3) then
+           call get_command_argument(number=1, value=infile)
+           call get_command_argument(number=2, value=basename)
+           call get_command_argument(number=3, value=dumpn)
+           read(dumpn,*)  ndump
+       else
+          print*,' ==============================================='             
+          print*, '  Reading from setup_readout'
+          print*,' ==============================================='                       
+          open(11,file='setup_readout') 
+          read(11,*)
+          read(11,10) infile
+          read(11,*)
+          read(11,*)
+          read(11,10) basename   
+          read(11,*)
+          read(11,*)
+          read(11,*) ndump 
    10 format(A) 
+       endif
    
    
       !print*, "What's the data file name?"
@@ -290,6 +306,6 @@
                                                                         
   107 format(I3,24(1pe13.5)) 
       print*,' ==============================================='       
-      print*, '  Converted ',trim(adjustl(infile)),' to ',outname      
+      print*, '  Converted ',trim(adjustl(infile)),' to ',trim(adjustl(basename))
 !                                                                       
       END                                           
