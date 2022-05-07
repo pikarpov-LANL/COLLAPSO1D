@@ -76,10 +76,13 @@ cd project/1dmlmix
 ### Setup Conversion from Binary to Readable Output
 The setup can be done either by editing `setup_readout` or by cmd arguments. In the first case:
 ```shell
-vi project/1dmlmix/setup_readout
+cd project/1dmlmix
+vi setup_readout
+./readout
 ```
 or you can provide the same 3 arguemnts, (Input, Output, #Dumps), as arguments to the `readout` executable:
 ```shell
+cd project/1dmlmix
 ./readout Input Output ndumps
 ```
 
