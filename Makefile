@@ -22,6 +22,7 @@ all:
 	make fort_bindings
 	make fort_project
 	make data
+	make readout
 
 cpp_wrappers:	
 	@echo INST $(INST)
@@ -67,6 +68,10 @@ data:
 	./a.out
 	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
 	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="
+
+readout:
+	cd ${PROJECT_DIR}/${PROJECT_NAME} && \
+        gfortran readout.f90 -o readout
 
 clean:
 	rm -rf build/ install/ CMakeFiles/

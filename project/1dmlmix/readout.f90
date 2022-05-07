@@ -27,32 +27,42 @@
       dimension etanue(idim),etanueb(idim),etanux(idim) 
       dimension tempnue(idim), tempnueb(idim), tempnux(idim) 
       logical te(idim), teb(idim), tx(idim) 
-      character*1 sample,again 
-      character*9 output,basename 
+      character*1 sample,again
+      character*30 output,basename 
       character*5 dumpn 
-      character*3 outname1 
-      character*4 outname2 
-      character*5 outname3 
-      character*6 outname4 
-      character*6 infile 
+      character(:), allocatable :: outname
+      character*30 infile 
       integer iskip 
 !                                                                       
       double precision dm,press,enue,enueb,ks,ka,ksb,kab,               &
      &     ksx                                                          
-!                                                                       
-      read *, infile 
+!    
+      open(11,file='setup_readout') 
+      read(11,*)
+      read(11,10) infile
+      read(11,*)
+      read(11,*)
+      read(11,*) ndump 
+      read(11,*)
+      read(11,*)
+      read(11,10) basename   
+   10 format(A) 
+   
+   
+      !print*, "What's the data file name?"
+      !read *, infile 
       open(42,file=infile,form='unformatted') 
 !                                                                       
       pi43=3.14159265359*4.0/3.0 
       idump=0 
    97 continue 
-      print *,'number of dumps?' 
-      read *, ndump 
+      !print *,'number of dumps?' 
+      !read *, ndump 
 !                                                                       
 !--read data                                                            
 !                                                                       
-      print *, 'output basename' 
-      read(*,fmt='(a)') basename 
+      !print *, 'output basename' 
+      !read(*,fmt='(a)') basename 
       ibasenamelen = index(basename,' ')-1 
                                                                         
       idump=0 
@@ -69,8 +79,9 @@
      &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),               &
      &        (vsound(i),i=1,nc)                                        
 !     $     ((ycc(i,j),j=1,19),i=1,nc)                                  
-!                                                                       
-         print *, rho(1),ftrape,ftrapb,ftrapx 
+!        
+         print*, 'rho(1)  ftrape  ftrapb  ftrapx'
+         print*, rho(1),ftrape,ftrapb,ftrapx 
          if (k.lt.40) then 
             imp=1 
 !         else                                                          
@@ -79,9 +90,9 @@
          if (mod(k,imp).eq.0) then 
 !            k1=36+int(k/imp)+1                                         
             k1=int(k/imp)+1 
-            print *, k1 
+            print *, 'k1 ',k1 
             rhomax=0. 
-            print *, 'xmcore',xmcore,t 
+            print *, 'xmcore,t',xmcore,t 
             encm(0)=xmcore 
 !xmcore-0.4107                                                          
             dke=0. 
@@ -93,7 +104,7 @@
                   dke=dke+0.5*deltam(i)*(v(i)-vesc)**2 
                end if 
             end do 
-            print *, dke 
+            print *,'dke ', dke 
             vmin=0. 
             do i=1,nc 
                if (v(i).lt.vmin) then 
@@ -103,29 +114,24 @@
                rhomax=max(rho(i),rhomax) 
             end do 
 !            write(72,103) t,vmin,xshock,rho(1),rhomax                  
-                                                                        
             if (k1.le.10) then 
                write(dumpn,100) k1-1 
   100          format('.',I1.1) 
-               outname1=basename(1:ibasenamelen)//dumpn//char(0) 
-               open(69,file=outname1) 
             else if (k1.le.100) then 
                write(dumpn,101) k1-1 
   101          format('.',I2.2) 
-               outname2=basename(1:ibasenamelen)//dumpn//char(0) 
-               open(69,file=outname2) 
             else if (k1.le.1000) then 
                write(dumpn,102) k1-1 
   102          format('.',I3.3) 
-               outname3=basename(1:ibasenamelen)//dumpn//char(0) 
-               open(69,file=outname3) 
             else 
                write(dumpn,104) k1-1 
   104          format('.',I4.4) 
-               outname4=basename(1:ibasenamelen)//dumpn//char(0) 
-               open(69,file=outname4) 
             end if 
-                                                                        
+            
+            allocate(character(LEN(TRIM(basename))+LEN(TRIM(dumpn))) :: outname)
+            outname=TRIM(basename(1:ibasenamelen)//dumpn)
+            open(69,file=outname) 
+            
             tautot=0. 
             dk=0. 
             dene=0. 
@@ -283,5 +289,7 @@
   106 format(4(1pe14.7)) 
                                                                         
   107 format(I3,24(1pe13.5)) 
+      print*,' ==============================================='       
+      print*, '  Converted ',trim(adjustl(infile)),' to ',outname      
 !                                                                       
       END                                           
