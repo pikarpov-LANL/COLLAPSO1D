@@ -1,6 +1,7 @@
 CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.7/site-packages/torch/share/cmake
 CONFIG:=Debug
 OPENACC:=0
+COMPILER:=nvfortran
 
 # List CUDA compute capabilities
 TORCH_CUDA_ARCH_LIST:=7.0
@@ -32,13 +33,13 @@ cpp_wrappers:
 
 fort_bindings:	
 	cd build/fortproxy && \
-	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=nvfortran -DCMAKE_INSTALL_PREFIX=$(INST) -DCMAKE_PREFIX_PATH=$(INST)/lib $(WORKDIR)/src/f90_bindings/ && \
+	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=${COMPILER} -DCMAKE_INSTALL_PREFIX=$(INST) -DCMAKE_PREFIX_PATH=$(INST)/lib $(WORKDIR)/src/f90_bindings/ && \
 	cmake --build . && \
 	make install
 
 fort_project:	
 	cd build/projectproxy && \
-	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=nvfortran -DCMAKE_INSTALL_PREFIX=$(INST) $(PROJECT_DIR) && \
+	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=${COMPILER} -DCMAKE_INSTALL_PREFIX=$(INST) $(PROJECT_DIR) && \
 	cmake --build . && \
 	make install
 	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(PROJECT_DIR)/$${f}; done
@@ -54,7 +55,7 @@ examples:
 	make cpp_wrappers
 	make fort_bindings
 	cd build/examplesproxy && \
-	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=nvfortran -DCMAKE_INSTALL_PREFIX=$(INST) $(EXAMPLES_DIR) && \
+	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=${COMPILER} -DCMAKE_INSTALL_PREFIX=$(INST) $(EXAMPLES_DIR) && \
 	cmake --build .  && \
 	make install	
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(EXAMPLES_DIR)/$${f}; done
