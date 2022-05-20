@@ -72,6 +72,11 @@ Lastly to run:
 cd project/1dmlmix
 ./1dmlmix
 ```
+to process and move the data to the project folder:
+```shell
+make data
+```
+Take note of the `Number of cells` (depend on the initial cell mass), since that determines the grid size (<Number of Cells (from Data)>) parameter for the main simulation setup.
 
 ### Setup Conversion from Binary to Readable Output
 The setup can be done either by editing `setup_readout` or by cmd arguments. In the first case:
