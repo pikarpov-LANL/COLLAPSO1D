@@ -63,7 +63,7 @@
 !                                                                       
 !--main loop to save the dump file                                      
 !                                                                       
-!--nstep is a counter for dump fiels                                    
+!--nstep is a counter for dump files                                    
 !--ntstep is the number of timesteps                                    
       nstep = 0 
       ntstep = 1 
@@ -300,7 +300,7 @@
 !                                                                       
 !--compute turbulence parameters                                        
 !                                                                       
-      call turbulence(ncell,x,f,q,v,rho,fmix) 
+!      call turbulence(ncell,x,f,q,v,rho,fmix) 
 !                                                                       
 !--compute q values                                                     
 !                                                                       
@@ -464,6 +464,7 @@
       common /carac/ deltam(idim), abar(idim) 
 !                                                                       
       data pi4/12.566371/ 
+      integer :: i
 !                                                                       
 !--update density                                                       
 !                                                                       
@@ -472,7 +473,8 @@
          k=kp05 - 1 
          rho(kp05)=3.d0*deltam(kp05)/                                   &
      &              (pi4*(x(k1)*x(k1)*x(k1)-x(k)*x(k)*x(k)))            
-      enddo 
+      enddo
+      
       return 
       END                                           
 !                                                                       
@@ -1143,14 +1145,8 @@
 !         deltamk=0.5d0*(deltam(km05)+deltam(kp05))                     
 !                                                                       
 !--pressure gradients                                                   
-!                                                                       
-         if (rho(km05+1).gt.0.1.and.km05.lt.1.and.                      &
-     &        1.5d0*rho(km05)*xk3.lt.rho(kp05)*xkp3) then               
-            pressp=(pr(kp05)+prnu(kp05)) 
-            print *, 'increased force' 
-         else 
-            pressp = pr(kp05) + prnu(kp05) 
-         end if 
+!                  
+         pressp = pr(kp05) + prnu(kp05)          
          pressm = pr(km05) + prnu(km05) 
          gradp=ak*(pressp - pressm) 
          gradpt=ak*(rho(kp05)*vturb2(kp05)-                             &
@@ -3369,7 +3365,7 @@
       common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /etnus/ etanue(idim),etanueb(idim),etanux(idim) 
       common /eosnu/ prnu(idim1) 
-      common /turb/ prturb(idim1) 
+      !common /ml/ prturb(idim1) 
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
 !                                                                       
       pturb = 1 
@@ -4980,9 +4976,9 @@
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),            &
-     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),               &
-     &     (vturb2(i),i=1,nc),                                          &
-     &     ((ycc(i,j),j=1,nqn),i=1,nc)                                  
+     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc)               
+!     &     (vturb2(i),i=1,nc),                                          &
+!     &     ((ycc(i,j),j=1,nqn),i=1,nc)                                  
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
 !                                                                       
       return 
@@ -5175,8 +5171,10 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      integer jtrape,jtrapb,jtrapx, ntstep
-      character*30 mlmodel
+      integer jtrape,jtrapb,jtrapx, ntstep, ind
+      character*30 mlmodel, rho_file, x_file
+      character*10 frmtx
+      character*11 frmtrho
 !                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
@@ -5633,7 +5631,8 @@
      &      '          > ----------------------------------'            
             write(*,500)'[    time/tmax, dt     ]',                     &
      &           time,'/',tmax,steps(1)                                 
-  500       format(A,1p,E10.3,A,E9.3,E15.3) 
+  500       format(A,1p,E10.3,A,E9.3,E15.3)
+
             if (mod(nupk,nups).eq.0) then 
                lu=72 
                open(lu,file='1dtmp',form='unformatted') 

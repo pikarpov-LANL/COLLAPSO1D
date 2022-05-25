@@ -1,7 +1,7 @@
       program readoutput 
 !********************************************************************   
 !                                                                   *   
-!  This program reads the unformatted file and pritns readable      *   
+!  This program reads the unformatted file and prints readable      *   
 !  numbers.                                                         *   
 !                                                                   *   
 !********************************************************************   
@@ -37,10 +37,10 @@
       double precision dm,press,enue,enueb,ks,ka,ksb,kab,               &
      &     ksx                                                          
 !   
-       if (command_argument_count() == 2) then
+       if (command_argument_count() == 1) then
            print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
            call EXIT(0)
-       else if (command_argument_count() == 1) then
+       else if (command_argument_count() == 2) then
            print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
            call EXIT(0)
        else if (command_argument_count() == 3) then
@@ -92,9 +92,9 @@
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),               &
-     &        (vsound(i),i=1,nc)                                        
-!     $     ((ycc(i,j),j=1,19),i=1,nc)                                  
+     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc)               
+!     &        (vsound(i),i=1,nc)                                        
+!     &     ((ycc(i,j),j=1,19),i=1,nc)                                  
 !        
          print*, 'rho(1)  ftrape  ftrapb  ftrapx'
          print*, rho(1),ftrape,ftrapb,ftrapx 
@@ -165,7 +165,9 @@
             sumzn=0. 
             sumfe=0. 
             iskip=0 
+            write(69,*) 'Time'
             write(69,105)10.d0*t 
+            write(69,*)'Cell M_enclosed Position Rho V Ye Pressure'            
             do i=1,nc 
 !               write(69,103)i,encm(i),x(i),rho(i),v(i),ye(i),          
 !     $           vsound(i)                                             
@@ -230,7 +232,7 @@
                   end if 
 !                  if (i.gt.700) then                                   
 !                     if (i.eq.701) write(69,*) t*10.                   
-!                  if (encm(i).gt.1.512.and.encm(i).lt.11.0) then       
+!                  if (encm(i).gt.1.512.and.encm(i).lt.11.0) then     
                   if (encm(i).gt.0..and.encm(i).lt.11.0) then 
                      write(69,103)i,encm(i),1.d9*x(i),2.d6*rho(i),      &
      &                    1.d8*v(i),ye(i),1.d16*pr(i),                  &
@@ -299,6 +301,7 @@
      &           sumar,sumca,sumti,sumcr,sumfe,sumni,sumzn              
          end if 
          print *, 'energy',dk/50.,dene/50. 
+         deallocate(outname)
       end do 
   103 format(I4,1pe12.4,1pe14.6,22(1pe12.4)) 
   105 format(1pe12.4,1pe14.6,7(1pe12.4)) 
