@@ -100,11 +100,15 @@
       call printout(lu) 
       stop 
       END                                           
+!
+! ============================ Subroutines ============================
+!      
       subroutine hydro(time,ncell,x,v,                                  &
-     &           u,rho,ye,f,du,dye,q,fmix,                              &
+     &           u,rho,ye,f,du,dye,q,                                   &
+     !fmix,                              &
      &           ynue,ynueb,ynux,dynue,dynueb,dynux,                    &
      &           unue,unueb,unux,dunue,dunueb,dunux,                    &
-     &           print_nuloss)                                          
+     &           print_nuloss,ntstep)                                          
 !                                                                       
 !****************************************************************       
 !                                                               *       
@@ -187,7 +191,11 @@
       common /mlmod/ mlmodel
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
-!                                                                       
+!  
+!--calculate shock radius
+!
+      call shock_position(ncell,x,v,print_nuloss,ntstep)
+!                                   
 !--compute density                                                      
 ! ---------------------------------------------------------             
 !                                                                       
@@ -241,7 +249,7 @@
       call nuinit(ncell,rho,x,ye,dye,                                   &
      &            ynue,ynueb,ynux,dynue,dynueb,dynux,                   &
      &            unue,unueb,unux,dunue,dunueb,dunux)                   
-!                                                                       
+!                                                                                                           
 !-- nu contribution to pressure                                         
 !                                                                       
       call nupress(ncell,rho,unue,unueb,unux) 
@@ -300,7 +308,7 @@
 !                                                                       
 !--compute turbulence parameters                                        
 !                                                                       
-!      call turbulence(ncell,x,f,q,v,rho,fmix) 
+      !call turbulence(ncell,x,f,q,v,rho,fmix) 
 !                                                                       
 !--compute q values                                                     
 !                                                                       
@@ -329,41 +337,49 @@
 !                                                                       
    99 return 
       END                                           
-!              
+!      
+!
+      subroutine shock_position(ncell,x,v,print_nuloss,ntstep)
+!***********************************************************            
+!                                                          *            
+!  This subroutine identifies the shock position           *            
+!                                                          *            
+!***********************************************************            
+!            
+      implicit double precision (a-h,o-z) 
 
-      subroutine testml
-      use torch_ftn
-      use iso_fortran_env
-      
-      integer :: n           
-      type(torch_module) :: torch_mod
-      type(torch_tensor) :: in_tensor, out_tensor
-      
-      character*30 mlmodel
-      common /mlmod/ mlmodel          
-      
-      real(kind=4):: input(224, 224, 3, 10)
-      real(kind=4), pointer :: output(:, :)
-      real(kind=4), allocatable :: output_h(:, :)
+      dimension x(1:ncell),v(1:ncell) 
+      real :: initial_v, old_max_v, shock_x
+      real, dimension(ncell) :: v_old
+      integer :: i,j,shock_ind, ind
+      logical print_nuloss
+!                              
+      initial_v = v(size(v))
+      do i=size(v), 1, -1
+          if (v(i).le.(initial_v-(initial_v-minval(v))*0.1)) then
+              old_max_v = v(i)
+              do j=i-1,0,-1
+                  if (v(j) .le. old_max_v) then
+                      old_max_v = v(j)
+                  else
+                      shock_x = x(j)
+                      shock_ind = j
+                      EXIT
+                  end if 
+              end do
+              EXIT
+          end if
+      end do
 
-      character(:), allocatable :: filename
-      integer :: stat
+511   format(A,1p,I4,A,E10.3) 
+      if (print_nuloss .eqv. .true.) then      
+          write(*,511)'[shock position (i, cm)]', shock_ind,               &
+          '                     ', 1.d9*shock_x          
+      end if 
       
-      filename = trim(adjustl(mlmodel))
-
-      input = 1.0
-      call in_tensor%from_array(input)
-      call torch_mod%load(filename)
-      call torch_mod%forward(in_tensor, out_tensor)
-      call out_tensor%to_array(output)
-      output_h = output
-
-      print *, output_h(1:5, 1)
-      print*, '--->>> Hi from ML'      
-      call EXIT(0)
+      return
       end
-
-
+!
       subroutine artvis(ncell,x,rho,v,q) 
 !***********************************************************            
 !                                                          *            
@@ -505,7 +521,7 @@
       common /units/ umass, udist, udens, utime, uergg, uergcc 
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
       common /carac/ deltam(idim), abar(idim) 
-      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
+      !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       double precision dupp 
 !                                                                       
       data pi4/12.566371/ 
@@ -518,11 +534,13 @@
       do kp05=1,ncell 
          k=kp05-1 
          k1=kp05 
-         vturbk=dsqrt(vturb2(kp05)) 
+         !vturbk=dsqrt(vturb2(kp05)) 
          akp1=pi4*x(k1)*x(k1) 
          akp=pi4*x(k)*x(k) 
-         pdv=(pr(kp05)+rho(kp05)*vturb2(kp05))*                         &
-     &        (akp1*v(k1)-akp*v(k))/deltam(kp05)                        
+         !pdv=(pr(kp05)+rho(kp05)*vturb2(kp05))*                         &
+     !&        (akp1*v(k1)-akp*v(k))/deltam(kp05)                        
+         pdv=pr(kp05)*(akp1*v(k1)-akp*v(k))/deltam(kp05)
+         
 !                                                                       
          dupp=0.0 
          if (temp(kp05).lt.6.and.rho(kp05).lt.1000.) then 
@@ -531,8 +549,9 @@
          if (ifleos(kp05).ne.3) then 
 !-- we subtract the energy added to the neutrino field                  
 ! no shock heating                                                      
-            du(kp05)=-pdv+0.5*dq(kp05)-dunu(kp05)-dupp+                 &
-     &           rho(kp05)*vturbk**3/dmix(kp05)                         
+            !du(kp05)=-pdv+0.5*dq(kp05)-dunu(kp05)-dupp+                 &
+     !&           rho(kp05)*vturbk**3/dmix(kp05)                         
+            du(kp05)=-pdv+0.5*dq(kp05)-dunu(kp05)-dupp     
             if (rho(kp05+1).gt.0.1.and.kp05.lt.1) then 
                xp05=.5d0*(x(k)+x(k1)) 
                xp15=.5d0*(x(k1)+x(k1+1)) 
@@ -1124,7 +1143,7 @@
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /carac/ deltam(idim), abar(idim) 
       common /damping/ damp, dcell 
-      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
+      !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
       data pi4/12.56637d0/ 
 !                                                                       
@@ -1149,8 +1168,8 @@
          pressp = pr(kp05) + prnu(kp05)          
          pressm = pr(km05) + prnu(km05) 
          gradp=ak*(pressp - pressm) 
-         gradpt=ak*(rho(kp05)*vturb2(kp05)-                             &
-     &        rho(km05)*vturb2(km05))                                   
+         !gradpt=ak*(rho(kp05)*vturb2(kp05)-                             &
+     !&        rho(km05)*vturb2(km05))                                   
 !                                                                       
 !--artificial viscosity pressure                                        
 !                                                                       
@@ -1189,7 +1208,7 @@
       dimension gpot(idim),deltam(idim) 
       dimension xmi(0:idim) 
 !                                                                       
-      common /fturb/ geff(idim), fmix1(idim), fmix2(idim) 
+      !common /fturb/ geff(idim), fmix1(idim), fmix2(idim) 
       common /core / dcore, xmcore 
       common /rshift/ gshift(idim) 
       common /const/ gg, clight, arad, bigr, xsecnn, xsecne 
@@ -1209,7 +1228,7 @@
          xmi(k)=xmi(k-1)+deltam(k) 
          r2=x(k)**2 
          f(k)=-gg*xmi(k)/r2 
-         geff(k)=-gg*xmi(k)/r2 
+!         geff(k)=-gg*xmi(k)/r2 
       enddo 
 !                                                                       
 !--calculate gravitational potential                                    
@@ -4742,7 +4761,7 @@
       common /ufactor/ ufact,yefact 
       logical ifign 
       common /ign  / ifign(idim) 
-      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
+      !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
       common /mlmod/ mlmodel
 !                                                                       
       character*9 filin,filout 
@@ -4833,7 +4852,7 @@
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
      &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
-     &     (vturb2(i),i=1,nc),                                          &
+     !&     (vturb2(i),i=1,nc),                                          &
      &     ((ycc(i,j),j=1,nqn),i=1,nc)                                  
 !                                                                       
       time = t 
@@ -4937,7 +4956,7 @@
       common /jtrap/ jtrape,jtrapb,jtrapx 
       common /carac/ deltam(idim), abar(idim) 
       common /ener2/ tkin, tterm 
-      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
+      !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
       dimension uint(idim), s(idim) 
       equivalence(trapnue,te) 
@@ -5220,9 +5239,9 @@
      &               dumunue(idim),dumunueb(idim),dumunux(idim)         
       common /f1   / f1v(0:idim),f1u(idim),f1ye(idim) 
       common /f2   / f2v(0:idim),f2u(idim),f2ye(idim) 
-      common /fturb/ geff(idim), fmix1(idim), fmix2(idim) 
-      common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
-      common /dturb/ dumvt2(idim) 
+      !common /fturb/ geff(idim), fmix1(idim), fmix2(idim) 
+      !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
+      !common /dturb/ dumvt2(idim) 
       common /f1nu / f1ynue(idim),f1ynueb(idim),f1ynux(idim),           &
      &               f1unue(idim),f1unueb(idim),f1unux(idim)            
       common /f2nu / f2ynue(idim),f2ynueb(idim),f2ynux(idim),           &
@@ -5274,10 +5293,11 @@
          print *, 'calling hydro first' 
          print_nuloss=.false. 
          call hydro(time,ncell,x,v,                                     &
-     &           u,rho,ye,f1v,f1u,f1ye,q,fmix1,                         &
+     &           u,rho,ye,f1v,f1u,f1ye,q,                               &
+     !fmix1,                         &
      &           ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,                 &
      &           unue,unueb,unux,f1unue,f1unueb,f1unux,                 &
-     &           print_nuloss)                                          
+     &           print_nuloss,ntstep)                                          
       end if 
 !                                                                       
 !--set step counter                                                     
@@ -5317,7 +5337,7 @@
             dumunue(i)=unue(i) + dtf11*f1unue(i) 
             dumunueb(i)=unueb(i) + dtf11*f1unueb(i) 
             dumunux(i)=unux(i) + dtf11*f1unux(i) 
-            dumvt2(i)=vturb2(i) + dtf11*fmix1(i) 
+            !dumvt2(i)=vturb2(i) + dtf11*fmix1(i) 
             reset(i)=.false. 
             if (dumye(i).lt.0.02) then 
                dumye(i)=.02 
@@ -5327,12 +5347,15 @@
 !--get forces at half the time step, using predictions                  
 !                                                                       
          thalf=time + f11*steps(1) 
-         print_nuloss=.true. 
+         print_nuloss=.false. 
+         !call write_data(ntstep*2,ncell,x,v)
+
          call hydro(thalf,ncell,dumx,dumv,                              &
-     &         dumu,rho,dumye,f2v,f2u,f2ye,q,fmix2,                     &
+     &         dumu,rho,dumye,f2v,f2u,f2ye,q,                           &
+     !fmix2,                     &
      &         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
      &         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
-     &         print_nuloss)                                            
+     &         print_nuloss,ntstep)          
 !                                                                       
 !--advance all the gas particles                                        
 !                                                                       
@@ -5351,7 +5374,7 @@
             dumunue(i)=unue(i) + dtf21*f1unue(i) + dtf22*f2unue(i) 
             dumunueb(i)=unueb(i) + dtf21*f1unueb(i) + dtf22*f2unueb(i) 
             dumunux(i)=unux(i) + dtf21*f1unux(i) + dtf22*f2unux(i) 
-            dumvt2(i)=vturb2(i) + dtf21*fmix1(i) + dtf22*fmix2(i) 
+            !dumvt2(i)=vturb2(i) + dtf21*fmix1(i) + dtf22*fmix2(i) 
             if (dumye(i).lt.0.02) then 
                dumye(i)=.02 
             end if 
@@ -5363,12 +5386,14 @@
 !--get forces at end of time step                                       
 !                                                                       
          tfull=time + steps(1) 
-         print_nuloss=.false. 
+         print_nuloss=.true. 
+         !call write_data(ntstep*2+1,ncell,x,v)         
          call hydro(tfull,ncell,dumx,dumv,                              &
-     &         dumu,rho,dumye,f2v,f2u,f2ye,q,fmix2,                     &
+     &         dumu,rho,dumye,f2v,f2u,f2ye,q,                           &
+     !fmix2,                     &
      &         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
      &         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
-     &         print_nuloss)                                            
+     &         print_nuloss,ntstep)    
 !                                                                       
 !--estimate integration error and set time step. If reduction           
 !  the maximum time step is set to dtime.                               
@@ -5520,7 +5545,7 @@
             unue(i)=dumunue(i) 
             unueb(i)=dumunueb(i) 
             unux(i)=dumunux(i) 
-            vturb2(i)=dumvt2(i) 
+            !vturb2(i)=dumvt2(i) 
             f1unue(i)=f2unue(i) 
             f1unueb(i)=f2unueb(i) 
             f1unux(i)=f2unux(i) 
@@ -5549,7 +5574,8 @@
                   xpold(i)=xp(i) 
                end do 
                call hydro(tfull,ncell,x,v,                              &
-     &              u,rho,ye,f1v,f1u,f1ye,q,fmix1,                      &
+     &              u,rho,ye,f1v,f1u,f1ye,q,                            &
+     !fmix1,                      &
      &              ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,              &
      &              unue,unueb,unux,f1unue,f1unueb,f1unux,              &
      &              print_nuloss)                                       
@@ -5620,7 +5646,7 @@
 !            write(99,120)time,x(160),x(170)                            
          end if 
 !                                                                       
-  120    format((1pe12.5),6(1x,1pe10.2)) 
+  120    format((1pe12.5),6(1x,1pe10.2))
 !                                                                       
 !--start new time step                                                  
 !                                                                       
@@ -5632,7 +5658,7 @@
             write(*,500)'[    time/tmax, dt     ]',                     &
      &           time,'/',tmax,steps(1)                                 
   500       format(A,1p,E10.3,A,E9.3,E15.3)
-
+!
             if (mod(nupk,nups).eq.0) then 
                lu=72 
                open(lu,file='1dtmp',form='unformatted') 
@@ -5645,7 +5671,51 @@
          return 
       end if 
 !                                                                       
-      END                                           
+      END  
+      
+      subroutine write_data(ntstep, ncell,x, v)
+       
+      implicit double precision (a-h,o-z) 
+
+      dimension x(1:ncell),v(1:ncell) 
+      integer :: i,j,shock_ind, ind
+      character*30 :: rho_file, x_file
+      
+      
+      if (ntstep<10) then          
+          write (rho_file, "(A9,I1,A4)") "tmpdir/v_", ntstep, ".txt"
+          write (x_file, "(A9,I1,A4)") "tmpdir/x_", ntstep, ".txt"         
+      else if (ntstep<100) then
+          write (rho_file, "(A9,I2,A4)") "tmpdir/v_", ntstep, ".txt"
+          write (x_file, "(A9,I2,A4)") "tmpdir/x_", ntstep, ".txt"
+      else if (ntstep<1000) then
+          write (rho_file, "(A9,I3,A4)") "tmpdir/v_", ntstep, ".txt"
+          write (x_file, "(A9,I3,A4)") "tmpdir/x_", ntstep, ".txt"
+      else if (ntstep<10000) then
+          write (rho_file, "(A9,I4,A4)") "tmpdir/v_", ntstep, ".txt"
+          write (x_file, "(A9,I4,A4)") "tmpdir/x_", ntstep, ".txt"
+      else
+          write (rho_file, "(A9,I5,A4)") "tmpdir/v_", ntstep, ".txt"
+          write (x_file, "(A9,I5,A4)") "tmpdir/x_", ntstep, ".txt"
+      end if 
+
+      if (MOD(ntstep, 1).eq.0) then
+          open(unit=995, file=trim(rho_file), status='replace')
+          do ind=1,ncell
+            write(995,*), v(ind)
+          end do
+          close(unit=995)
+
+          open(unit=996, file=trim(x_file), status='replace')
+          do ind=1,ncell
+            write(996,*), x(ind)
+          end do
+          close(unit=996)
+          !print*, '=== end rho ==='
+          !call EXIT(0)
+      end if
+      end
+      
       subroutine unit 
 !************************************************************           
 !                                                           *           
