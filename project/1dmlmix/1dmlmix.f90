@@ -337,7 +337,39 @@
 !                                                                       
    99 return 
       END                                           
-!      
+!
+!
+      subroutine testml
+      use torch_ftn
+      use iso_fortran_env
+      
+      integer :: n           
+      type(torch_module) :: torch_mod
+      type(torch_tensor) :: in_tensor, out_tensor
+      
+      character*30 mlmodel
+      common /mlmod/ mlmodel          
+      
+      real(kind=4):: input(224, 224, 3, 10)
+      real(kind=4), pointer :: output(:, :)
+      real(kind=4), allocatable :: output_h(:, :)
+
+      character(:), allocatable :: filename
+      integer :: stat
+      
+          filename = trim(adjustl(mlmodel))
+
+          input = 1.0
+          call in_tensor%from_array(input)
+          call torch_mod%load(filename)
+          call torch_mod%forward(in_tensor, out_tensor)
+          call out_tensor%to_array(output)
+          output_h = output
+
+          print *, output_h(1:5, 1)
+          print*, '--->>> Hi from ML'      
+          call EXIT(0)
+      end
 !
       subroutine shock_position(ncell,x,v,print_nuloss,ntstep)
 !***********************************************************            
@@ -354,7 +386,11 @@
       integer :: i,j,shock_ind, ind
       logical print_nuloss
 !                              
-      initial_v = v(size(v))
+      initial_v = v(size(v))      
+      !if print_nuloss.eqv..true. then 
+      !    print*, v!(10:20)      
+      !    call EXIT(0)
+      !endif
       do i=size(v), 1, -1
           if (v(i).le.(initial_v-(initial_v-minval(v))*0.1)) then
               old_max_v = v(i)
@@ -376,6 +412,7 @@
           write(*,511)'[shock position (i, cm)]', shock_ind,               &
           '                     ', 1.d9*shock_x          
       end if 
+      !call exit(0)
       
       return
       end

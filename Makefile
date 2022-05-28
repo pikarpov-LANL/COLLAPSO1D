@@ -1,7 +1,7 @@
 CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.7/site-packages/torch/share/cmake
 CONFIG:=Debug
 OPENACC:=0
-COMPILER:=nvfortran
+COMPILER:= gfortran
 
 # List CUDA compute capabilities
 TORCH_CUDA_ARCH_LIST:=7.0
@@ -44,6 +44,7 @@ fort_project:
 	cmake --build . && \
 	make install
 	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(PROJECT_DIR)/$${f}; done
+	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp -r $(INST)/lib/* $(PROJECT_DIR)/$${f}; done
 
 project:
 	mkdir -p build/proxy build/fortproxy build/projectproxy
@@ -60,6 +61,7 @@ examples:
 	cmake --build .  && \
 	make install	
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(EXAMPLES_DIR)/$${f}; done
+	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/* $(EXAMPLES_DIR)/$${f}; done
 
 data:
 	@echo "=== Using read_data/setup ==="
