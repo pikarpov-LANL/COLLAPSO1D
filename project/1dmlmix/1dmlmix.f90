@@ -11,7 +11,7 @@
 !                                                                       
 !--ntstep counts the number of timesteps                                
       integer jtrape,jtrapb,jtrapx,ntstep
-      character*30 mlmodel
+      character*30 mlmodel_name
 !                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
@@ -47,7 +47,7 @@
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
       common /uocean/ uopr, uotemp, uorho1, uotemp1, uou1 
       common /uswest/ usltemp, uslrho, uslu, uslp, u2slu
-      common /mlmod/ mlmodel      
+      common /mlmod/ mlmodel_name
 !                                                                       
 !--read initial condition   
 !
@@ -145,11 +145,10 @@
 !------------|---------|---------|---------|---                         
 !  cell      0         1         2         3                            
 !  edge                                                                 
-!                                                                       
+!                    
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx
-      character*30 mlmodel
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (tiny=-1e-5) 
@@ -188,7 +187,7 @@
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
       common/uocean/ uopr, uotemp, uorho1, uotemp1, uou1 
       common/uswest/ usltemp, uslrho, uslu, uslp, u2slu
-      common /mlmod/ mlmodel
+      common /mlmod/ mlmodel_name
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !  
@@ -255,8 +254,7 @@
       call nupress(ncell,rho,unue,unueb,unux) 
 !                                                                       
 !--turbulence contribution to pressure via ML 
-      !call testml
-      call turbpress(ncell,rho) 
+      !scall turbpress(ncell,rho) 
 !                                                                       
 !--e+/e- capture                                                        
 !                                                                       
@@ -338,38 +336,52 @@
    99 return 
       END                                           
 !
+!     
+      subroutine turbpress(ncell,rho) 
+!*******************************************************                
+!                                                                       
+! This subroutine passes the grid to a trained PyTorch model            
+! that predicts pressure due to turbulence                              
+!                                                                       
+!******************************************************                 
 !
-      subroutine testml
-      use torch_ftn
-      use iso_fortran_env
+      use pytorch
+      implicit double precision (a-h,o-z) 
+      !implicit single precision (a-h,o-z) 
+!          
+      character*30 :: mlmodel_name
+!
+      parameter(idim=4000) 
+      parameter (idim1=idim+1) 
+!                                                                       
+      dimension rho(idim) 
+      dimension unue(idim),unueb(idim),unux(idim) 
+!                                                                       
+      logical trapnue, trapnueb, trapnux 
       
-      integer :: n           
-      type(torch_module) :: torch_mod
-      type(torch_tensor) :: in_tensor, out_tensor
-      
-      character*30 mlmodel
-      common /mlmod/ mlmodel          
-      
-      real(kind=4):: input(224, 224, 3, 10)
-      real(kind=4), pointer :: output(:, :)
+      common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim) 
+      common /etnus/ etanue(idim),etanueb(idim),etanux(idim) 
+      common /eosnu/ prnu(idim1) 
+      common /mlmod/ mlmodel_name               
+      !common /ml/ prturb(idim1) 
+      common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
+!                                                                                  
+      real(real32):: input(224, 224, 3, 10)
+      !real(kind=4), pointer :: output(:, :)
       real(kind=4), allocatable :: output_h(:, :)
 
-      character(:), allocatable :: filename
-      integer :: stat
+      character(:), allocatable :: filename      
       
-          filename = trim(adjustl(mlmodel))
-
-          input = 1.0
-          call in_tensor%from_array(input)
-          call torch_mod%load(filename)
-          call torch_mod%forward(in_tensor, out_tensor)
-          call out_tensor%to_array(output)
-          output_h = output
-
-          print *, output_h(1:5, 1)
-          print*, '--->>> Hi from ML'      
-          call EXIT(0)
-      end
+      filename = trim(mlmodel_name)
+      
+      pturb = 1
+!          
+      input = 1.0
+      output_h = mlmodel(input, filename)
+      call exit(0)
+      return 
+      END       
+!
 !
       subroutine shock_position(ncell,x,v,print_nuloss,ntstep)
 !***********************************************************            
@@ -412,7 +424,6 @@
           write(*,511)'[shock position (i, cm)]', shock_ind,               &
           '                     ', 1.d9*shock_x          
       end if 
-      !call exit(0)
       
       return
       end
@@ -3400,38 +3411,7 @@
 !                                                                       
       return 
       END                                           
-!                                                                       
-      subroutine turbpress(ncell,rho) 
-!*******************************************************                
-!                                                                       
-! This subroutine passes the grid to a trained PyTorch model            
-! that predicts pressure due to turbulence                              
-!                                                                       
-!******************************************************                 
-!                                                                       
-      implicit double precision (a-h,o-z) 
-!                                                                       
-      parameter(idim=4000) 
-      parameter (idim1=idim+1) 
-!                                                                       
-      dimension rho(idim) 
-      dimension unue(idim),unueb(idim),unux(idim) 
-!                                                                       
-      logical trapnue, trapnueb, trapnux 
-      common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim) 
-      common /etnus/ etanue(idim),etanueb(idim),etanux(idim) 
-      common /eosnu/ prnu(idim1) 
-      !common /ml/ prturb(idim1) 
-      common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
-!                                                                       
-      pturb = 1 
-      !do i=1,ncell                                                     
-      !  prturb(i)=                                                     
-      !enddo                                                            
-      !print *,'nupress: maximum prnu/pr,etanuemx',ratmax,etanuemx      
-!                                                                       
-      return 
-      END                                           
+!
 !                                                                       
                                                                         
       subroutine nuscat(ncell,rho,x,ynue,ynueb,ynux,                    &
@@ -4761,7 +4741,7 @@
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       real ycc,yccave
-      character*30 mlmodel
+      character*30 mlmodel_name
 !                                                                       
       common /cc   / ycc(idim,iqn), yccave(iqn) 
       common /ener1/ dq(idim), dunu(idim) 
@@ -4799,9 +4779,9 @@
       logical ifign 
       common /ign  / ifign(idim) 
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
-      common /mlmod/ mlmodel
+      common /mlmod/ mlmodel_name
 !                                                                       
-      character*9 filin,filout 
+      character*30 filin,filout 
 
       data pi4/12.56637d0/ 
       gg=13.34 
@@ -4815,7 +4795,7 @@
       read(11,*)
       read(11,10) filout 
       read(11,*)
-      read(11,10) mlmodel   
+      read(11,10) mlmodel_name
    10 format(A) 
       read(11,*)
       read(11,*) idump 
@@ -4855,7 +4835,7 @@
       !print *,'iextf,ieos',iextf,ieos 
       !print*,'======================='
       !print*, filin
-      !print*, filout
+      !print*, filout      
       !print*, idump
       !print*, dtime,tmax
       !print*, cq,cl
@@ -4867,8 +4847,8 @@
 !--open binary file containing initial conditions                       
 !                                                                       
                                                                         
-      open(60,file=filin,form='unformatted') 
-      open(61,file=filout,form='unformatted') 
+      open(60,file=trim(filin),form='unformatted') 
+      open(61,file=trim(filout),form='unformatted') 
 !                                                                       
 !--position pointer in binary file                                      
 !                                                                       
@@ -5228,7 +5208,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx, ntstep, ind
-      character*30 mlmodel, rho_file, x_file
+      character*30 mlmodel_name, rho_file, x_file
       character*10 frmtx
       character*11 frmtrho
 !                                                                       
@@ -5292,7 +5272,7 @@
       common /nsat/ satc,xtime 
       common /nuprint/ nups,nupk,tacr 
       common /outp/ rout, p1out, p2out
-      common /mlmod/ mlmodel
+      common /mlmod/ mlmodel_name
 !                                                                       
       save ifirst 
       data ifirst/.true./ 
