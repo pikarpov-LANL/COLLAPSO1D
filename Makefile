@@ -1,10 +1,11 @@
-CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.7/site-packages/torch/share/cmake
+#CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.7/site-packages/torch/share/cmake
+CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.8/site-packages/torch/share/cmake
 CONFIG:=Debug
 OPENACC:=0
 COMPILER:= gfortran
 
 # List CUDA compute capabilities
-TORCH_CUDA_ARCH_LIST:=7.0
+# TORCH_CUDA_ARCH_LIST:=7.0
 
 WORKDIR:=$(shell pwd -P)
 INST:=$(WORKDIR)/install
@@ -28,7 +29,7 @@ cpp_wrappers:
 	@echo INST $(INST)
 	cd build/proxy && \
 	pwd && \
-	cmake -DCMAKE_CUDA_COMPILER=$(CUDACXX) -DCMAKE_INSTALL_PREFIX=$(INST) -DCMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) -DTORCH_CUDA_ARCH_LIST=$(TORCH_CUDA_ARCH_LIST) $(WORKDIR)/src/proxy_lib && \
+	cmake -DCMAKE_INSTALL_PREFIX=$(INST) -DCMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) $(WORKDIR)/src/proxy_lib && \
 	cmake --build . && \
 	make install  	
 

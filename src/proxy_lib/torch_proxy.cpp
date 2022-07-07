@@ -21,7 +21,7 @@
 
 #include <torch/torch.h>
 #include <torch/script.h>
-#include <cuda_runtime.h>
+// #include <cuda_runtime.h>
 
 #include "defines.inc"
 #include "torch_proxy.h"
@@ -52,16 +52,16 @@ bool is_present_flag(int flags, int probe) {
     return (flags & probe) != 0;
 }
     
-bool is_device_ptr(void* ptr) {
-    cudaPointerAttributes attributes;
-    cudaPointerGetAttributes(&attributes, ptr);
-    return attributes.devicePointer != NULL;
-}
+//bool is_device_ptr(void* ptr) {
+//    cudaPointerAttributes attributes;
+//    cudaPointerGetAttributes(&attributes, ptr);
+//    return attributes.devicePointer != NULL;
+//}
 
 template<typename T>
 torch::Tensor tensor_from_array(const std::vector<ftn_shape_type>& f_shape, T* data) {
     torch::Device            device = torch::kCPU;
-    if (is_device_ptr(data)) device = torch::kCUDA;
+    // if (is_device_ptr(data)) device = torch::kCUDA;
 
     std::vector<int64_t> shape(f_shape.size());
     for (size_t i=0; i<f_shape.size(); i++) {
@@ -88,9 +88,9 @@ void torch_module_load_cpp(void** h_module, const char* file_name, int flags) {
     auto module = new torch::jit::Module;
     debug_print("Loading module from file %s... ", file_name);
     *module = torch::jit::load(file_name);
-    if (is_present_flag(flags, TORCH_FTN_MODULE_USE_DEVICE)) {
-         module->to(at::kCUDA);
-    }
+    // if (is_present_flag(flags, TORCH_FTN_MODULE_USE_DEVICE)) {
+    //     module->to(at::kCUDA);
+    // }
     *h_module = static_cast<void*>(module);
     debug_print("done. Handle %p, %s backend\n", *h_module,
         is_present_flag(flags, TORCH_FTN_MODULE_USE_DEVICE) ? "GPU" : "CPU");
@@ -190,20 +190,20 @@ void torch_tensor_to_array_cpp(void* handle,
     size_bytes *= elem_size;
 
     auto ptr = static_cast<void*>(tensor->data_ptr());
-    if (is_device_ptr(ptr)) {
-        debug_print("Passing GPU tensor %p to Fortran array\n", handle);
+    //if (is_device_ptr(ptr)) {
+    //    debug_print("Passing GPU tensor %p to Fortran array\n", handle);
 
-        if (device_host_map.find(ptr) == device_host_map.end()) {
-            device_host_map[ptr] = new int8_t[size_bytes];
-        }
-        *host_ptr = device_host_map[ptr];
-        *device_ptr = ptr;
-    } else {
+    //    if (device_host_map.find(ptr) == device_host_map.end()) {
+    //        device_host_map[ptr] = new int8_t[size_bytes];
+    //    }
+    //    *host_ptr = device_host_map[ptr];
+    //    *device_ptr = ptr;
+    //} else {
         debug_print("Passing CPU %p to Fortran array\n", handle);
 
         *host_ptr = ptr;
         *device_ptr = nullptr;
-    }
+    //}
 }
 
 void torch_tensor_backward(void* handle) {
