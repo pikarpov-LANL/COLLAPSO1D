@@ -1,5 +1,6 @@
 #CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.7/site-packages/torch/share/cmake
 CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.8/site-packages/torch/share/cmake
+LD_LIBRARY_PATH:=$(LD_LIBRARY_PATH):.
 CONFIG:=Debug
 OPENACC:=0
 COMPILER:= gfortran
@@ -45,7 +46,7 @@ fort_project:
 	cmake --build . && \
 	make install
 	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(PROJECT_DIR)/$${f}; done
-	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp -r $(INST)/lib/* $(PROJECT_DIR)/$${f}; done
+	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(PROJECT_DIR)/$${f}; done
 
 project:
 	mkdir -p build/proxy build/fortproxy build/projectproxy
@@ -62,7 +63,7 @@ examples:
 	cmake --build .  && \
 	make install	
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(EXAMPLES_DIR)/$${f}; done
-	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/* $(EXAMPLES_DIR)/$${f}; done
+	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(EXAMPLES_DIR)/$${f}; done
 
 data:
 	@echo "=== Using read_data/setup ==="
