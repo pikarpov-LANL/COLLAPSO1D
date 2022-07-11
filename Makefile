@@ -68,7 +68,7 @@ examples:
 data:
 	@echo "=== Using read_data/setup ==="
 	cd read_data && \
-	gfortran read_woosley.f -o a.out && \
+	gfortran read_sukhbold.f -o a.out && \
 	./a.out
 	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
 	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="

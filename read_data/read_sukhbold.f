@@ -20,7 +20,7 @@ c
 c
       parameter(idim=4000)
 c      parameter (nkep=1129)
-      parameter (nkep=1073)
+      parameter (nkep=1093)
 c      parameter (nkep=1067)
       common /kep/ vel(nkep),rad(nkep),dens(nkep),t9(nkep),
      1             yel(nkep),ab(nkep),omega(nkep),press(nkep)
@@ -51,7 +51,8 @@ c      print *, 'mass cut'
 c      read *, mcut
       mcut=40.
       max=0
-      maxrad = 8.0e4
+c      maxrad = 8.0e4
+      maxrad = 6.5e4
       open (42,file='mess2')
 c      
 c--read options
@@ -69,17 +70,17 @@ c
   522 format(A)      
 c
       open(11,file=trim(filin))
-      do i=1,22
+      do i=1,2
          read(11,*)ajunk
-         print *, ajunk
+         print *, ajunk, i
       end do
       do 10 i=1,nkep
-         print *, 'in data',i
-         read(11,*) izone, djunk, djunk, drad, dvel, ddens, dtemp,
+c         print *, 'in data',i
+         read(11,*) izone, djunk, drad, dvel, ddens, dtemp,
      $        djunk,djunk,djunk,domega,dabar,dyel,
      $        (yccin(i,j),j=1,19)
          rnorm=0.
-         print *, yccin(i,1),yccin(i,2),drad,dvel,ddens,dtemp
+c         print *, yccin(i,1),yccin(i,2),drad,dvel,ddens,dtemp
          do j=1,19
             rnorm=rnorm+yccin(i,j)
          end do
@@ -216,7 +217,8 @@ c
             ifleos(i)=iflag
             xp(i)=xpj
             xn(i)=xnj
-            if (x(i).gt.maxrad) then
+            print*, "FOR NCELL, x, maxrad", x(i), maxrad
+            if (x(i).gt.maxrad) then               
                print *, enclmass(i)
                ncell=i
                goto 50
@@ -253,7 +255,7 @@ c--for all other k
      $              ycc(i,19)
             end if
             write(45,*) i,enclmass(i),dj(i)
-            print *,'stuff', deltam(i), enclmass(i),x(i),x(i-1),x(1)
+c            print *,'stuff', deltam(i), enclmass(i),x(i),x(i-1),x(1)
             if (enclmass(i).lt..6d0) then
                deltam(i+1) = deltam(1)*(x(i)/x(1))**1.0
             elseif (enclmass(i).lt..7d0) then
@@ -293,6 +295,7 @@ c
             ifleos(i)=iflag
             xp(i)=xpj
             xn(i)=xnj
+            print*, "FOR NCELL, x, maxrad", i, x(i), maxrad
             if (x(i).gt.maxrad) then
                print *, enclmass(i)
                ncell=i
@@ -346,7 +349,7 @@ c
 c
       nc = ncell
       do i=1,nc
-         print *, u(i)
+c         print *, u(i)
          if (u(i).eq.0) stop
          ynue(i)=0.
          ynueb(i)=0.
@@ -369,7 +372,7 @@ c
 c
 c--write
 c
-      print *, nc
+c      print *, nc
 c
       write(29,iostat=io,err=10)nc,t,gc,rb,fe,fb,fx,
      $     (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),
@@ -381,12 +384,12 @@ c
      $     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),
      $     (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
      $     ((ycc(i,j),j=1,19),i=1,nc)
-      print *, nc,t,gc,rb,fe,fb,fx
+c      print *, nc,t,gc,rb,fe,fb,fx
 c
       do i=1,ncell
          write (43,103) (ycc(i,j),j=1,19)
       end do
-      print *, x(0),x(1)
+c      print *, x(0),x(1)
  102  format(I4,4(1pe14.4),I3)
  103  format(19(1pe12.4))
       return
