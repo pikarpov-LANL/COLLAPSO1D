@@ -19,11 +19,8 @@ c
       parameter(pi43=3.14159*4.0/3.0)
 c
       parameter(idim=4000)
-c      parameter (nkep=1129)
-      parameter (nkep=1093)
-c      parameter (nkep=1067)
-      common /kep/ vel(nkep),rad(nkep),dens(nkep),t9(nkep),
-     1             yel(nkep),ab(nkep),omega(nkep),press(nkep)
+      parameter(header_length=2)
+c
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
       common /numb/ ncell
@@ -41,7 +38,10 @@ c      parameter (nkep=1067)
       double precision rhocgs, tkelv, yej, abarj, ucgs, pcgs, xpj, xnj
       double precision f3, totalmass,enclmass(0:idim)
       double precision mcut
+      double precision, allocatable :: vel(:),rad(:),dens(:),t9(:),
+     1             yel(:),ab(:),omega(:),press(:)
       integer max,j,i,izone
+      integer nlines, nkep
 c
       character*128 filin,filout
       character setup_par
@@ -57,7 +57,6 @@ c      maxrad = 8.0e4
 c      
 c--read options
 c      
-
       open(521,file='setup')
       read(521,*)
       read(521,522) filin
@@ -69,8 +68,30 @@ c
       read(521,*) deltam(1)
   522 format(A)      
 c
+c--get number of entries
+c
+      nlines = 0
+      OPEN (1, file = filin)
+      DO
+          READ (1,*, END=42)
+          nlines = nlines + 1
+      END DO
+   42 CLOSE (1)
+c   
+      nkep = nlines-header_length
+      allocate(vel(nkep))
+      allocate(rad(nkep))
+      allocate(dens(nkep))
+      allocate(t9(nkep))
+      allocate(yel(nkep))
+      allocate(ab(nkep))
+      allocate(omega(nkep))
+      allocate(press(nkep))
+c
+c--read-in the data
+c
       open(11,file=trim(filin))
-      do i=1,2
+      do i=1,header_length
          read(11,*)ajunk
          print *, ajunk, i
       end do
@@ -315,10 +336,10 @@ c
       print *,'  Input progenitor:         ', trim(filin)
       print *,'  Number of cells:  ', ncell
       print *,'  Output file name:         ', trim(filout) 
-      print *,'-----------------------------------'
+      print *,'-----------------------------------'      
       stop
       end
-c
+c  
       subroutine wdump
 c************************************************************
 c                                                           *
