@@ -233,10 +233,13 @@
 !                  if (i.gt.700) then                                   
 !                     if (i.eq.701) write(69,*) t*10.                   
 !                  if (encm(i).gt.1.512.and.encm(i).lt.11.0) then     
-                  if (encm(i).gt.0..and.encm(i).lt.11.0) then 
+                  if (encm(i).gt.0..and.encm(i).lt.11.0) then
+! Pressure: converting the units, you get a 2.d22 factor, so where did 1.d16 come from?
+
                      write(69,103)i,encm(i),1.d9*x(i),2.d6*rho(i),      &
-     &                    1.d8*v(i),ye(i),1.d16*pr(i),                  &
-     &                    1.d8*vsound(i)                                
+!     &                    1.d8*v(i),ye(i),1.d16*pr(i)!,                  &
+     &                    1.d8*v(i),ye(i),2.d22*pr(i)!,                  &
+!     &                    1.d8*vsound(i)                                
 !                  if (i.gt.1) then                                     
                      if (ufreez(i).lt.1.d-10) then 
                        dene2=dene2+                                     &
