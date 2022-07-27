@@ -28,10 +28,10 @@
       dimension tempnue(idim), tempnueb(idim), tempnux(idim) 
       logical te(idim), teb(idim), tx(idim) 
       character*1 sample,again
-      character*30 output,basename 
+      character*1024 output,basename 
       character*5 dumpn 
       character(:), allocatable :: outname
-      character*30 infile 
+      character*1024 infile 
       integer iskip, ndump
 !                                                                       
       double precision dm,press,enue,enueb,ks,ka,ksb,kab,               &
@@ -82,7 +82,8 @@
       ibasenamelen = index(basename,' ')-1 
                                                                         
       idump=0 
-      do k=1,ndump 
+      do k=1,ndump
+         print*, 'Dump: ', k
          idump = idump+1 
          read(42) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                  &
      &   (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),      &
@@ -96,8 +97,8 @@
 !     &        (vsound(i),i=1,nc)                                        
 !     &     ((ycc(i,j),j=1,19),i=1,nc)                                  
 !        
-         print*, 'rho(1)  ftrape  ftrapb  ftrapx'
-         print*, rho(1),ftrape,ftrapb,ftrapx 
+         !print*, 'rho(1)  ftrape  ftrapb  ftrapx'
+         !print*, rho(1),ftrape,ftrapb,ftrapx 
          if (k.lt.40) then 
             imp=1 
 !         else                                                          
@@ -106,9 +107,9 @@
          if (mod(k,imp).eq.0) then 
 !            k1=36+int(k/imp)+1                                         
             k1=int(k/imp)+1 
-            print *, 'k1 ',k1 
+!            print *, 'k1 ',k1 
             rhomax=0. 
-            print *, 'xmcore,t',xmcore,t 
+!            print *, 'xmcore,t',xmcore,t 
             encm(0)=xmcore 
 !xmcore-0.4107                                                          
             dke=0. 
@@ -120,7 +121,7 @@
                   dke=dke+0.5*deltam(i)*(v(i)-vesc)**2 
                end if 
             end do 
-            print *,'dke ', dke 
+!            print *,'dke ', dke 
             vmin=0. 
             do i=1,nc 
                if (v(i).lt.vmin) then 
@@ -167,7 +168,7 @@
             iskip=0 
             write(69,*) 'Time'
             write(69,105)10.d0*t 
-            write(69,*)'Cell M_enclosed Position Rho V Ye Pressure'            
+            write(69,*)'Cell M_enclosed Position Rho V Ye Pressure Temperature'            
             do i=1,nc 
 !               write(69,103)i,encm(i),x(i),rho(i),v(i),ye(i),          
 !     $           vsound(i)                                             
@@ -238,7 +239,8 @@
 
                      write(69,103)i,encm(i),1.d9*x(i),2.d6*rho(i),      &
 !     &                    1.d8*v(i),ye(i),1.d16*pr(i)!,                  &
-     &                    1.d8*v(i),ye(i),2.d22*pr(i)!,                  &
+     &                    1.d8*v(i),ye(i),2.d22*pr(i),                  &
+     &                    1.d9*temp(i)     
 !     &                    1.d8*vsound(i)                                
 !                  if (i.gt.1) then                                     
                      if (ufreez(i).lt.1.d-10) then 
@@ -300,10 +302,10 @@
                   end if 
                end if 
             end do 
-            print *, 'Nickel',sumc,sumo,sumne,summg,sumsi,sums,         &
-     &           sumar,sumca,sumti,sumcr,sumfe,sumni,sumzn              
+            !print *, 'Nickel',sumc,sumo,sumne,summg,sumsi,sums,         &
+!     &           sumar,sumca,sumti,sumcr,sumfe,sumni,sumzn              
          end if 
-         print *, 'energy',dk/50.,dene/50. 
+ !        print *, 'energy',dk/50.,dene/50. 
          deallocate(outname)
       end do 
   103 format(I4,1pe12.4,1pe14.6,22(1pe12.4)) 

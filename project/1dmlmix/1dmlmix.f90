@@ -4781,7 +4781,7 @@
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
       common /mlmod/ mlmodel_name
 !                                                                       
-      character*30 filin,filout 
+      character*1024 filin,filout 
 
       data pi4/12.56637d0/ 
       gg=13.34 

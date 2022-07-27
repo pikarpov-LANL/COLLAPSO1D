@@ -43,7 +43,7 @@ c
       integer max,j,i,izone
       integer nlines, nkep
 c
-      character*128 filin,filout
+      character*1024 filin,filout
       character setup_par
       character*1 ajunk
 c
@@ -71,7 +71,7 @@ c
 c--get number of entries
 c
       nlines = 0
-      OPEN (1, file = filin)
+      OPEN (1, file = trim(filin))
       DO
           READ (1,*, END=42)
           nlines = nlines + 1
