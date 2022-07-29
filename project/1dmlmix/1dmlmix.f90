@@ -11,7 +11,7 @@
 !                                                                       
 !--ntstep counts the number of timesteps                                
       integer jtrape,jtrapb,jtrapx,ntstep
-      character*30 mlmodel_name
+      character*128 mlmodel_name
 !                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
@@ -39,7 +39,8 @@
       common /swesty/ xpf(idim), pvar2(idim), pvar3(idim), pvar4(idim) 
       common /tempe/ temp(idim) 
       common /therm/ xmu(idim) 
-      common /timej / time, dt 
+      common /timej / time, dt
+      common /rshock/ shock_ind, shock_x
       logical trapnue, trapnueb, trapnux, print_nuloss 
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /typef/ iextf, ieos 
@@ -83,7 +84,7 @@
         call printout(lu) 
         print*,' ' 
         print*,' ********' 
-        print*,' savetime = ',time 
+        print*,' savetime = ',time*10 
         print*,' ********' 
         print*,' ' 
 !      if (time.gt.4.0) dtime = .0001                                   
@@ -149,6 +150,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx
+      character*128 mlmodel_name
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (tiny=-1e-5) 
@@ -193,7 +195,7 @@
 !  
 !--calculate shock radius
 !
-      call shock_position(ncell,x,v,print_nuloss,ntstep)
+      call shock_radius(ncell,x,v,print_nuloss,ntstep)
 !                                   
 !--compute density                                                      
 ! ---------------------------------------------------------             
@@ -349,7 +351,7 @@
       implicit double precision (a-h,o-z) 
       !implicit single precision (a-h,o-z) 
 !          
-      character*30 :: mlmodel_name
+      character*128 :: mlmodel_name
 !
       parameter(idim=4000) 
       parameter (idim1=idim+1) 
@@ -383,19 +385,22 @@
       END       
 !
 !
-      subroutine shock_position(ncell,x,v,print_nuloss,ntstep)
+      subroutine shock_radius(ncell,x,v,print_nuloss,ntstep)
 !***********************************************************            
 !                                                          *            
-!  This subroutine identifies the shock position           *            
+!  This subroutine identifies the shock radius          *            
 !                                                          *            
 !***********************************************************            
 !            
       implicit double precision (a-h,o-z) 
 
+      common /rshock/ shock_ind, shock_x      
       dimension x(1:ncell),v(1:ncell) 
-      real :: initial_v, old_max_v, shock_x
+      !real :: initial_v, old_max_v, shock_x
+      real :: initial_v, old_max_v
       real, dimension(ncell) :: v_old
-      integer :: i,j,shock_ind, ind
+      !integer :: i,j,shock_ind, ind
+      integer :: i,j, ind
       logical print_nuloss
 !                              
       initial_v = v(size(v))      
@@ -419,10 +424,11 @@
           end if
       end do
 
-511   format(A,1p,I4,A,E10.3) 
+511   format(A,1p,I5,A,E10.3) 
+!511   format(A,1p,E10.3,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
-          write(*,511)'[shock position (i, cm)]', shock_ind,               &
-          '                     ', 1.d9*shock_x          
+          write(*,511)'[ shock radius (i, cm) ]', int(shock_ind),               &
+          '                    ', 1.d9*shock_x          
       end if 
       
       return
@@ -4741,7 +4747,7 @@
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       real ycc,yccave
-      character*30 mlmodel_name
+      character*128 mlmodel_name
 !                                                                       
       common /cc   / ycc(idim,iqn), yccave(iqn) 
       common /ener1/ dq(idim), dunu(idim) 
@@ -4801,8 +4807,10 @@
       read(11,*) idump 
       read(11,*)
       read(11,*) dtime
+      dtime = dtime/10 !convert to numerical units
       read(11,*)
-      read(11,*) tmax 
+      read(11,*) tmax
+      tmax = tmax/10 !convert to numerical units
       read(11,*)
       read(11,*) cq
       read(11,*)
@@ -4861,7 +4869,7 @@
       nqn=17 
 !                                                                       
       read(60) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
-     &   (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),      &
+     &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
      &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
      &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
@@ -4869,8 +4877,8 @@
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
      &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
+     &      ((ycc(i,j),j=1,nqn),i=1,nc)                                       
      !&     (vturb2(i),i=1,nc),                                          &
-     &     ((ycc(i,j),j=1,nqn),i=1,nc)                                  
 !                                                                       
       time = t 
 !                                                                       
@@ -4967,6 +4975,7 @@
       common /tempe/ temp(idim) 
       common /cgas / gamma 
       common /timej / time, dt 
+      common /rshock/ shock_ind, shock_x
       logical trapnue, trapnueb, trapnux 
       common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /ftrap/ ftrape,ftrapb,ftrapx 
@@ -5003,18 +5012,18 @@
 !      do i=1,1                                                         
 !         write (12,*) i, nc,t,gamma,tkin,tterm                         
 !      end do                                                           
-!                                                                       
+!     
       write(lu)nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
-     &   (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),      &
+     &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
      &      (uint(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),       &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
      &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),            &
-     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc)               
+     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
+     &      ((ycc(i,j),j=1,nqn),i=1,nc),shock_ind,shock_x
 !     &     (vturb2(i),i=1,nc),                                          &
-!     &     ((ycc(i,j),j=1,nqn),i=1,nc)                                  
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
 !                                                                       
       return 
@@ -5208,7 +5217,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx, ntstep, ind
-      character*30 mlmodel_name, rho_file, x_file
+      character*128 mlmodel_name, rho_file, x_file
       character*10 frmtx
       character*11 frmtrho
 !                                                                       
@@ -5244,7 +5253,8 @@
       common /swesty/ xpf(idim), pvar2(idim), pvar3(idim), pvar4(idim) 
       common /tempe/ temp(idim) 
       common /therm/ xmu(idim) 
-      common /timej / time, dt 
+      common /timej / time, dt
+      common /rshock/ shock_ind, shock_x
       logical trapnue, trapnueb, trapnux, print_nuloss 
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /typef/ iextf, ieos 
@@ -5595,7 +5605,7 @@
      !fmix1,                      &
      &              ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,              &
      &              unue,unueb,unux,f1unue,f1unueb,f1unux,              &
-     &              print_nuloss)                                       
+     &              print_nuloss,ntstep)                                       
             endif 
          endif 
          time=tfull 
@@ -5673,7 +5683,7 @@
             print 520,'<',ntstep,                                       &
      &      '          > ----------------------------------'            
             write(*,500)'[    time/tmax, dt     ]',                     &
-     &           time,'/',tmax,steps(1)                                 
+     &           time*10,'/',tmax*10,steps(1)                                 
   500       format(A,1p,E10.3,A,E9.3,E15.3)
 !
             if (mod(nupk,nups).eq.0) then 
@@ -5695,7 +5705,7 @@
       implicit double precision (a-h,o-z) 
 
       dimension x(1:ncell),v(1:ncell) 
-      integer :: i,j,shock_ind, ind
+      !integer :: i,j,shock_ind, ind
       character*30 :: rho_file, x_file
       
       

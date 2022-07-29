@@ -1,8 +1,8 @@
 <Data File Name>
-DataOut_s19.0
+DataOut
 
 <Output Basename>
-DataOut_s19.0_readable
+DataOut_readable
 
 <Number of dumps>
 1000

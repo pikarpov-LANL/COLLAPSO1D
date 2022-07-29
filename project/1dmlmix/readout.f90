@@ -82,20 +82,19 @@
       ibasenamelen = index(basename,' ')-1 
                                                                         
       idump=0 
-      do k=1,ndump
-         print*, 'Dump: ', k
+      do k=1,ndump         
          idump = idump+1 
          read(42) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                  &
-     &   (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),      &
+     &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
      &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
      &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc)               
+     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
+     &      ((ycc(i,j),j=1,17),i=1,nc),shock_ind,shock_x
 !     &        (vsound(i),i=1,nc)                                        
-!     &     ((ycc(i,j),j=1,19),i=1,nc)                                  
 !        
          !print*, 'rho(1)  ftrape  ftrapb  ftrapx'
          !print*, rho(1),ftrape,ftrapb,ftrapx 
@@ -166,9 +165,10 @@
             sumzn=0. 
             sumfe=0. 
             iskip=0 
-            write(69,*) 'Time'
-            write(69,105)10.d0*t 
-            write(69,*)'Cell M_enclosed Position Rho V Ye Pressure Temperature'            
+            write(69,*) 'Time [s]  R_shock [index]  R_shock [cm]'
+            write(69,108)10.d0*t, int(shock_ind), 1.d9*shock_x
+            write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
+                        & Ye  Pressure [g/cm/s^2] Temperature [K]'            
             do i=1,nc 
 !               write(69,103)i,encm(i),x(i),rho(i),v(i),ye(i),          
 !     $           vsound(i)                                             
@@ -307,12 +307,14 @@
          end if 
  !        print *, 'energy',dk/50.,dene/50. 
          deallocate(outname)
+         print*, 'Dump: ', k
       end do 
-  103 format(I4,1pe12.4,1pe14.6,22(1pe12.4)) 
+  103 format(I5,1pe12.4,1pe14.6,22(1pe12.4)) 
   105 format(1pe12.4,1pe14.6,7(1pe12.4)) 
   106 format(4(1pe14.7)) 
                                                                         
   107 format(I3,24(1pe13.5)) 
+  108 format(1pe12.4,I5,1pe12.4) 
       print*,' ==============================================='       
       print*, '  Converted ',trim(adjustl(infile)),' to ',trim(adjustl(basename))
 !                                                                       
