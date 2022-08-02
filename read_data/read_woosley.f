@@ -365,6 +365,14 @@ c
       common /cent/ dj(idim)
       real ycc(idim,20)
       common /abun/ ycc
+      common /timei/ steps(idim)
+      common /rshock/ shock_ind, shock_x
+      common /dump/ from_dump
+c      
+      steps = 0
+      shock_ind = 0
+      shock_x = 0
+      from_dump = .false.      
 c
       nc = ncell
       do i=1,nc
@@ -393,7 +401,9 @@ c--write
 c
       print *, nc
 c
+      nqn=17
       write(29,iostat=io,err=10)nc,t,gc,rb,fe,fb,fx,
+     $     shock_ind,shock_x,from_dump,
      $     (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),
      $     (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),
      $     (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),
@@ -402,7 +412,7 @@ c
      $     (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),
      $     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),
      $     (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
-     $     ((ycc(i,j),j=1,19),i=1,nc)
+     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc) 
       print *, nc,t,gc,rb,fe,fb,fx
 c
       do i=1,ncell

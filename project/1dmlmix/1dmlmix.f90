@@ -52,7 +52,7 @@
 !                                                                       
 !--read initial condition   
 !
-      call readini
+      call readini      
 !                                                                       
 !--define code's units                                                  
 !                                                                       
@@ -68,7 +68,7 @@
 !--ntstep is the number of timesteps                                    
       nstep = 0 
       ntstep = 1 
-                                                                        
+          
       do while (time.lt.tmax) 
 !42   continue                                                          
 !                                                                       
@@ -4742,6 +4742,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
+      logical from_dump
 !                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
@@ -4766,7 +4767,8 @@
       common /shock/ cq,cl 
       common /tempe/ temp(idim) 
       common /cgas/ gamma 
-      common /timej/ time, dt 
+      common /timej/ time, dt
+      common /rshock/ shock_ind, shock_x
       common /propt/ dtime,tmax 
       logical trapnue, trapnueb, trapnux 
       common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim) 
@@ -4782,16 +4784,21 @@
       common /damping/ damp,dcell 
       common /neutm/ iflxlm, icvb 
       common /ufactor/ ufact,yefact 
-      logical ifign 
+      logical ifign
       common /ign  / ifign(idim) 
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim)
       common /mlmod/ mlmodel_name
+      common /timei/ istep(idim),t0(idim),steps(idim),                  &
+      &               dum2v(idim)
+      common /cent/ dj(idim)
+      common /dump/ from_dump
 !                                                                       
       character*1024 filin,filout 
 
       data pi4/12.56637d0/ 
       gg=13.34 
       tacr=1.d2 
+      from_dump=.false.
 !                                                                       
 !--read options                                                         
 !                                                                       
@@ -4853,8 +4860,7 @@
       !print*,'======================='
 !                                                                       
 !--open binary file containing initial conditions                       
-!                                                                       
-                                                                        
+!                                                             
       open(60,file=trim(filin),form='unformatted') 
       open(61,file=trim(filout),form='unformatted') 
 !                                                                       
@@ -4867,8 +4873,9 @@
 !--read data                                                            
 !                                                                       
       nqn=17 
-!                                                                       
+!        
       read(60) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
+     &      shock_ind,shock_x,from_dump,                                &
      &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
      &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
@@ -4876,10 +4883,10 @@
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
-     &      ((ycc(i,j),j=1,nqn),i=1,nc)                                       
+     &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
+     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)                       
      !&     (vturb2(i),i=1,nc),                                          &
-!                                                                       
+!
       time = t 
 !                                                                       
       print *, nc, t, xmcore, rb, ftrape,ftrapb,ftrapx 
@@ -4952,6 +4959,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
+      logical from_dump
 !                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
@@ -4981,13 +4989,19 @@
       common /ftrap/ ftrape,ftrapb,ftrapx 
       common /jtrap/ jtrape,jtrapb,jtrapx 
       common /carac/ deltam(idim), abar(idim) 
-      common /ener2/ tkin, tterm 
+      common /ener2/ tkin, tterm
+      common /timei/ istep(idim),t0(idim),steps(idim),                  &
+     &               dum2v(idim)
+      common /cent/ dj(idim)
+      common /dump/ from_dump
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
       dimension uint(idim), s(idim) 
       equivalence(trapnue,te) 
       equivalence(trapnueb,teb) 
       equivalence(trapnux,tx) 
+      
+      from_dump=.true.
 !                                                                       
       if (ieos.eq.4) then 
          do i=1,ncell 
@@ -5012,20 +5026,21 @@
 !      do i=1,1                                                         
 !         write (12,*) i, nc,t,gamma,tkin,tterm                         
 !      end do                                                           
-!     
+!           
       write(lu)nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
+     &      shock_ind,shock_x,from_dump,                                &
      &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
-     &      (uint(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),       &
+     &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
      &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
-     &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),            &
-     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
-     &      ((ycc(i,j),j=1,nqn),i=1,nc),shock_ind,shock_x
+     &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
+     &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
+     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)                 
 !     &     (vturb2(i),i=1,nc),                                          &
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
-!                                                                       
+!               
       return 
 !                                                                       
 !--an error as occured while writting                                   
@@ -5217,6 +5232,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx, ntstep, ind
+      logical from_dump
       character*128 mlmodel_name, rho_file, x_file
       character*10 frmtx
       character*11 frmtrho
@@ -5224,7 +5240,7 @@
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
-      logical ifirst, reset(idim) 
+      logical ifirst, reset(idim)
 !                                                                       
       logical ebetaeq, pbetaeq 
       common /beta/ ebetaeq(idim), pbetaeq(idim) 
@@ -5283,10 +5299,11 @@
       common /nuprint/ nups,nupk,tacr 
       common /outp/ rout, p1out, p2out
       common /mlmod/ mlmodel_name
+      common /dump/ from_dump
 !                                                                       
-      save ifirst 
-      data ifirst/.true./ 
-      data tiny/3.e-5/ 
+      save ifirst
+      data ifirst/.true./      
+      data tiny/3.e-5/         
 !                                                                       
 !--Compute next dump time and initialise variables.                     
 !                                                                       
@@ -5303,12 +5320,20 @@
       e1=1./512. 
 !                                                                       
 !--first time set time step to default                                  
-!                                                                       
-      if(ifirst) then 
+!
+      !print*, steps
+      !if ( ANY( steps>(dt0/1.d8) ) ) then
+      !    from_dump=.true.
+      !    print*, '-----------> From Dump is True!', steps(1)
+      !endif            
+
+      if(ifirst) then
          ifirst=.false. 
          dumx(0)=x(0) 
-         do i=1,ncell 
-            steps(i)=dt0/1.d8 
+         do i=1,ncell
+            if (from_dump.eqv..false.) then
+                steps(i)=dt0/1.d8
+            end if
             istep(i)=nint(dtime/steps(i)) 
             t0(i)=time 
             tempold(i)=temp(i) 
@@ -5682,8 +5707,8 @@
   520       format(A,I12,A) 
             print 520,'<',ntstep,                                       &
      &      '          > ----------------------------------'            
-            write(*,500)'[    time/tmax, dt     ]',                     &
-     &           time*10,'/',tmax*10,steps(1)                                 
+            write(*,500)'[    time/tmax, dt (s) ]',                     &
+     &           time*10,'/',tmax*10,steps(1)*10                              
   500       format(A,1p,E10.3,A,E9.3,E15.3)
 !
             if (mod(nupk,nups).eq.0) then 

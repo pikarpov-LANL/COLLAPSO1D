@@ -26,6 +26,7 @@
       dimension f2unue(idim),f2unueb(idim),f2unux(idim) 
       dimension etanue(idim),etanueb(idim),etanux(idim) 
       dimension tempnue(idim), tempnueb(idim), tempnux(idim) 
+      dimension dj(idim), steps(idim)
       logical te(idim), teb(idim), tx(idim) 
       character*1 sample,again
       character*1024 output,basename 
@@ -33,6 +34,7 @@
       character(:), allocatable :: outname
       character*1024 infile 
       integer iskip, ndump
+      logical from_dump
 !                                                                       
       double precision dm,press,enue,enueb,ks,ka,ksb,kab,               &
      &     ksx                                                          
@@ -85,6 +87,7 @@
       do k=1,ndump         
          idump = idump+1 
          read(42) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                  &
+     &      shock_ind,shock_x,from_dump,                                &         
      &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
      &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
@@ -92,8 +95,8 @@
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
-     &      ((ycc(i,j),j=1,17),i=1,nc),shock_ind,shock_x
+     &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
+     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)                  
 !     &        (vsound(i),i=1,nc)                                        
 !        
          !print*, 'rho(1)  ftrape  ftrapb  ftrapx'

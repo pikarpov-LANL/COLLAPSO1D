@@ -13,6 +13,7 @@ INST:=$(WORKDIR)/install
 PROJECT_NAME:=1dmlmix
 PROJECT_DIR:=$(WORKDIR)/project
 EXAMPLES_DIR:=$(WORKDIR)/examples
+DATA_READ:=read_sukhbold.f
 DATA_DIR:=$(WORKDIR)/read_data
 DATA_FILE:=$(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup)
 
@@ -68,7 +69,7 @@ examples:
 data:
 	@echo "=== Using read_data/setup ==="
 	cd read_data && \
-	gfortran read_sukhbold.f -o a.out && \
+	gfortran -std=legacy $(DATA_READ) -o a.out && \
 	./a.out
 	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
 	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="
