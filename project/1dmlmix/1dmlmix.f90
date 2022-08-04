@@ -3253,11 +3253,13 @@
 !                                                                       
       f=ufoe/utime 
       if (print_nuloss.eqv..true.) then 
-        write(*,510)'[nue loss, foes/s (MeV)]',rlumnue*f,               &
-     &  '               ',enue                                          
+        write(*,510)'[nue loss (foe/s)@(MeV)]',rlumnue*f,               &
+     &  '               ',enue
+        write(*,510)'[nueb loss(foe/s)@(MeV)]',rlumnueb*f,               &
+     &  '               ',enueb
+        write(*,510)'[nux loss (foe/s)@(MeV)]',rlumnux*f,               &
+     &  '               ',enux
   510   format(A,1p,E10.3,A,E10.3) 
-        !print*,'nueb loss:',rlumnueb*f,' foes/s at <E> (MeV)',enueb    
-        !print*,' nux loss:',rlumnux*f,' foes/s at <E> (MeV)',enux      
       endif 
 !                                                                       
       return 
@@ -4756,7 +4758,9 @@
       common /celle/ x(0:idim),v(0:idim),f(0:idim) 
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim) 
       common /nustuff/ ynue(idim),ynueb(idim),ynux(idim),               &
-     &               unue(idim),unueb(idim),unux(idim)                  
+     &               unue(idim),unueb(idim),unux(idim)
+      common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
+     &               enue, enueb, enux, e2nue, e2nueb, e2nux     
       common /state/ xp(idim), xn(idim), eta(idim), ifleos(idim) 
       common /eosq/ pr(idim1), vsound(idim), u2(idim), vsmax 
       common /freez/ ufreez(idim) 
@@ -4873,9 +4877,9 @@
 !--read data                                                            
 !                                                                       
       nqn=17 
-!        
+!       
       read(60) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
-     &      shock_ind,shock_x,from_dump,                                &
+     &      shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,       &
      &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
      &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
@@ -4884,7 +4888,7 @@
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
      &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
-     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)                       
+     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)
      !&     (vturb2(i),i=1,nc),                                          &
 !
       time = t 
@@ -4973,7 +4977,9 @@
       common /celle/ x(0:idim),v(0:idim),f(0:idim) 
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim) 
       common /nustuff/ ynue(idim),ynueb(idim),ynux(idim),               &
-     &               unue(idim),unueb(idim),unux(idim)                  
+     &               unue(idim),unueb(idim),unux(idim)
+      common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
+     &               enue, enueb, enux, e2nue, e2nueb, e2nux
       common /state/ xp(idim), xn(idim), eta(idim), ifleos(idim) 
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /freez/ ufreez(idim) 
@@ -5026,9 +5032,9 @@
 !      do i=1,1                                                         
 !         write (12,*) i, nc,t,gamma,tkin,tterm                         
 !      end do                                                           
-!           
+!       
       write(lu)nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
-     &      shock_ind,shock_x,from_dump,                                &
+     &      shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,       &
      &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
      &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
@@ -5037,7 +5043,7 @@
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
      &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
-     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)                 
+     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)             
 !     &     (vturb2(i),i=1,nc),                                          &
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
 !               

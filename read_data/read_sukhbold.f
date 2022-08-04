@@ -371,11 +371,16 @@ c
       common /timei/ steps(idim)
       common /rshock/ shock_ind, shock_x
       common /dump/ from_dump
+      double precision rlumnue, rlumnueb, rlumnux      
 c      
       steps = 0
       shock_ind = 0
       shock_x = 0
-      from_dump = .false.
+      from_dump = .false.      
+c--initialize neutrino fluxes      
+      rlumnue = 0
+      rlumnueb = 0
+      rlumnux = 0
 c
       nc = ncell
       do i=1,nc
@@ -406,7 +411,7 @@ c      print *, nc
 c
       nqn=17
       write(29,iostat=io,err=10)nc,t,gc,rb,fe,fb,fx,
-     $     shock_ind,shock_x,from_dump,
+     $     shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,
      $     (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),
      $     (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),
      $     (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),
@@ -415,7 +420,7 @@ c
      $     (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),
      $     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),
      $     (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
-     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)      
+     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)   
 c
       do i=1,ncell
          write (43,103) (ycc(i,j),j=1,19)

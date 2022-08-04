@@ -87,7 +87,7 @@
       do k=1,ndump         
          idump = idump+1 
          read(42) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                  &
-     &      shock_ind,shock_x,from_dump,                                &         
+     &      shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,       &
      &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
      &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
@@ -168,8 +168,8 @@
             sumzn=0. 
             sumfe=0. 
             iskip=0 
-            write(69,*) 'Time [s]  R_shock [index]  R_shock [cm]'
-            write(69,108)10.d0*t, int(shock_ind), 1.d9*shock_x
+            write(69,*) 'Time [s]  R_shock [index]  R_shock [cm] nu_e_flux [foe/s]'
+            write(69,108)10.d0*t, int(shock_ind), 1.d9*shock_x, rlumnue
             write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
                         & Ye  Pressure [g/cm/s^2] Temperature [K]'            
             do i=1,nc 
