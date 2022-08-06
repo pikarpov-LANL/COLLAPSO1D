@@ -30,7 +30,7 @@
       logical te(idim), teb(idim), tx(idim) 
       character*1 sample,again
       character*1024 output,basename 
-      character*5 dumpn 
+      character*32 dumpn 
       character(:), allocatable :: outname
       character*1024 infile 
       integer iskip, ndump
@@ -132,23 +132,10 @@
                end if 
                rhomax=max(rho(i),rhomax) 
             end do 
-!            write(72,103) t,vmin,xshock,rho(1),rhomax                  
-            if (k1.le.10) then 
-               write(dumpn,100) k1-1 
-  100          format('.',I1.1) 
-            else if (k1.le.100) then 
-               write(dumpn,101) k1-1 
-  101          format('.',I2.2) 
-            else if (k1.le.1000) then 
-               write(dumpn,102) k1-1 
-  102          format('.',I3.3) 
-            else 
-               write(dumpn,104) k1-1 
-  104          format('.',I4.4) 
-            end if 
-            
-            allocate(character(LEN(TRIM(basename))+LEN(TRIM(dumpn))) :: outname)
-            outname=TRIM(basename(1:ibasenamelen)//dumpn)
+!            write(72,103) t,vmin,xshock,rho(1),rhomax                              
+            write(dumpn,*) k1-1
+            allocate(character(LEN(TRIM(basename))+LEN(adjustl(dumpn))) :: outname)
+            outname=basename(1:ibasenamelen)//'.'//adjustl(dumpn)
             open(69,file=outname) 
             
             tautot=0. 
@@ -317,7 +304,7 @@
   106 format(4(1pe14.7)) 
                                                                         
   107 format(I3,24(1pe13.5)) 
-  108 format(1pe12.4,I5,1pe12.4) 
+  108 format(1pe12.4,I5,1pe12.4,1pe12.4) 
       print*,' ==============================================='       
       print*, '  Converted ',trim(adjustl(infile)),' to ',trim(adjustl(basename))
 !                                                                       
