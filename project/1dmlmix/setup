@@ -6,10 +6,10 @@ DataOut
 traced_model.pt
 <Dump # to read>
 1
-<Initial dt>
-.0001 
-<Max dt>
-1.
+<Dump time intervals [s]>
+1.d-3
+<Max dt [s]>
+1.d0
 <Artificial Viscocity #1>
 1.0
 <Artificial Viscocity #2>
@@ -21,7 +21,7 @@ traced_model.pt
 <If > 1, include core mass>
 2.d0
 <Number of Cells (from Data)>
-1207
+1803
 <delp (not default)>
 1.d-5
 <Number of steps per luminosity output>

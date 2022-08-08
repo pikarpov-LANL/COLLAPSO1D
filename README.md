@@ -5,30 +5,24 @@
 3. [Setup Details](README.md#setup-details)
 4. [Make Commands](README.md#make-commands)
 
-This is a 1D lagrangian code to explore CCSN modeling. For progenitors, it takes KEPLER generated [data](https://2sn.org/stellarevolution/) of Alex Heger & Stan Woosley.
+This is a 1D lagrangian code to explore CCSN modeling. For progenitors, it takes KEPLER generated data. Currently, there is support for [Heger et al, 2000](https://2sn.org/stellarevolution/) and [Sukhbold et al, 2016](https://arxiv.org/abs/1510.04643).
 
-Turbulence is treated through mixing length theory (MLT) and Machine Learning (ML) based models.
+Turbulence is treated through mixing length theory (MLT) and Machine Learning (ML) based models. The latter has been trained using the [Sapsan](https://github.com/pikarpov-LANL/Sapsan) ML pipeline.
 
 PyTorch is implemented based on [pytorch-fortran](https://github.com/alexeedm/pytorch-fortran).
 
 ## Dependencies
 
-### NVFORTRAN
-While the base code can be compiled via `gfortran`, the PyTorch implimentation requires the [nvidia HPC toolkit 21.9](https://developer.nvidia.com/nvidia-hpc-sdk-219-downloads). You can register and download it for free via the link. Since it includes CUDA 11.4, while the maximum supported by PyTorch is 11.3, we also need to setup CUDA separately. 
+### GFORTRAN
+Both the main CCSN code and the PyTorch wrapper can be compiled with `gfortran >= 9.4.0`.
 
 ### PyTorch
-To install the latest PyTorch, follow the official [instructions](https://pytorch.org/). Lastly, we need to make sure all compilers link correctly.
+To install the latest PyTorch for CPU, follow the official [instructions](https://pytorch.org/). Lastly, we need to make sure all compilers link correctly.
 
 ### ~/.bashrc
 Add the following to you `~/.bashrc` and then `source ~/.bashrc`:
 ```bash
-export PATH=/opt/nvidia/hpc_sdk/Linux_x86_64/21.9/compilers/bin/:$PATH
-export CUDACXX=/usr/local/cuda/bin/nvcc
-export CUDA_HOME=/usr/local/cuda
-export PATH=/usr/local/cuda:$PATH
-export PATH=/usr/local/cuda/bin:$PATH
-export CUDA_HOME=/usr/local/cuda
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
 ```
 
 ---

@@ -22,26 +22,27 @@
 cmake_minimum_required(VERSION 3.13)
 
 # C++ library should be built with the same compiler as Pytorch
-project(PyTorch-ProxyLib LANGUAGES CXX CUDA)
+#project(PyTorch-ProxyLib LANGUAGES CXX CUDA)
+project(PyTorch-ProxyLib LANGUAGES CXX)
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 find_package(Torch REQUIRED)
 
 # CUDA architecture
-if(NOT DEFINED CUDA_ARCH_LIST)
-    set(CUDA_ARCH_LIST 7.0)
-endif()
-set(ENV{TORCH_CUDA_ARCH_LIST} ${CUDA_ARCH_LIST})
-string(REPLACE "." "" CMAKE_CUDA_ARCH_LIST "${CUDA_ARCH_LIST}")
+#if(NOT DEFINED CUDA_ARCH_LIST)
+#    set(CUDA_ARCH_LIST 7.0)
+#endif()
+#set(ENV{TORCH_CUDA_ARCH_LIST} ${CUDA_ARCH_LIST})
+#string(REPLACE "." "" CMAKE_CUDA_ARCH_LIST "${CUDA_ARCH_LIST}")
 
 add_library(pytorch_proxy SHARED torch_proxy.cpp)
 
 # General settings
 set_target_properties(pytorch_proxy PROPERTIES
                                   CXX_STANDARD  17
-                                  CUDA_STANDARD 14
-                                  POSITION_INDEPENDENT_CODE ON
-                                  CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCH_LIST})
+				  #CUDA_STANDARD 14
+                                  POSITION_INDEPENDENT_CODE ON)
+				  #CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCH_LIST})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
 # Includes

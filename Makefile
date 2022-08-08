@@ -1,16 +1,19 @@
-CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.7/site-packages/torch/share/cmake
+#CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.7/site-packages/torch/share/cmake
+CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.8/site-packages/torch/share/cmake
+LD_LIBRARY_PATH:=$(LD_LIBRARY_PATH):.
 CONFIG:=Debug
 OPENACC:=0
-COMPILER:=nvfortran
+COMPILER:= gfortran
 
 # List CUDA compute capabilities
-TORCH_CUDA_ARCH_LIST:=7.0
+# TORCH_CUDA_ARCH_LIST:=7.0
 
 WORKDIR:=$(shell pwd -P)
 INST:=$(WORKDIR)/install
 PROJECT_NAME:=1dmlmix
 PROJECT_DIR:=$(WORKDIR)/project
 EXAMPLES_DIR:=$(WORKDIR)/examples
+DATA_READ:=read_sukhbold.f
 DATA_DIR:=$(WORKDIR)/read_data
 DATA_FILE:=$(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup)
 
@@ -28,7 +31,7 @@ cpp_wrappers:
 	@echo INST $(INST)
 	cd build/proxy && \
 	pwd && \
-	cmake -DCMAKE_CUDA_COMPILER=$(CUDACXX) -DCMAKE_INSTALL_PREFIX=$(INST) -DCMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) -DTORCH_CUDA_ARCH_LIST=$(TORCH_CUDA_ARCH_LIST) $(WORKDIR)/src/proxy_lib && \
+	cmake -DCMAKE_INSTALL_PREFIX=$(INST) -DCMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) $(WORKDIR)/src/proxy_lib && \
 	cmake --build . && \
 	make install  	
 
@@ -44,6 +47,7 @@ fort_project:
 	cmake --build . && \
 	make install
 	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(PROJECT_DIR)/$${f}; done
+	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(PROJECT_DIR)/$${f}; done
 
 project:
 	mkdir -p build/proxy build/fortproxy build/projectproxy
@@ -60,12 +64,13 @@ examples:
 	cmake --build .  && \
 	make install	
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(EXAMPLES_DIR)/$${f}; done
+	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(EXAMPLES_DIR)/$${f}; done
 
 data:
 	@echo "=== Using read_data/setup ==="
 	cd read_data && \
-	gfortran read_woosley.f -o a.out && \
-	./a.out
+	gfortran -std=legacy $(DATA_READ) -o read_data && \
+	./read_data
 	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
 	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="
 

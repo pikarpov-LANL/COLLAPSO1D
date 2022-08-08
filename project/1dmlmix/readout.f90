@@ -1,7 +1,7 @@
       program readoutput 
 !********************************************************************   
 !                                                                   *   
-!  This program reads the unformatted file and pritns readable      *   
+!  This program reads the unformatted file and prints readable      *   
 !  numbers.                                                         *   
 !                                                                   *   
 !********************************************************************   
@@ -26,21 +26,23 @@
       dimension f2unue(idim),f2unueb(idim),f2unux(idim) 
       dimension etanue(idim),etanueb(idim),etanux(idim) 
       dimension tempnue(idim), tempnueb(idim), tempnux(idim) 
+      dimension dj(idim), steps(idim)
       logical te(idim), teb(idim), tx(idim) 
       character*1 sample,again
-      character*30 output,basename 
+      character*1024 output,basename 
       character*5 dumpn 
       character(:), allocatable :: outname
-      character*30 infile 
+      character*1024 infile 
       integer iskip, ndump
+      logical from_dump
 !                                                                       
       double precision dm,press,enue,enueb,ks,ka,ksb,kab,               &
      &     ksx                                                          
 !   
-       if (command_argument_count() == 2) then
+       if (command_argument_count() == 1) then
            print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
            call EXIT(0)
-       else if (command_argument_count() == 1) then
+       else if (command_argument_count() == 2) then
            print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
            call EXIT(0)
        else if (command_argument_count() == 3) then
@@ -82,22 +84,23 @@
       ibasenamelen = index(basename,' ')-1 
                                                                         
       idump=0 
-      do k=1,ndump 
+      do k=1,ndump         
          idump = idump+1 
          read(42) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                  &
-     &   (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),      &
+     &      shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,       &
+     &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
      &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
      &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),               &
-     &        (vsound(i),i=1,nc)                                        
-!     $     ((ycc(i,j),j=1,19),i=1,nc)                                  
+     &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
+     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)                  
+!     &        (vsound(i),i=1,nc)                                        
 !        
-         print*, 'rho(1)  ftrape  ftrapb  ftrapx'
-         print*, rho(1),ftrape,ftrapb,ftrapx 
+         !print*, 'rho(1)  ftrape  ftrapb  ftrapx'
+         !print*, rho(1),ftrape,ftrapb,ftrapx 
          if (k.lt.40) then 
             imp=1 
 !         else                                                          
@@ -106,9 +109,9 @@
          if (mod(k,imp).eq.0) then 
 !            k1=36+int(k/imp)+1                                         
             k1=int(k/imp)+1 
-            print *, 'k1 ',k1 
+!            print *, 'k1 ',k1 
             rhomax=0. 
-            print *, 'xmcore,t',xmcore,t 
+!            print *, 'xmcore,t',xmcore,t 
             encm(0)=xmcore 
 !xmcore-0.4107                                                          
             dke=0. 
@@ -120,7 +123,7 @@
                   dke=dke+0.5*deltam(i)*(v(i)-vesc)**2 
                end if 
             end do 
-            print *,'dke ', dke 
+!            print *,'dke ', dke 
             vmin=0. 
             do i=1,nc 
                if (v(i).lt.vmin) then 
@@ -165,7 +168,10 @@
             sumzn=0. 
             sumfe=0. 
             iskip=0 
-            write(69,105)10.d0*t 
+            write(69,*) 'Time [s]  R_shock [index]  R_shock [cm] nu_e_flux [foe/s]'
+            write(69,108)10.d0*t, int(shock_ind), 1.d9*shock_x, rlumnue
+            write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
+                        & Ye  Pressure [g/cm/s^2] Temperature [K]'            
             do i=1,nc 
 !               write(69,103)i,encm(i),x(i),rho(i),v(i),ye(i),          
 !     $           vsound(i)                                             
@@ -230,11 +236,15 @@
                   end if 
 !                  if (i.gt.700) then                                   
 !                     if (i.eq.701) write(69,*) t*10.                   
-!                  if (encm(i).gt.1.512.and.encm(i).lt.11.0) then       
-                  if (encm(i).gt.0..and.encm(i).lt.11.0) then 
+!                  if (encm(i).gt.1.512.and.encm(i).lt.11.0) then     
+                  if (encm(i).gt.0..and.encm(i).lt.11.0) then
+! Pressure: converting the units, you get a 2.d22 factor, so where did 1.d16 come from?
+
                      write(69,103)i,encm(i),1.d9*x(i),2.d6*rho(i),      &
-     &                    1.d8*v(i),ye(i),1.d16*pr(i),                  &
-     &                    1.d8*vsound(i)                                
+!     &                    1.d8*v(i),ye(i),1.d16*pr(i)!,                  &
+     &                    1.d8*v(i),ye(i),2.d22*pr(i),                  &
+     &                    1.d9*temp(i)     
+!     &                    1.d8*vsound(i)                                
 !                  if (i.gt.1) then                                     
                      if (ufreez(i).lt.1.d-10) then 
                        dene2=dene2+                                     &
@@ -295,16 +305,19 @@
                   end if 
                end if 
             end do 
-            print *, 'Nickel',sumc,sumo,sumne,summg,sumsi,sums,         &
-     &           sumar,sumca,sumti,sumcr,sumfe,sumni,sumzn              
+            !print *, 'Nickel',sumc,sumo,sumne,summg,sumsi,sums,         &
+!     &           sumar,sumca,sumti,sumcr,sumfe,sumni,sumzn              
          end if 
-         print *, 'energy',dk/50.,dene/50. 
+ !        print *, 'energy',dk/50.,dene/50. 
+         deallocate(outname)
+         print*, 'Dump: ', k
       end do 
-  103 format(I4,1pe12.4,1pe14.6,22(1pe12.4)) 
+  103 format(I5,1pe12.4,1pe14.6,22(1pe12.4)) 
   105 format(1pe12.4,1pe14.6,7(1pe12.4)) 
   106 format(4(1pe14.7)) 
                                                                         
   107 format(I3,24(1pe13.5)) 
+  108 format(1pe12.4,I5,1pe12.4) 
       print*,' ==============================================='       
       print*, '  Converted ',trim(adjustl(infile)),' to ',trim(adjustl(basename))
 !                                                                       
