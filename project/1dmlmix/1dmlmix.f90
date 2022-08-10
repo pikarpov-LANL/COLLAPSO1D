@@ -42,6 +42,7 @@
       common /timej / time, dt
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x
+
       logical trapnue, trapnueb, trapnux, print_nuloss 
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /typef/ iextf, ieos 
@@ -154,6 +155,7 @@
       character*128 mlmodel_name
       logical post_bounce
       double precision mlin_x, mlin_v, mlin_rho
+
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (tiny=-1e-5) 
@@ -1333,7 +1335,6 @@
       common /damping/ damp, dcell 
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
       common /mloutput/ pr_turb(idim1)
-
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
       data pi4/12.56637d0/ 
@@ -5428,6 +5429,7 @@
       common /timej / time, dt
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x
+
       logical trapnue, trapnueb, trapnux, print_nuloss 
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /typef/ iextf, ieos 
@@ -5460,6 +5462,7 @@
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
       common /interp/ mlin_grid_size
       common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)!                                                                       
+
       save ifirst
       data ifirst/.true./      
       data tiny/3.e-5/         
@@ -5890,6 +5893,7 @@
       end if 
 !                                                                       
       END  
+
 
       subroutine write_data(ntstep, ncell,x, v)
        
