@@ -1,6 +1,7 @@
-#CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.7/site-packages/torch/share/cmake
-CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/lib/python3.8/site-packages/torch/share/cmake
-LD_LIBRARY_PATH:=$(LD_LIBRARY_PATH):.
+#If 'cmake' is not found automatically, enter its location manually below
+CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
+#CMAKE_PREFIX_PATH:=/home/$(USER)/anaconda3/lib/python3.8/site-packages/torch/share/cmake
+
 CONFIG:=Debug
 OPENACC:=0
 COMPILER:= gfortran
@@ -26,6 +27,7 @@ all:
 	make fort_project
 	make data
 	make readout
+	@echo "=== Compilation Successful ==="
 
 cpp_wrappers:	
 	@echo INST $(INST)
@@ -41,7 +43,7 @@ fort_bindings:
 	cmake --build . && \
 	make install
 
-fort_project:	
+fort_project:
 	cd build/projectproxy && \
 	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=${COMPILER} -DCMAKE_INSTALL_PREFIX=$(INST) $(PROJECT_DIR) && \
 	cmake --build . && \
@@ -54,6 +56,7 @@ project:
 	make cpp_wrappers
 	make fort_bindings
 	make fort_project
+	@echo "=== Project Compiled ==="
 
 examples:
 	mkdir -p build/proxy build/fortproxy build/examplesproxy
