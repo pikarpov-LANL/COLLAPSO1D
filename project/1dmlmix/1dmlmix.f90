@@ -41,6 +41,8 @@
       common /therm/ xmu(idim) 
       common /timej / time, dt
       common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x
+
       logical trapnue, trapnueb, trapnux, print_nuloss 
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /typef/ iextf, ieos 
@@ -149,8 +151,11 @@
 !                    
       implicit double precision (a-h,o-z) 
 !                                                                       
-      integer jtrape,jtrapb,jtrapx
+      integer jtrape,jtrapb,jtrapx, mlin_grid_size
       character*128 mlmodel_name
+      logical post_bounce
+      double precision mlin_x, mlin_v, mlin_rho
+
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (tiny=-1e-5) 
@@ -190,18 +195,19 @@
       common/uocean/ uopr, uotemp, uorho1, uotemp1, uou1 
       common/uswest/ usltemp, uslrho, uslu, uslp, u2slu
       common /mlmod/ mlmodel_name
+      common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /interp/ mlin_grid_size
+      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
-!  
-!--calculate shock radius
-!
-      call shock_radius(ncell,x,v,print_nuloss,ntstep)
-!                                   
+!                                        
 !--compute density                                                      
 ! ---------------------------------------------------------             
 !                                                                       
       call density(ncell,x,rho) 
-!                                                                       
+!                                                                      
 !                                                                       
 !--compute thermodynamical properties                                   
 !  ----------------------------------                                   
@@ -254,9 +260,6 @@
 !-- nu contribution to pressure                                         
 !                                                                       
       call nupress(ncell,rho,unue,unueb,unux) 
-!                                                                       
-!--turbulence contribution to pressure via ML 
-      !scall turbpress(ncell,rho) 
 !                                                                       
 !--e+/e- capture                                                        
 !                                                                       
@@ -312,10 +315,23 @@
 !                                                                       
 !--compute q values                                                     
 !                                                                       
-      call artvis(ncell,x,rho,v,q) 
-!                                                                       
+      call artvis(ncell,x,rho,v,q)                                                                     
+!     
+      !post_bounce = .true.
+      if (post_bounce.eqv..true.) then
+          !--calculate PNS & shock radii, only in post-bounce stage
+           call shock_radius(ncell,x,v,print_nuloss)
+           call pns_radius(ncell,x,rho,print_nuloss)
+           call interpolate(ncell,x,v)  
+           
+           !--turbulence contribution to pressure via ML in post-bounce regime
+           !call turbpress(ncell,rho,x,v)
+      else
+          !--check if bounced
+          call bounce(ntstep)
+      endif
+!
 !--compute forces on the particles                                      
-!                                                                       
       call forces(ncell,x,f,q,v,rho) 
 !                                                                       
 !--flux limited diffusion                                               
@@ -325,8 +341,7 @@
      &    dunue,dunueb,dunux)                                           
 !                                                                       
 !--compute energy derivative                                            
-!                                                                       
-!                                                                       
+!                                                          
       call energ(ncell,x,v,dye,du,rho) 
 !                                                                       
 !--compute neutrino pressure work and change of <E>s                    
@@ -339,75 +354,125 @@
       END                                           
 !
 !     
-      subroutine turbpress(ncell,rho) 
-!*******************************************************                
-!                                                                       
-! This subroutine passes the grid to a trained PyTorch model            
-! that predicts pressure due to turbulence                              
-!                                                                       
-!******************************************************                 
+      subroutine turbpress(ncell,rho,x,v) 
+!*********************************************************               
+!                                                        *               
+! This subroutine passes the grid to a trained           *
+! PyTorch model that predicts pressure due to turbulence *                             
+!                                                        *               
+!*********************************************************                
 !
       use pytorch
       implicit double precision (a-h,o-z) 
-      !implicit single precision (a-h,o-z) 
 !          
       character*128 :: mlmodel_name
+      integer mlin_grid_size
+      double precision mlin_x, mlin_v, mlin_rho, pr_turb   
 !
       parameter(idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim) 
-      dimension unue(idim),unueb(idim),unux(idim) 
+      dimension x(0:idim), v(0:idim)
+      dimension unue(idim),unueb(idim),unux(idim)       
 !                                                                       
       logical trapnue, trapnueb, trapnux 
       
-      common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim) 
+      common /trap/ trapnue(idim),trapnueb(idim),trapnux(idim) 
       common /etnus/ etanue(idim),etanueb(idim),etanux(idim) 
       common /eosnu/ prnu(idim1) 
       common /mlmod/ mlmodel_name               
       !common /ml/ prturb(idim1) 
-      common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
-!                                                                                  
-      real(real32):: input(224, 224, 3, 10)
+      common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax
+      common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x       
+      common /interp/ mlin_grid_size
+      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim) 
+      common /mloutput/ pr_turb(idim1)
+!                                         
+! The tensor shape is exactly backwards from python: (Length,Channels,N batches)
+      double precision :: input(mlin_grid_size, 2, 1)
       !real(kind=4), pointer :: output(:, :)
-      real(kind=4), allocatable :: output_h(:, :)
-
-      character(:), allocatable :: filename      
+      !real(kind=4), allocatable :: output_h(:, :)                  
       
-      filename = trim(mlmodel_name)
+      pr_turb = 0
+!      
+      input(:,1,1) = mlin_v(1:mlin_grid_size)
+      input(:,2,1) = mlin_rho(1:mlin_grid_size)
+      print*, 'input ',shape(input)
+      !input = 1.0
       
-      pturb = 1
-!          
-      input = 1.0
-      output_h = mlmodel(input, filename)
+      !output_h = mlmodel(input, trim(mlmodel_name))
+      
+      !pr_turb(int(shock_ind):int(pns_ind)) = output_h(:,1)
       call exit(0)
       return 
       END       
+! 
+      subroutine interpolate(ncell,x,v)
+!*******************************************************
+!                                                      *
+! This subroutine resizes the input variables          *
+! through 1d linear interpolation                      *
+!                                                      *
+!*******************************************************            
+!
+      use linear_interpolation_module
+      use linspace_mod
+      
+      implicit double precision (a-h,o-z) 
+      
+      integer mlin_grid_size
+      double precision mlin_x, mlin_v, mlin_rho
+
+      parameter(idim=4000)   
+      dimension x(1:ncell),v(1:ncell),rho(1:ncell)
+
+      common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x  
+      common /interp/ mlin_grid_size
+      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)      
+      
+      integer i
+      integer,dimension(6) :: iflag
+      type(linear_interp_1d) :: s1v,s1rho      
+      
+      mlin_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)
+      
+      !print*, 'mlin grid size', mlin_grid_size
+      !print*, 'Sizes ', size(v), size(mlin_x)
+      
+      call s1v%initialize(x,v,iflag(1))
+      call s1rho%initialize(x,rho,iflag(2))
+      do i=1, mlin_grid_size
+          call s1v%evaluate(mlin_x(i),mlin_v(i))
+          call s1rho%evaluate(mlin_x(i),mlin_rho(i))
+      end do            
+      call s1v%destroy()
+      call s1rho%destroy()      
+     
+      return
+      end
 !
 !
-      subroutine shock_radius(ncell,x,v,print_nuloss,ntstep)
+      subroutine shock_radius(ncell,x,v,print_nuloss)
 !***********************************************************            
 !                                                          *            
-!  This subroutine identifies the shock radius          *            
+!  This subroutine identifies the shock radius             *            
 !                                                          *            
 !***********************************************************            
 !            
       implicit double precision (a-h,o-z) 
 
-      common /rshock/ shock_ind, shock_x      
+      common /rshock/ shock_ind, shock_x    
       dimension x(1:ncell),v(1:ncell) 
-      !real :: initial_v, old_max_v, shock_x
       real :: initial_v, old_max_v
       real, dimension(ncell) :: v_old
-      !integer :: i,j,shock_ind, ind
       integer :: i,j, ind
       logical print_nuloss
 !                              
       initial_v = v(size(v))      
-      !if print_nuloss.eqv..true. then 
-      !    print*, v!(10:20)      
-      !    call EXIT(0)
-      !endif
+
       do i=size(v), 1, -1
           if (v(i).le.(initial_v-(initial_v-minval(v))*0.1)) then
               old_max_v = v(i)
@@ -425,13 +490,79 @@
       end do
 
 511   format(A,1p,I5,A,E10.3) 
-!511   format(A,1p,E10.3,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
           write(*,511)'[ shock radius (i, cm) ]', int(shock_ind),               &
           '                    ', 1.d9*shock_x          
       end if 
       
       return
+      end
+!
+      subroutine pns_radius(ncell,x,rho,print_nuloss)
+!***********************************************************            
+!                                                          *            
+!  This subroutine identifies the Proto-Neutron Star radius*            
+!                                                          *            
+!***********************************************************            
+!            
+      implicit double precision (a-h,o-z) 
+
+      common /pns/ pns_ind, pns_x   
+      dimension x(1:ncell),rho(1:ncell) 
+      real :: rho_threshold      
+      integer :: i
+      logical print_nuloss
+!      
+      rho_threshold = 5.d10
+!
+      do i=size(rho), 1, -1        
+          if (rho(i) .ge. rho_threshold) then                        
+              pns_x = rho(i)
+              pns_ind = i
+              EXIT
+          end if 
+      end do      
+
+511   format(A,1p,I5,A,E10.3) 
+      if (print_nuloss .eqv. .true.) then      
+          write(*,511)'[ PNS radius (i, cm) ]', int(pns_ind),               &
+          '                    ', 1.d9*pns_x          
+      end if 
+      
+      return
+      end
+!
+!
+      subroutine bounce(ntstep)
+!***********************************************************            
+!                                                          *            
+!  This subroutine identifies if the bounce has occured    *            
+!                                                          *            
+!***********************************************************            
+!            
+      implicit double precision (a-h,o-z) 
+
+      logical post_bounce
+      parameter (idim=4000) 
+      common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
+           &               enue, enueb, enux, e2nue, e2nueb, e2nux
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /timej / time, dt
+      
+      post_bounce = .false.
+      
+      if (ntstep==1) then
+          rlumnue_max = rlumnue
+      endif
+      
+      if (rlumnue>(2*rlumnue_max)) then
+          post_bounce = .true.
+          bounce_ntstep = ntstep
+          bounce_time = time
+      else if (rlumnue > rlumnue_max) then
+          rlumnue_max = rlumnue
+      endif                  
+      
       end
 !
       subroutine artvis(ncell,x,rho,v,q) 
@@ -735,7 +866,8 @@
 !                                                                       
 !--for NSE, add in the nuclear component to the thermal                 
 !--energy to get the total available internal energy                    
-!                                                                       
+!           
+            print *,'For NSE, nuclear component was added to E_thermal to get E_total,'
             print *,'change occured at cell',k,u(k),ufreez(k)           &
      &           ,ifleos(k)                                             
             u(k)=u(k)+ufreez(k) 
@@ -752,7 +884,8 @@
      &                   xak,xhk,yehk,zbark,abark,ubind,dubind)         
 !                                                                       
 !--for freeze-out, remove the nuclear component from the totalc--energy 
-!                                                                       
+!                            
+            print *,'For freeze-out, nuclear component was removed from E_total'
             print *,'change occured at cell',k,u(k),-ubind/uergg        &
      &           ,ifleos(k)                                             
             u(k)=u(k)-ubind/uergg 
@@ -812,7 +945,8 @@
             if (ieos.eq.4) then 
                du(k)=(0.5*dq(k) - dunu(k) +                             &
      &                 sfac*dye(k)*(xmuhk-xmuek))/                      &
-     &                 temp(k)                                          
+     &                 temp(k)   
+            print *,'du was recalculated,'
             print *,'change occured at cell',k,u(k),ifleos(k) 
             endif 
          elseif(ifleos(k).eq.3.and.rho(k).lt.rhoswe) then 
@@ -1186,7 +1320,9 @@
 !****************************************************************       
 !                                                                       
       implicit double precision (a-h,o-z) 
-!                                                                       
+!             
+      logical post_bounce
+      double precision pr_turb
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
@@ -1197,6 +1333,8 @@
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /carac/ deltam(idim), abar(idim) 
       common /damping/ damp, dcell 
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /mloutput/ pr_turb(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
       data pi4/12.56637d0/ 
@@ -1218,9 +1356,13 @@
 !         deltamk=0.5d0*(deltam(km05)+deltam(kp05))                     
 !                                                                       
 !--pressure gradients                                                   
-!                  
+!        
          pressp = pr(kp05) + prnu(kp05)          
-         pressm = pr(km05) + prnu(km05) 
+         pressm = pr(km05) + prnu(km05)
+         if (post_bounce.eqv..true.) then
+             pressp = pressp+pr_turb(kp05)
+             pressm = pressm+pr_turb(km05)
+         endif
          gradp=ak*(pressp - pressm) 
          !gradpt=ak*(rho(kp05)*vturb2(kp05)-                             &
      !&        rho(km05)*vturb2(km05))                                   
@@ -3255,10 +3397,10 @@
       if (print_nuloss.eqv..true.) then 
         write(*,510)'[nue loss (foe/s)@(MeV)]',rlumnue*f,               &
      &  '               ',enue
-        write(*,510)'[nueb loss(foe/s)@(MeV)]',rlumnueb*f,               &
-     &  '               ',enueb
-        write(*,510)'[nux loss (foe/s)@(MeV)]',rlumnux*f,               &
-     &  '               ',enux
+!        write(*,510)'[nueb loss(foe/s)@(MeV)]',rlumnueb*f,               &
+!     &  '               ',enueb
+!        write(*,510)'[nux loss (foe/s)@(MeV)]',rlumnux*f,               &
+!     &  '               ',enux
   510   format(A,1p,E10.3,A,E10.3) 
       endif 
 !                                                                       
@@ -4297,7 +4439,7 @@
 !                                                                       
 !--iteration went out of bound or did not converge                      
 !                                                                       
-!      print *,'rootemp: iteration did not converge'                    
+      print *,'rootemp: iteration did not converge'                    
       write(*,*)temp,dtemp 
 !                                                                       
       return 
@@ -4700,7 +4842,7 @@
       double precision xasl, xhsl, yehsl, abar, xmuh 
 !                                                                       
       ye=dmax1(yesl,0.031d0) 
-      if (ye.gt..5d0) print *, kcell,ye 
+      if (ye.gt..5d0) print *, 'kcell, ye: ',kcell,ye 
       ye=dmin1(ye,0.5d0) 
       call inveos(inpvar,told,ye,brydns,1,eosflg,0,sf,                  &
      &            xprev,pprev)                                          
@@ -4743,7 +4885,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      integer jtrape,jtrapb,jtrapx 
+      integer jtrape,jtrapb,jtrapx, mlin_grid_size
       logical from_dump
 !                                                                       
       parameter (idim=4000) 
@@ -4796,6 +4938,7 @@
       &               dum2v(idim)
       common /cent/ dj(idim)
       common /dump/ from_dump
+      common /interp/ mlin_grid_size
 !                                                                       
       character*1024 filin,filout 
 
@@ -4815,6 +4958,8 @@
       read(11,10) mlmodel_name
    10 format(A) 
       read(11,*)
+      read(11,*) mlin_grid_size
+      read(11,*)      
       read(11,*) idump 
       read(11,*)
       read(11,*) dtime
@@ -4833,8 +4978,6 @@
       read(11,*)
       read(11,*) dcore 
       read(11,*)
-      read(11,*) ncell
-      read(11,*)
       read(11,*) delp
       read(11,*)
       read(11,*) nups
@@ -4852,21 +4995,23 @@
       read(11,*) yefact 
       !print *,'cq,cl',cq,cl 
       !print *,'iextf,ieos',iextf,ieos 
-      !print*,'======================='
-      !print*, filin
-      !print*, filout      
-      !print*, idump
-      !print*, dtime,tmax
+      print*,'================ Setup ================'
+      print*, 'Input File:           ', trim(filin)
+      print*, 'Output File:          ', trim(filout)
+      print*, 'ML Model Name:        ', trim(mlmodel_name)
+      print*, 'Grid Size for ML:  ', mlin_grid_size
+      print*, 'Dump # to read:    ', idump
+      print*, 'Dump time interval:', dtime
+      print*, 'Max time:          ', tmax
       !print*, cq,cl
       !print*, iextf,ieos,dcore
       !print*, ncell,delp,nups,damp,dcell
-      !print*, iflxlm, icvb, ufact, yefact
-      !print*,'======================='
+      !print*, iflxlm, icvb, ufact, yefact      
 !                                                                       
 !--open binary file containing initial conditions                       
 !                                                             
       open(60,file=trim(filin),form='unformatted') 
-      open(61,file=trim(filout),form='unformatted') 
+      open(61,file=trim(filout),form='unformatted')
 !                                                                       
 !--position pointer in binary file                                      
 !                                                                       
@@ -4891,12 +5036,13 @@
      &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)
      !&     (vturb2(i),i=1,nc),                                          &
 !
+      ncell = nc
       time = t 
 !                                                                       
-      print *, nc, t, xmcore, rb, ftrape,ftrapb,ftrapx 
-      do k=1,nc 
-         write(44,*)k,temp(k),u(k),u2(k) 
-      end do 
+      !print *, nc, t, xmcore, rb, ftrape,ftrapb,ftrapx 
+      !do k=1,nc 
+      !   write(44,*)k,temp(k),u(k),u2(k) 
+      !end do 
       do k=1,nc 
          if (ifleos(k).lt.0.6) stop 
          if (ifleos(k).eq.3) then 
@@ -4907,34 +5053,38 @@
 !         u(k)=0.9*u(k)                                                 
 !         u2(k)=0.9*u2(k)                                               
       end do 
-      do k=1,3 
-         print *,u2(k),pr(k),ufreez(k) 
-         print *, unue(k),unueb(k),unux(k) 
-         print *, ynue(k),ynueb(k),ynux(k) 
-         print *, xp(k), xn(k), ifleos(k), xmcore 
-         do j=1,nqn 
-            print *,ycc(k,j) 
-         end do 
-      end do 
+      !do k=1,3 
+      !   print *,u2(k),pr(k),ufreez(k) 
+      !   print *, unue(k),unueb(k),unux(k) 
+      !   print *, ynue(k),ynueb(k),ynux(k) 
+      !   print *, xp(k), xn(k), ifleos(k), xmcore 
+      !   do j=1,nqn 
+      !      print *,ycc(k,j) 
+      !   end do 
+      !end do 
       p1out=pr(ncell) 
       p2out=1.39*gg*deltam(ncell)/x(ncell)**4/pi4 
       rout=x(ncell) 
+      
+      print*,'================ ',trim(filin),' ================='
       print *, 'ncell = ', ncell 
-      print *, 'xmcore = ', xmcore 
-      print *, 'rho(1) = ', rho(1) 
-      print *, x(ncell),pr(ncell) 
-      print *, 'deltam(1) = ', deltam(1) 
-      print *, 'time = ',time 
+      print *, 'xmcore =     ', xmcore 
+      print *, 'rho(1) =     ', rho(1) 
+      print *, 'x(ncell) =   ',x(ncell)
+      print *, 'pr(ncell) =  ',pr(ncell) 
+      print *, 'deltam(1) =  ', deltam(1), ' (mass of the cell, cell centered)' 
+      print *, 'time =       ',time
+      print*,'======================================='
 !      gamma=1.666666666666667                                          
       ncell1=ncell+1 
       if (ieos.eq.4) then 
          do i=1,ncell 
-            write(71,*)i,u2(i),u(i),abar(i) 
+            !write(71,*)i,u2(i),u(i),abar(i) 
             if (ifleos(i).eq.3) then 
                s=u2(i) 
                u2(i)=u(i) 
                u(i)=s 
-               write (71,*) i,u2(i),u(i),abar(i) 
+               !write (71,*) i,u2(i),u(i),abar(i) 
             endif 
          enddo 
       endif 
@@ -5237,11 +5387,12 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      integer jtrape,jtrapb,jtrapx, ntstep, ind
-      logical from_dump
-      character*128 mlmodel_name, rho_file, x_file
+      integer jtrape,jtrapb,jtrapx, ntstep, ind, mlin_grid_size
+      logical from_dump, post_bounce
+      character*128 mlmodel_name, rho_file, x_file      
       character*10 frmtx
       character*11 frmtrho
+      double precision mlin_x, mlin_v, mlin_rho
 !                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
@@ -5277,6 +5428,8 @@
       common /therm/ xmu(idim) 
       common /timej / time, dt
       common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x
+
       logical trapnue, trapnueb, trapnux, print_nuloss 
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /typef/ iextf, ieos 
@@ -5306,7 +5459,10 @@
       common /outp/ rout, p1out, p2out
       common /mlmod/ mlmodel_name
       common /dump/ from_dump
-!                                                                       
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /interp/ mlin_grid_size
+      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)!                                                                       
+
       save ifirst
       data ifirst/.true./      
       data tiny/3.e-5/         
@@ -5348,7 +5504,8 @@
             xnold(i)=xn(i) 
             xpold(i)=xp(i) 
          enddo 
-         print *, 'calling hydro first' 
+         
+         write(*,'(A)')'<      Hydro Setup     >'             
          print_nuloss=.false. 
          call hydro(time,ncell,x,v,                                     &
      &           u,rho,ye,f1v,f1u,f1ye,q,                               &
@@ -5716,6 +5873,12 @@
             write(*,500)'[    time/tmax, dt (s) ]',                     &
      &           time*10,'/',tmax*10,steps(1)*10                              
   500       format(A,1p,E10.3,A,E9.3,E15.3)
+  
+            if (post_bounce.eqv..true.) then
+                write(*,501)'[    bounce time (s)   ]',                     &
+         &           bounce_time                              
+      501       format(A,1p,E10.3)
+            endif
 !
             if (mod(nupk,nups).eq.0) then 
                lu=72 
@@ -5730,7 +5893,8 @@
       end if 
 !                                                                       
       END  
-      
+
+
       subroutine write_data(ntstep, ncell,x, v)
        
       implicit double precision (a-h,o-z) 
@@ -6538,7 +6702,4 @@
      &   +p(7)*t96                                                      
       rk=dexp(rk) 
       return 
-      END                                           
-
-
-
+      END
