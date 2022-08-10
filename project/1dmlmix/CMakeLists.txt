@@ -21,6 +21,6 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-add_executable(1dmlmix 1dmlmix.f90 ocean.f90 sleos.f90 nse4c.f90 pytorch.f90)
+add_executable(1dmlmix 1dmlmix.f90 ocean.f90 sleos.f90 nse4c.f90 pytorch.f90 linear_interpolation_module.f90 linspace.f90)
 target_link_libraries(1dmlmix pytorch_fort_proxy pytorch_proxy)
 install(TARGETS 1dmlmix)

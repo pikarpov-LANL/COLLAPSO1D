@@ -1,16 +1,18 @@
 <Input File>
 Data
-<Output File>    
+<Output File>
 DataOut
 <Input PyTorch Model>
 traced_model.pt
+<Input Grid Size to interpolate for PyTorch Model>
+200
 <Dump # to read>
 1
 <Dump time intervals [s]>
 1.d-3
-<Max dt [s]>
-1.d0
-<Artificial Viscocity #1>
+<Max time [s]>
+0.250
+<Artifiicqial Viscocity #1>
 1.0
 <Artificial Viscocity #2>
 .25
@@ -20,8 +22,6 @@ traced_model.pt
 4
 <If > 1, include core mass>
 2.d0
-<Number of Cells (from Data)>
-1803
 <delp (not default)>
 1.d-5
 <Number of steps per luminosity output>
