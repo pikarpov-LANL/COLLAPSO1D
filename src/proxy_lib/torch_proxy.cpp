@@ -97,7 +97,7 @@ void torch_module_load_cpp(void** h_module, const char* file_name, int flags) {
 }
 
 void torch_module_forward_cpp(void* h_module, void* h_input, void** h_output, int flags) {
-    c10::InferenceMode mode(is_present_flag(flags, TORCH_FTN_MODULE_USE_INFERENCE_MODE));
+    c10::InferenceMode mode( is_present_flag(flags, TORCH_FTN_MODULE_USE_INFERENCE_MODE) );
     auto module = static_cast<torch::jit::Module*>(h_module);
     auto input  = static_cast<torch::Tensor*>(h_input);
     auto output = new torch::Tensor;
