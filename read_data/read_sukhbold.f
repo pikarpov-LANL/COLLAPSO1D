@@ -18,7 +18,7 @@ c
       parameter(uergg=1e16)
       parameter(pi43=3.14159*4.0/3.0)
 c
-      parameter(idim=4000)
+      parameter(idim=10000)
       parameter(header_length=2)
 c
       common /celle/ x(0:idim),v(0:idim)
@@ -153,7 +153,7 @@ c
       x(0) = 0.d0
       v(0) = 0.d0
       enclmass(0) = 0.d0
-      do i=1,4000
+      do i=1,idim
          do k=1,nkep
             if (rad(k).gt.x(i-1)) goto 20
          end do
@@ -350,7 +350,7 @@ c
       implicit double precision (a-h, o-z)
 c
       logical from_dump
-      parameter (idim=4000)
+      parameter (idim=10000)
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
       common /numb/ ncell
