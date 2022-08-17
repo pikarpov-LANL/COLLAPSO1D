@@ -322,7 +322,7 @@
           !--calculate PNS & shock radii, only in post-bounce stage
            call shock_radius(ncell,x,v,print_nuloss)
            call pns_radius(ncell,x,rho,print_nuloss)
-           call interpolate(ncell,x,v)  
+           !call interpolate(ncell,x,v)  
            
            !--turbulence contribution to pressure via ML in post-bounce regime
            !call turbpress(ncell,rho,x,v)
@@ -471,28 +471,31 @@
       integer :: i,j, ind
       logical print_nuloss
 !                              
-      initial_v = v(size(v))      
+      !initial_v = v(size(v))      
 
-      do i=size(v), 1, -1
-          if (v(i).le.(initial_v-(initial_v-minval(v))*0.1)) then
-              old_max_v = v(i)
-              do j=i-1,0,-1
-                  if (v(j) .le. old_max_v) then
-                      old_max_v = v(j)
-                  else
-                      shock_x = x(j)
-                      shock_ind = j
-                      EXIT
-                  end if 
-              end do
-              EXIT
-          end if
-      end do
+      !do i=size(v), 1, -1
+      !    if (v(i).le.(initial_v-(initial_v-minval(v))*0.1)) then
+      !        old_max_v = v(i)
+      !        do j=i-1,0,-1
+      !            if (v(j) .le. old_max_v) then
+      !                old_max_v = v(j)
+      !            else
+      !                shock_x = x(j)
+      !                shock_ind = j
+      !                EXIT
+      !            end if 
+      !        end do
+      !        EXIT
+      !    end if
+      !end do
+      
+      shock_ind = minloc(v, dim=1)
+      shock_x = x(shock_ind)
 
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
-          write(*,511)'[ shock radius (i, cm) ]', int(shock_ind),               &
-          '                    ', 1.d9*shock_x          
+          write(*,511)'[ shock radius (i, km) ]', int(shock_ind),               &
+          '                    ', 1.d4*shock_x          
       end if 
       
       return
@@ -513,7 +516,7 @@
       integer :: i
       logical print_nuloss
 !      
-      rho_threshold = 5.d10
+      rho_threshold = 2.d11
 !
       do i=size(rho), 1, -1        
           if (rho(i) .ge. rho_threshold) then                        
@@ -525,8 +528,8 @@
 
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
-          write(*,511)'[ PNS radius (i, cm) ]', int(pns_ind),               &
-          '                    ', 1.d9*pns_x          
+          write(*,511)'[ PNS radius (i, km) ]', int(pns_ind),               &
+          '                    ', 1.d4*pns_x          
       end if 
       
       return
@@ -3393,19 +3396,19 @@
       rlumnueb=0.8*rlumnueb 
       rlumnux=rlumnux 
 !                                                                       
-      f=ufoe/utime 
+      unitf=ufoe/utime 
       if (print_nuloss.eqv..true.) then 
-        write(*,510)'[nue loss (foe/s)@(MeV)]',rlumnue*f,               &
+        write(*,510)'[nue loss (foe/s)@(MeV)]',rlumnue*unitf,           &
      &  '               ',enue
-!        write(*,510)'[nueb loss(foe/s)@(MeV)]',rlumnueb*f,               &
+!        write(*,510)'[nueb loss(foe/s)@(MeV)]',rlumnueb*unitf,          &
 !     &  '               ',enueb
-!        write(*,510)'[nux loss (foe/s)@(MeV)]',rlumnux*f,               &
+!        write(*,510)'[nux loss (foe/s)@(MeV)]',rlumnux*unitf,           &
 !     &  '               ',enux
   510   format(A,1p,E10.3,A,E10.3) 
       endif 
 !                                                                       
       return 
-      END                                           
+      END                                             
 !                                                                       
       subroutine nupp(ncell,rho,ye,dynue,dynueb,dynux,                  &
      &                dunue,dunueb,dunux)                               
