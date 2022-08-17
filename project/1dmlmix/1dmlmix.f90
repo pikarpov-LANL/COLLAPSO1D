@@ -521,7 +521,7 @@
 !
       do i=size(rho), 1, -1        
           if (rho(i) .ge. rho_threshold) then                        
-              pns_x = rho(i)
+              pns_x = x(i)
               pns_ind = i
               EXIT
           end if 
@@ -529,7 +529,7 @@
 
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
-          write(*,511)'[ PNS radius (i, km) ]', int(pns_ind),               &
+          write(*,511)'[   PNS radius (i, km) ]', int(pns_ind),               &
           '                    ', 1.d4*pns_x          
       end if 
       
