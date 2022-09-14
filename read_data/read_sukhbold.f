@@ -18,7 +18,7 @@ c
       parameter(uergg=1e16)
       parameter(pi43=3.14159*4.0/3.0)
 c
-      parameter(idim=10000)
+      parameter(idim=4000)
       parameter(header_length=2)
 c
       common /celle/ x(0:idim),v(0:idim)
@@ -350,7 +350,7 @@ c
       implicit double precision (a-h, o-z)
 c
       logical from_dump
-      parameter (idim=10000)
+      parameter (idim=4000)
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
       common /numb/ ncell
@@ -419,7 +419,8 @@ c
      $     (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),
      $     (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),
      $     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),
-     $     (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
+     $     (dj(i),i=1,nc),
+     $     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
      $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)   
 c
       do i=1,ncell

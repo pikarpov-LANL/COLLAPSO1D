@@ -205,7 +205,7 @@
 !                                        
 !--compute density                                                      
 ! ---------------------------------------------------------             
-!                                                                       
+!    
       call density(ncell,x,rho) 
 !                                                                      
 !                                                                       
@@ -213,7 +213,10 @@
 !  ----------------------------------                                   
 !  (this allows the use of simple eos)                                  
 !  (ieos=3 or 4 calls for the sophisticated eos's)                      
-!                                                                       
+!                               
+      !do i=30,40
+      !    print*, i, ye(i)
+      !enddo
       !print *, '[time] ',time,ieos                                     
       if(ieos.eq.1)call eospg(ncell,rho,u) 
       if(ieos.eq.2)call eospgr(ncell,rho,u) 
@@ -240,7 +243,7 @@
          ynuxmx=dmax1(ynux(k),ynuxmx) 
          if (ye(k).lt.0.0) print *,'ye<0, k=',k,ye(k) 
 !         if (ye(k).gt.0.51) print *,'ye>0.51, k=',k,ye(k)              
-         if (ynue(k).lt.tiny) print *,'yne<0, k=',k,ynue(k),            &
+         if (ynue(k).lt.tiny) print *,'ynue<0, k=',k,ynue(k),            &
      &                               trapnue(k),ebetaeq(k)              
                                                                         
          if (ynux(k).lt.tiny) print*,'ynux<0, k=',k,ynux(k) 
@@ -4174,8 +4177,8 @@
 !--set the critical densities for Swesty's eos, nu trapping             
 !                                                                       
       t9nse=8. 
-      rhoswe=1.e11/udens 
-!      rhoswe=1.e11/udens                                               
+!      rhoswe=1.e9/udens 
+      rhoswe=1.e11/udens                                               
       rhonue=0.1e11/udens 
       rhonux=0.2e11/udens 
 !                                                                       
@@ -4846,7 +4849,10 @@
       double precision xasl, xhsl, yehsl, abar, xmuh 
 !                                                                       
       ye=dmax1(yesl,0.031d0) 
-      if (ye.gt..5d0) print *, 'kcell, ye: ',kcell,ye 
+      if (ye.gt..5d0) then 
+          print *, 'kcell, ye: ',kcell,ye 
+          !call exit(0)
+      endif
       ye=dmin1(ye,0.5d0) 
       call inveos(inpvar,told,ye,brydns,1,eosflg,0,sf,                  &
      &            xprev,pprev)                                          
@@ -5036,7 +5042,8 @@
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
+     &      (dj(i),i=1,nc),                                             &
+     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
      &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)
      !&     (vturb2(i),i=1,nc),                                          &
 !
@@ -5190,13 +5197,14 @@
       write(lu)nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
      &      shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,       &
      &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
-     &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
+     &      (uint(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),       &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
      &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
-     &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
+     &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),            &
+     &      (dj(i),i=1,nc),                                             &
+     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
      &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)             
 !     &     (vturb2(i),i=1,nc),                                          &
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
@@ -5509,7 +5517,7 @@
             xpold(i)=xp(i) 
          enddo 
          
-         write(*,'(A)')'<      Hydro Setup     >'             
+         write(*,'(A)')'<      Hydro Setup     >'       
          print_nuloss=.false. 
          call hydro(time,ncell,x,v,                                     &
      &           u,rho,ye,f1v,f1u,f1ye,q,                               &
@@ -5518,6 +5526,9 @@
      &           unue,unueb,unux,f1unue,f1unueb,f1unux,                 &
      &           print_nuloss,ntstep)                                          
       end if 
+      !do i=30,40
+      !    print*, i, ye(i)
+      !enddo      
 !                                                                       
 !--set step counter                                                     
 !                                                                       
@@ -5574,10 +5585,15 @@
      !fmix2,                     &
      &         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
      &         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
-     &         print_nuloss,ntstep)          
+     &         print_nuloss,ntstep)        
 !                                                                       
 !--advance all the gas particles                                        
-!                                                                       
+!        
+         !do i=30,40
+         !    print*, i, dtf21*f1ye(i), dtf22*f2ye(i) 
+          !print*, i, dumye(i), ye(i),dtf21*f1ye(i), dtf22*f2ye(i) 
+          !print*, i, ye(i)+dtf21*f1ye(i)+dtf22*f2ye(i) 
+         !enddo
          do i=1,ncell 
             dtf21=f21*steps(i) 
             dtf22=f22*steps(i) 
@@ -5598,6 +5614,9 @@
                dumye(i)=.02 
             end if 
          enddo 
+         !do i=30,40
+         !    print*, i, dft21, dft22, steps(i)
+         !enddo         
 !                                                                       
 !     set saturation const=0                                            
          satc=0 
@@ -5606,13 +5625,19 @@
 !                                                                       
          tfull=time + steps(1) 
          print_nuloss=.true. 
-         !call write_data(ntstep*2+1,ncell,x,v)         
+         !call write_data(ntstep*2+1,ncell,x,v)
+         !print*, '.......................'
+         !do i=30,40
+         ! print*, i, dumye(i)
+         !enddo         
+         !print*, '-----------------------'
          call hydro(tfull,ncell,dumx,dumv,                              &
      &         dumu,rho,dumye,f2v,f2u,f2ye,q,                           &
      !fmix2,                     &
      &         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
      &         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
      &         print_nuloss,ntstep)    
+      !call exit(0)     
 !                                                                       
 !--estimate integration error and set time step. If reduction           
 !  the maximum time step is set to dtime.                               
