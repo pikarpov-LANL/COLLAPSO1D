@@ -550,7 +550,9 @@
       implicit double precision (a-h,o-z) 
 
       logical post_bounce
+
       parameter (idim=10000) 
+
       common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
            &               enue, enueb, enux, e2nue, e2nueb, e2nux
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
@@ -4849,10 +4851,7 @@
       double precision xasl, xhsl, yehsl, abar, xmuh 
 !                                                                       
       ye=dmax1(yesl,0.031d0) 
-      if (ye.gt..5d0) then 
-          print *, 'kcell, ye: ',kcell,ye 
-          !call exit(0)
-      endif
+      if (ye.gt..5d0) print *, 'kcell, ye: ',kcell,ye 
       ye=dmin1(ye,0.5d0) 
       call inveos(inpvar,told,ye,brydns,1,eosflg,0,sf,                  &
      &            xprev,pprev)                                          
