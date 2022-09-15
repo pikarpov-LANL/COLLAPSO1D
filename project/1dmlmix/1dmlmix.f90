@@ -13,7 +13,7 @@
       integer jtrape,jtrapb,jtrapx,ntstep
       character*128 mlmodel_name
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       common /bstuf/ rb, dumrb, f1rb, f2rb 
@@ -156,7 +156,7 @@
       logical post_bounce
       double precision mlin_x, mlin_v, mlin_rho
 
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
       parameter (tiny=-1e-5) 
 !                                                                       
@@ -205,7 +205,7 @@
 !                                        
 !--compute density                                                      
 ! ---------------------------------------------------------             
-!                                                                       
+!    
       call density(ncell,x,rho) 
 !                                                                      
 !                                                                       
@@ -213,7 +213,10 @@
 !  ----------------------------------                                   
 !  (this allows the use of simple eos)                                  
 !  (ieos=3 or 4 calls for the sophisticated eos's)                      
-!                                                                       
+!                               
+      !do i=30,40
+      !    print*, i, ye(i)
+      !enddo
       !print *, '[time] ',time,ieos                                     
       if(ieos.eq.1)call eospg(ncell,rho,u) 
       if(ieos.eq.2)call eospgr(ncell,rho,u) 
@@ -240,7 +243,7 @@
          ynuxmx=dmax1(ynux(k),ynuxmx) 
          if (ye(k).lt.0.0) print *,'ye<0, k=',k,ye(k) 
 !         if (ye(k).gt.0.51) print *,'ye>0.51, k=',k,ye(k)              
-         if (ynue(k).lt.tiny) print *,'yne<0, k=',k,ynue(k),            &
+         if (ynue(k).lt.tiny) print *,'ynue<0, k=',k,ynue(k),            &
      &                               trapnue(k),ebetaeq(k)              
                                                                         
          if (ynux(k).lt.tiny) print*,'ynux<0, k=',k,ynux(k) 
@@ -322,7 +325,7 @@
           !--calculate PNS & shock radii, only in post-bounce stage
            call shock_radius(ncell,x,v,print_nuloss)
            call pns_radius(ncell,x,rho,print_nuloss)
-           call interpolate(ncell,x,v)  
+           !call interpolate(ncell,x,v)  
            
            !--turbulence contribution to pressure via ML in post-bounce regime
            !call turbpress(ncell,rho,x,v)
@@ -369,7 +372,7 @@
       integer mlin_grid_size
       double precision mlin_x, mlin_v, mlin_rho, pr_turb   
 !
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim) 
@@ -425,7 +428,7 @@
       integer mlin_grid_size
       double precision mlin_x, mlin_v, mlin_rho
 
-      parameter(idim=4000)   
+      parameter(idim=10000)   
       dimension x(1:ncell),v(1:ncell),rho(1:ncell)
 
       common /rshock/ shock_ind, shock_x
@@ -471,28 +474,31 @@
       integer :: i,j, ind
       logical print_nuloss
 !                              
-      initial_v = v(size(v))      
+      !initial_v = v(size(v))      
 
-      do i=size(v), 1, -1
-          if (v(i).le.(initial_v-(initial_v-minval(v))*0.1)) then
-              old_max_v = v(i)
-              do j=i-1,0,-1
-                  if (v(j) .le. old_max_v) then
-                      old_max_v = v(j)
-                  else
-                      shock_x = x(j)
-                      shock_ind = j
-                      EXIT
-                  end if 
-              end do
-              EXIT
-          end if
-      end do
+      !do i=size(v), 1, -1
+      !    if (v(i).le.(initial_v-(initial_v-minval(v))*0.1)) then
+      !        old_max_v = v(i)
+      !        do j=i-1,0,-1
+      !            if (v(j) .le. old_max_v) then
+      !                old_max_v = v(j)
+      !            else
+      !                shock_x = x(j)
+      !                shock_ind = j
+      !                EXIT
+      !            end if 
+      !        end do
+      !        EXIT
+      !    end if
+      !end do
+      
+      shock_ind = minloc(v, dim=1)
+      shock_x = x(shock_ind)
 
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
-          write(*,511)'[ shock radius (i, cm) ]', int(shock_ind),               &
-          '                    ', 1.d9*shock_x          
+          write(*,511)'[ shock radius (i, km) ]', int(shock_ind),               &
+          '                    ', 1.d4*shock_x          
       end if 
       
       return
@@ -513,11 +519,12 @@
       integer :: i
       logical print_nuloss
 !      
-      rho_threshold = 5.d10
+!--g/cm^3 / unit conversion
+      rho_threshold = 2.d11/2.d6
 !
       do i=size(rho), 1, -1        
           if (rho(i) .ge. rho_threshold) then                        
-              pns_x = rho(i)
+              pns_x = x(i)
               pns_ind = i
               EXIT
           end if 
@@ -525,8 +532,8 @@
 
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
-          write(*,511)'[ PNS radius (i, cm) ]', int(pns_ind),               &
-          '                    ', 1.d9*pns_x          
+          write(*,511)'[   PNS radius (i, km) ]', int(pns_ind),               &
+          '                    ', 1.d4*pns_x          
       end if 
       
       return
@@ -543,7 +550,9 @@
       implicit double precision (a-h,o-z) 
 
       logical post_bounce
-      parameter (idim=4000) 
+
+      parameter (idim=10000) 
+
       common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
            &               enue, enueb, enux, e2nue, e2nueb, e2nux
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
@@ -575,7 +584,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension x(0:idim),v(0:idim) 
@@ -659,7 +668,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
       dimension x(0:idim),rho(idim) 
       common /carac/ deltam(idim), abar(idim) 
@@ -688,7 +697,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
       parameter (avokb=6.02e23*1.381e-16) 
 !                                                                       
@@ -805,7 +814,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       parameter (avokb=6.02e23*1.381e-16) 
@@ -996,7 +1005,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim), u(idim) 
@@ -1049,7 +1058,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim), u(idim) 
@@ -1114,7 +1123,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       double precision umass 
@@ -1253,7 +1262,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension x(0:idim),f(0:idim),v(0:idim) 
@@ -1323,7 +1332,7 @@
 !             
       logical post_bounce
       double precision pr_turb
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension x(0:idim),f(0:idim),v(0:idim) 
@@ -1398,7 +1407,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
       dimension x(0:idim),f(0:idim) 
       dimension gpot(idim),deltam(idim) 
@@ -1459,7 +1468,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim) 
       common /numb/ ncell, ncell1 
@@ -1765,7 +1774,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter (delta=0.783) 
       parameter (deltab=1.805) 
 !-- tffac=(6pi^2/2)^2/3 hbar*2/(2 mp kb)*avo^2/3                        
@@ -1972,7 +1981,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
 !                                                                       
       parameter(sinw2=0.23) 
       parameter(fe=(1.+4.*sinw2+8.*sinw2*sinw2)/(6.*3.14159)) 
@@ -2057,7 +2066,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !--1/(2.*avo*pi**2*(hbar*c)**3 in Mev-3 cm-3 nucleon g-1)               
       parameter (prefac=1.09e7) 
@@ -2158,7 +2167,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (tiny=1d-15) 
       parameter (rcrit=1.) 
 !                                                                       
@@ -2322,7 +2331,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter(fs=1./(12.*3.14159)) 
 !-- cross section Gf / gram is 6.02e23*5.29e-44=3.2e-20                 
       parameter(sigma=fs*3.2e-20) 
@@ -2468,7 +2477,7 @@
 !                                                                       
       integer ncell 
       parameter (tiny=1.d-10) 
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
       dimension x(0:idim), rho(idim), ye(idim) 
       dimension dynue(idim),dynueb(idim),dynux(idim),                   &
@@ -2858,7 +2867,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter (idim1=idim+1) 
 !--1/(avo*pi**2*(hbar*c)**3 in Mev-3 cm-3 nucleon g-1)                  
 !      parameter(prefac=2.19e7)                                         
@@ -3039,7 +3048,7 @@
       integer jtrape,jtrapb,jtrapx 
 !                                                                       
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (small=1d-20) 
       parameter (rcrit=1.) 
 !                                                                       
@@ -3393,19 +3402,19 @@
       rlumnueb=0.8*rlumnueb 
       rlumnux=rlumnux 
 !                                                                       
-      f=ufoe/utime 
+      unitf=ufoe/utime 
       if (print_nuloss.eqv..true.) then 
-        write(*,510)'[nue loss (foe/s)@(MeV)]',rlumnue*f,               &
+        write(*,510)'[nue loss (foe/s)@(MeV)]',rlumnue*unitf,           &
      &  '               ',enue
-!        write(*,510)'[nueb loss(foe/s)@(MeV)]',rlumnueb*f,               &
+!        write(*,510)'[nueb loss(foe/s)@(MeV)]',rlumnueb*unitf,          &
 !     &  '               ',enueb
-!        write(*,510)'[nux loss (foe/s)@(MeV)]',rlumnux*f,               &
+!        write(*,510)'[nux loss (foe/s)@(MeV)]',rlumnux*unitf,           &
 !     &  '               ',enux
   510   format(A,1p,E10.3,A,E10.3) 
       endif 
 !                                                                       
       return 
-      END                                           
+      END                                             
 !                                                                       
       subroutine nupp(ncell,rho,ye,dynue,dynueb,dynux,                  &
      &                dunue,dunueb,dunux)                               
@@ -3419,7 +3428,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
 !                                                                       
       dimension rho(idim), ye(idim) 
       dimension dynue(idim), dynueb(idim), dynux(idim),                 &
@@ -3532,7 +3541,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim) 
@@ -3586,7 +3595,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
 !                                                                       
       parameter(sinw2=0.23) 
       parameter(ga=-0.5) 
@@ -3865,7 +3874,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter(tiny=1d-15) 
 !                                                                       
       dimension x(0:idim) 
@@ -3990,7 +3999,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension x(0:idim),rho(idim),v(0:idim) 
@@ -4142,7 +4151,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
 !                                                                       
       common /carac/ deltam(idim), abar(idim) 
@@ -4170,8 +4179,8 @@
 !--set the critical densities for Swesty's eos, nu trapping             
 !                                                                       
       t9nse=8. 
-      rhoswe=1.e11/udens 
-!      rhoswe=1.e11/udens                                               
+!      rhoswe=1.e9/udens 
+      rhoswe=1.e11/udens                                               
       rhonue=0.1e11/udens 
       rhonux=0.2e11/udens 
 !                                                                       
@@ -4214,7 +4223,7 @@
 !************************************************************           
 !                                                                       
       implicit double precision (a-h,o-z) 
-      parameter(idim=4000) 
+      parameter(idim=10000) 
 !                                                                       
       dimension x(0:idim), v(0:idim),u(idim),                           &
      &     rho(idim), ye(idim)                                          
@@ -4323,7 +4332,7 @@
 !************************************************************           
 !                                                                       
       implicit double precision (a-h,o-z) 
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter(idim1=idim+1) 
 !                                                                       
       dimension x(0:idim), v(0:idim),u(idim),                           &
@@ -4888,7 +4897,7 @@
       integer jtrape,jtrapb,jtrapx, mlin_grid_size
       logical from_dump
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       real ycc,yccave
@@ -5032,7 +5041,8 @@
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
+     &      (dj(i),i=1,nc),                                             &
+     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
      &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)
      !&     (vturb2(i),i=1,nc),                                          &
 !
@@ -5115,7 +5125,7 @@
       integer jtrape,jtrapb,jtrapx 
       logical from_dump
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
 !                                                                       
@@ -5186,13 +5196,14 @@
       write(lu)nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
      &      shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,       &
      &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
-     &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
+     &      (uint(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),       &
      &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
      &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
-     &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
+     &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),            &
+     &      (dj(i),i=1,nc),                                             &
+     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
      &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)             
 !     &     (vturb2(i),i=1,nc),                                          &
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
@@ -5394,7 +5405,7 @@
       character*11 frmtrho
       double precision mlin_x, mlin_v, mlin_rho
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       logical ifirst, reset(idim)
@@ -5505,7 +5516,7 @@
             xpold(i)=xp(i) 
          enddo 
          
-         write(*,'(A)')'<      Hydro Setup     >'             
+         write(*,'(A)')'<      Hydro Setup     >'       
          print_nuloss=.false. 
          call hydro(time,ncell,x,v,                                     &
      &           u,rho,ye,f1v,f1u,f1ye,q,                               &
@@ -5514,6 +5525,9 @@
      &           unue,unueb,unux,f1unue,f1unueb,f1unux,                 &
      &           print_nuloss,ntstep)                                          
       end if 
+      !do i=30,40
+      !    print*, i, ye(i)
+      !enddo      
 !                                                                       
 !--set step counter                                                     
 !                                                                       
@@ -5570,10 +5584,15 @@
      !fmix2,                     &
      &         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
      &         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
-     &         print_nuloss,ntstep)          
+     &         print_nuloss,ntstep)        
 !                                                                       
 !--advance all the gas particles                                        
-!                                                                       
+!        
+         !do i=30,40
+         !    print*, i, dtf21*f1ye(i), dtf22*f2ye(i) 
+          !print*, i, dumye(i), ye(i),dtf21*f1ye(i), dtf22*f2ye(i) 
+          !print*, i, ye(i)+dtf21*f1ye(i)+dtf22*f2ye(i) 
+         !enddo
          do i=1,ncell 
             dtf21=f21*steps(i) 
             dtf22=f22*steps(i) 
@@ -5594,6 +5613,9 @@
                dumye(i)=.02 
             end if 
          enddo 
+         !do i=30,40
+         !    print*, i, dft21, dft22, steps(i)
+         !enddo         
 !                                                                       
 !     set saturation const=0                                            
          satc=0 
@@ -5602,13 +5624,19 @@
 !                                                                       
          tfull=time + steps(1) 
          print_nuloss=.true. 
-         !call write_data(ntstep*2+1,ncell,x,v)         
+         !call write_data(ntstep*2+1,ncell,x,v)
+         !print*, '.......................'
+         !do i=30,40
+         ! print*, i, dumye(i)
+         !enddo         
+         !print*, '-----------------------'
          call hydro(tfull,ncell,dumx,dumv,                              &
      &         dumu,rho,dumye,f2v,f2u,f2ye,q,                           &
      !fmix2,                     &
      &         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
      &         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
      &         print_nuloss,ntstep)    
+      !call exit(0)     
 !                                                                       
 !--estimate integration error and set time step. If reduction           
 !  the maximum time step is set to dtime.                               
@@ -6116,7 +6144,7 @@
 !                                                                *      
 !*****************************************************************      
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       parameter (nel=14) 

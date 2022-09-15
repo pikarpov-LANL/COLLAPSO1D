@@ -1,33 +1,58 @@
 
 ## General:
 
-netwinv4, *.atb, #.inc are all eos/nse files
+`netwinv4`, `*.atb`, `#.inc` are all eos/nse files
 
 Note that there are some warnings in the code.  Most due to one of the old EOSs used that Nadyozhin and Blinnikov developed.
 
-## Setup Code
-readalexnew.f 
-compile gfortran readalexnew.f -o a.out
+## Setup Code 
+
+### setup
+Compile data format conversion: 
+
+```shell
+gfortran readalexnew.f -o a.out
+```
+
 When it runs, it asks for the innermost zone mass and then evolves the masses based on prescriptions that worked well a long time ago.  
 
-run15f1:
+### run15f1
+
 Core-Collapse Code:
-1dburn.f is the main core-collapse code
-ocean.f is the low-density eos
-nse4c.f is the nse code
-sleos.f is the Swesty-Lattimer EOS
+
+| File     | Description             |
+| -------- | ----------------------- |
+| 1dburn.f | main core-collapse code |
+| ocean.f  | the low-density eos     |
+| nse4c.f  | the nse code            |
+| sleos.f  | the Swesty-Lattimer EOS |
 
 ## to compile:
+
+```shell
 gfortran -O 1dburn.f ocean.f nse4c.f sleos.f -o goodname
+```
 
 It reads inlahyc that has the 
-input file
-output file
-dump number to read the input file
-initial timestep and total timestep
-artificial viscosity values
-options: external force (not used in this code), equation of state option, if >1, include core mass
-number of zones, delp (not used in current version), nups (number of steps per luminosity output), damping term, damping zones below this number
-iflxlm (flux limiter option), capture rate option, changing the nuclear potential energy (why?), yefact (not used)
+
+1. input file
+2. output file
+3. dump number to read the input file
+4. initial timestep and total timestep
+5. artificial viscosity values
+6. options: 
+   1. external force (not used in this code)
+   2. equation of state option
+   3. if >1, include core mass
+7. options: number of zones
+   1. delp (not used in current version)
+   2. nups (number of steps per luminosity output)
+   3. damping term
+   4. damping zones below this number
+8. options: 
+   1. iflxlm (flux limiter option)
+   2. capture rate option
+   3. changing the nuclear potential energy (why?)
+   4. yefact (not used)
 
 readoutput codes read the binary output and put into ascii

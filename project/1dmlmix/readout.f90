@@ -156,7 +156,7 @@
             sumfe=0. 
             iskip=0 
             write(69,*) 'Time [s]  R_shock [index]  R_shock [cm] nu_e_flux [foe/s]'
-            write(69,108)10.d0*t, int(shock_ind), 1.d9*shock_x, rlumnue
+            write(69,108)10.d0*t, int(shock_ind), 1.d9*shock_x, 2.d-3*rlumnue
             write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
                         & Ye  Pressure [g/cm/s^2] Temperature [K]'            
             do i=1,nc 

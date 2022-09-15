@@ -19,8 +19,11 @@ c
       parameter(pi43=3.14159*4.0/3.0)
 c
       parameter(idim=4000)
-      parameter(header_length=22)
-c
+c      parameter (nkep=1129)
+      parameter (nkep=1073)
+c      parameter (nkep=1067)
+      common /kep/ vel(nkep),rad(nkep),dens(nkep),t9(nkep),
+     1             yel(nkep),ab(nkep),omega(nkep),press(nkep)
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
       common /numb/ ncell
@@ -38,13 +41,9 @@ c
       double precision rhocgs, tkelv, yej, abarj, ucgs, pcgs, xpj, xnj
       double precision f3, totalmass,enclmass(0:idim)
       double precision mcut
-      double precision, allocatable :: vel(:),rad(:),dens(:),t9(:),
-     1             yel(:),ab(:),omega(:),press(:)
       integer max,j,i,izone
-      integer nlines, nkep      
 c
-      character*1024 filin,filout
-      character setup_par
+      character*9 filout
       character*1 ajunk
 c
 c      print *, 'mass cut'
@@ -53,45 +52,10 @@ c      read *, mcut
       max=0
       maxrad = 8.0e4
       open (42,file='mess2')
-c      
-c--read options
-c      
-
-      open(521,file='setup')
-      read(521,*)
-      read(521,522) filin
-      read(521,*)
-      read(521,*)
-      read(521,522) filout      
-      read(521,*)
-      read(521,*)
-      read(521,*) deltam(1)
-  522 format(A)      
-c
-c--get number of entries
-c
-      nlines = 0
-      OPEN (1, file = trim(filin))
-      DO
-          READ (1,*, END=42)
-          nlines = nlines + 1
-      END DO
-   42 CLOSE (1)
-c   
-      nkep = nlines-header_length
-      allocate(vel(nkep))
-      allocate(rad(nkep))
-      allocate(dens(nkep))
-      allocate(t9(nkep))
-      allocate(yel(nkep))
-      allocate(ab(nkep))
-      allocate(omega(nkep))
-      allocate(press(nkep))
-c
-c--read-in the data
-c
-      open(11,file=trim(filin))
-      do i=1,header_length
+      open(11,file='s20presn')
+c      open(11,file='s15presn')
+c      open(11,file='s25presn')
+      do i=1,22
          read(11,*)ajunk
          print *, ajunk
       end do
@@ -135,7 +99,7 @@ c        end if
       end do
       print *, dmtot,rold
       print *, 'initial cell mass?'
-c      read(*,*) deltam(1)
+      read(*,*) deltam(1)
       print *, totalmass, deltam(1)
 c
 c--nucdata is in nse5.f
@@ -328,13 +292,12 @@ c
  102  format(20(1pe9.2))
  103  format(3(1pe16.8))
  115  format(I5,1pe13.4)
-      open (29,file=trim(filout),form='unformatted')
+      print *, ncell
+      print *,'What is the output file name?'
+      read(*,99) filout
+   99 format(A9)   
+      open (29,file=filout,form='unformatted')
       call wdump
-      print *,'-----------------------------------'
-      print *,'  Input progenitor:         ', trim(filin)
-      print *,'  Number of cells:  ', ncell
-      print *,'  Output file name:         ', trim(filout) 
-      print *,'-----------------------------------'
       stop
       end
 c
@@ -347,7 +310,6 @@ c************************************************************
 c
       implicit double precision (a-h, o-z)
 c
-      logical from_dump
       parameter (idim=4000)
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
@@ -366,19 +328,6 @@ c
       common /cent/ dj(idim)
       real ycc(idim,20)
       common /abun/ ycc
-      common /timei/ steps(idim)
-      common /rshock/ shock_ind, shock_x
-      common /dump/ from_dump
-      double precision rlumnue,rlumnueb,rlumnux      
-c      
-      steps = 0
-      shock_ind = 0
-      shock_x = 0
-      from_dump = .false.      
-c--initialize neutrino fluxes      
-      rlumnue = 0
-      rlumnueb = 0
-      rlumnux = 0 
 c
       nc = ncell
       do i=1,nc
@@ -407,9 +356,7 @@ c--write
 c
       print *, nc
 c
-      nqn=17
       write(29,iostat=io,err=10)nc,t,gc,rb,fe,fb,fx,
-     $     shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,
      $     (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),
      $     (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),
      $     (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),
@@ -417,9 +364,8 @@ c
      $     (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),
      $     (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),
      $     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),
-     $     (dj(i),i=1,nc),
-     $     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
-     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc) 
+     $     (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
+     $     ((ycc(i,j),j=1,19),i=1,nc)
       print *, nc,t,gc,rb,fe,fb,fx
 c
       do i=1,ncell
@@ -8177,7 +8123,6 @@ C***********************************************************************
  100  FHALF=F1  
  999  RETURN
       END
-
 
 
 
