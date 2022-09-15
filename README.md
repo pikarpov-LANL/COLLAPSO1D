@@ -5,7 +5,7 @@
 3. [Setup Details](README.md#setup-details)
 4. [Make Commands](README.md#make-commands)
 
-This is a 1D lagrangian code to explore CCSN modeling. For progenitors, it takes KEPLER generated data. Currently, there is support for [Heger et al, 2000](https://2sn.org/stellarevolution/) and [Sukhbold et al, 2016](https://arxiv.org/abs/1510.04643).
+This is a 1D lagrangian code to explore CCSN modeling. For progenitors, it takes KEPLER generated data. Currently, there is support for [Heger & Woosley, 2000:](https://2sn.org/stellarevolution/) and [Sukhbold et al, 2016](https://arxiv.org/abs/1510.04643).
 
 Turbulence is treated through mixing length theory (MLT) and Machine Learning (ML) based models. The latter has been trained using the [Sapsan](https://github.com/pikarpov-LANL/Sapsan) ML pipeline.
 

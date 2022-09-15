@@ -4752,8 +4752,8 @@
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
-     &     (vturb2(i),i=1,nc),                                          &
+     &     (vturb2(i),i=1,nc),                                          &     
+     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &     
      &     ((ycc(i,j),j=1,nqn),i=1,nc)                                  
 !                                                                       
       time = t 
@@ -4896,8 +4896,8 @@
      &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
      &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
      &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),            &
-     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),               &
      &     (vturb2(i),i=1,nc),                                          &
+     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),               &
      &     ((ycc(i,j),j=1,nqn),i=1,nc)                                  
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
 !                                                                       

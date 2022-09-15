@@ -52,8 +52,8 @@ c      read *, mcut
       max=0
       maxrad = 8.0e4
       open (42,file='mess2')
-c      open(11,file='s20presn')
-      open(11,file='s15presn')
+      open(11,file='s20presn')
+c      open(11,file='s15presn')
 c      open(11,file='s25presn')
       do i=1,22
          read(11,*)ajunk
