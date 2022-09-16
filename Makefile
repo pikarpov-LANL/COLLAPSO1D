@@ -1,6 +1,6 @@
 #If 'cmake' is not found automatically, enter its location manually below
 CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
-#CMAKE_PREFIX_PATH:=/home/$(USER)/anaconda3/lib/python3.8/site-packages/torch/share/cmake
+#CMAKE_PREFIX_PATH=/home/pkarpov/anaconda3/lib/python3.10/site-packages/torch/share/cmake
 
 CONFIG:=Debug
 OPENACC:=0
@@ -14,8 +14,8 @@ INST:=$(WORKDIR)/install
 PROJECT_NAME:=1dmlmix
 PROJECT_DIR:=$(WORKDIR)/project
 EXAMPLES_DIR:=$(WORKDIR)/examples
-DATA_READ:=read_sukhbold.f
-DATA_DIR:=$(WORKDIR)/read_data
+PREP_DATA:=prep_woosley.f#prep_sukhbold.f
+DATA_DIR:=$(WORKDIR)/prep_data
 DATA_FILE:=$(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup)
 
 .PHONY: all project examples data clean
@@ -70,10 +70,10 @@ examples:
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(EXAMPLES_DIR)/$${f}; done
 
 data:
-	@echo "=== Using read_data/setup ==="
-	cd read_data && \
-	gfortran -std=legacy $(DATA_READ) -o read_data && \
-	./read_data
+	@echo "=== Using prep_data/setup ==="
+	cd prep_data && \
+	gfortran -std=legacy $(PREP_DATA) -o prep_data && \
+	./prep_data
 	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
 	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="
 
