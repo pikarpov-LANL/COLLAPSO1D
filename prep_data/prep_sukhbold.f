@@ -371,7 +371,7 @@ c
       common /timei/ steps(idim)
       common /rshock/ shock_ind, shock_x
       common /dump/ from_dump
-      double precision rlumnue, rlumnueb, rlumnux      
+      double precision rlumnue,rlumnueb,rlumnux      
 c      
       steps = 0
       shock_ind = 0
@@ -409,7 +409,7 @@ c--write
 c
 c      print *, nc
 c
-      idump=1
+      idump=0
       nqn=17
       write(29,iostat=io,err=10) idump,nc,t,gc,rb,fe,fb,fx,
      $     shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,

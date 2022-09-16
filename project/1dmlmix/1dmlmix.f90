@@ -51,6 +51,7 @@
       common /uocean/ uopr, uotemp, uorho1, uotemp1, uou1 
       common /uswest/ usltemp, uslrho, uslu, uslp, u2slu
       common /mlmod/ mlmodel_name
+      common /idump/ idump
 !                                                                       
 !--read initial condition   
 !
@@ -65,16 +66,14 @@
       call preset 
 !                                                                       
 !--main loop to save the dump file                                      
-!                                                                       
-!--nstep is a counter for dump files                                    
-!--ntstep is the number of timesteps                                    
-      nstep = 0 
+!                                                                                                          
+!--ntstep is the number of timesteps                                          
       ntstep = 1 
           
       do while (time.lt.tmax) 
-!42   continue                                                          
-!                                                                       
-        nstep = nstep + 1 
+!42   continue
+!--idump is a counter for dump files         
+        idump = idump + 1              
 !                                                                       
 !--step runs the runge-kutta operator                                   
 !                                                                       
@@ -84,10 +83,11 @@
 !                                                                       
         lu=61 
         call printout(lu) 
-        print*,' ' 
-        print*,' ********' 
-        print*,' savetime = ',time*10 
-        print*,' ********' 
+        print*,' '    
+        print*,'****************' 
+        print*,' idump        = ', idump
+        print*,' savetime (s) = ', time*10
+        print*,'****************' 
         print*,' ' 
 !      if (time.gt.4.0) dtime = .0001                                   
 !                                                                       
@@ -96,11 +96,11 @@
         !print *,time,tmax                                              
         !if(time.gt.tmax) go to 90                                      
 !                                                                       
-        !go to 42                                                       
+        !go to 42                                                              
       end do 
 !                                                                       
       !90 call printout(lu)                                             
-      call printout(lu) 
+      !call printout(lu) 
       stop 
       END                                           
 !
@@ -4894,7 +4894,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      integer jtrape,jtrapb,jtrapx, mlin_grid_size
+      integer jtrape,jtrapb,jtrapx,mlin_grid_size,idump
       logical from_dump
 !                                                                       
       parameter (idim=10000) 
@@ -4947,6 +4947,7 @@
       &               dum2v(idim)
       common /cent/ dj(idim)
       common /dump/ from_dump
+      common /idump/ idump
       common /interp/ mlin_grid_size
 !                                                                       
       character*1024 filin,filout 
@@ -4972,10 +4973,8 @@
       read(11,*) idump 
       read(11,*)
       read(11,*) dtime
-      dtime = dtime/10 !convert to numerical units
       read(11,*)
       read(11,*) tmax
-      tmax = tmax/10 !convert to numerical units
       read(11,*)
       read(11,*) cq
       read(11,*)
@@ -5005,17 +5004,22 @@
       !print *,'cq,cl',cq,cl 
       !print *,'iextf,ieos',iextf,ieos 
       print*,'================ Setup ================'
-      print*, 'Input File:           ', trim(filin)
-      print*, 'Output File:          ', trim(filout)
-      print*, 'ML Model Name:        ', trim(mlmodel_name)
-      print*, 'Grid Size for ML:  ', mlin_grid_size
-      print*, 'Dump # to read:    ', idump
-      print*, 'Dump time interval:', dtime
-      print*, 'Max time:          ', tmax
+      print*, 'Input File:            ', trim(filin)
+      print*, 'Output File:           ', trim(filout)
+      print*, 'ML Model Name:         ', trim(mlmodel_name)
+      print*, 'Grid Size for ML:      ', mlin_grid_size
+      print*, 'Dump # to read:        ', idump
+      print*, 'Dump time interval (s):', dtime
+      print*, 'Max time (s):          ', tmax
       !print*, cq,cl
       !print*, iextf,ieos,dcore
       !print*, ncell,delp,nups,damp,dcell
-      !print*, iflxlm, icvb, ufact, yefact      
+      !print*, iflxlm, icvb, ufact, yefact
+!                                                                       
+!--convert to code time units                      
+!        
+      dtime = dtime/10
+      tmax = tmax/10 
 !                                                                       
 !--open binary file containing initial conditions                       
 !                                                             
@@ -5032,20 +5036,21 @@
 !                                                                       
       nqn=17 
 !       
-      read(60) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
-     &      shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,       &
-     &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
-     &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
-     &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
-     &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
-     &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
-     &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
-     &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &      (dj(i),i=1,nc),                                             &
-     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
-     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)
-     !&     (vturb2(i),i=1,nc),                                          &
+      read(60) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,              &
+            shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,      &
+            (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),  &
+            (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),         &
+            (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),           &
+            (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),          &
+            (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),       &
+            (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),       &
+            (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),          &
+            (dj(i),i=1,nc),                                            &
+            (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
+            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)
+!        (vturb2(i),i=1,nc),                                          &
 !
+      print*, 'idump as read = ', idump
       ncell = nc
       time = t 
 !                                                                       
@@ -5133,7 +5138,7 @@
 !                                                                       
       common /cc   / ycc(idim,iqn), yccave(iqn) 
       common /ener1/ dq(idim), dunu(idim) 
-      common /numb/ ncell, ncell1 
+      common /numb/ ncell, ncell1
       common /celle/ x(0:idim),v(0:idim),f(0:idim) 
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim) 
       common /nustuff/ ynue(idim),ynueb(idim),ynux(idim),               &
@@ -5160,6 +5165,7 @@
      &               dum2v(idim)
       common /cent/ dj(idim)
       common /dump/ from_dump
+      common /idump/ idump
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
       dimension uint(idim), s(idim) 
@@ -5193,19 +5199,19 @@
 !         write (12,*) i, nc,t,gamma,tkin,tterm                         
 !      end do                                                           
 !       
-      write(lu)nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                     &
-     &      shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,       &
-     &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
-     &      (uint(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),       &
-     &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
-     &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
-     &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
-     &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
-     &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),            &
-     &      (dj(i),i=1,nc),                                             &
-     &      (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),              &
-     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)             
-!     &     (vturb2(i),i=1,nc),                                          &
+      write(lu) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
+            shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,      &
+            (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),  &
+            (uint(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),      &
+            (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),           &
+            (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),          &
+            (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),       &
+            (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),       &
+            (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),           &
+            (dj(i),i=1,nc),                                            &
+            (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
+            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)             
+!          (vturb2(i),i=1,nc),                                          &
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
 !               
       return 

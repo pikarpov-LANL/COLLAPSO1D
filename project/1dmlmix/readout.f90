@@ -33,7 +33,7 @@
       character*32 dumpn 
       character(:), allocatable :: outname
       character*1024 infile 
-      integer iskip, ndump
+      integer iskip, ndump, idump
       logical from_dump
 !                                                                       
       double precision dm,press,enue,enueb,ks,ka,ksb,kab,               &
@@ -72,7 +72,6 @@
       open(42,file=infile,form='unformatted') 
 !                                                                       
       pi43=3.14159265359*4.0/3.0 
-      idump=0 
    97 continue 
       !print *,'number of dumps?' 
       !read *, ndump 
@@ -83,21 +82,20 @@
       !read(*,fmt='(a)') basename 
       ibasenamelen = index(basename,' ')-1 
                                                                         
-      idump=0 
       do k=1,ndump         
-         idump = idump+1 
-         read(42) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,                  &
-     &      shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,       &
-     &      (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),   &
-     &      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),          &
-     &      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),            &
-     &      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),           &
-     &      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),        &
-     &      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),        &
-     &      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),           &
-     &      (dj(i),i=1,nc),(te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),&
-     &      (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)                  
-!     &        (vsound(i),i=1,nc)                                        
+         read(42) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
+               shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,     &
+               (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc), &
+               (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),        &
+               (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),          &
+               (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),         &
+               (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),      &
+               (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),      &
+               (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),         &
+               (dj(i),i=1,nc),                                           &
+               (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),            &
+               (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)                  
+!             (vsound(i),i=1,nc)                                        
 !        
          !print*, 'rho(1)  ftrape  ftrapb  ftrapx'
          !print*, rho(1),ftrape,ftrapb,ftrapx 
@@ -133,7 +131,8 @@
                rhomax=max(rho(i),rhomax) 
             end do 
 !            write(72,103) t,vmin,xshock,rho(1),rhomax                              
-            write(dumpn,*) k1-1
+            !write(dumpn,*) k1-1
+            write(dumpn,*) idump
             allocate(character(LEN(TRIM(basename))+LEN(adjustl(dumpn))) :: outname)
             outname=basename(1:ibasenamelen)//'.'//adjustl(dumpn)
             open(69,file=outname) 
@@ -297,7 +296,7 @@
          end if 
  !        print *, 'energy',dk/50.,dene/50. 
          deallocate(outname)
-         print*, 'Dump: ', k
+         print*, 'Dump: ', idump
       end do 
   103 format(I5,1pe12.4,1pe14.6,22(1pe12.4)) 
   105 format(1pe12.4,1pe14.6,7(1pe12.4)) 

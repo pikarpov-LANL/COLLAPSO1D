@@ -407,7 +407,7 @@ c--write
 c
 c      print *, nc
 c
-      idump=1
+      idump=0
       nqn=17
       write(29,iostat=io,err=10) idump,nc,t,gc,rb,fe,fb,fx,
      $     shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,
@@ -421,7 +421,6 @@ c
      $     (dj(i),i=1,nc),
      $     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
      $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc) 
-c      print *, nc,t,gc,rb,fe,fb,fx
 c
       do i=1,ncell
          write (43,103) (ycc(i,j),j=1,19)
