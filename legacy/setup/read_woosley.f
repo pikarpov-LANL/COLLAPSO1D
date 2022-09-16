@@ -19,8 +19,8 @@ c
       parameter(pi43=3.14159*4.0/3.0)
 c
       parameter(idim=4000)
-c      parameter (nkep=1129)
-      parameter (nkep=1073)
+      parameter (nkep=1129)
+c      parameter (nkep=1073)
 c      parameter (nkep=1067)
       common /kep/ vel(nkep),rad(nkep),dens(nkep),t9(nkep),
      1             yel(nkep),ab(nkep),omega(nkep),press(nkep)
