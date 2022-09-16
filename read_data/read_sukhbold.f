@@ -93,7 +93,7 @@ c
       open(11,file=trim(filin))
       do i=1,header_length
          read(11,*)ajunk
-         print *, ajunk, i
+c         print *, ajunk, i
       end do
       do 10 i=1,nkep
 c         print *, 'in data',i
@@ -133,10 +133,9 @@ c        end if
      $        dlog10(1.d9*t9(i)),
      $        5.2d8*(t9(i)/11.6)**3/2.d6/dens(i),ab(i)
       end do
-      print *, dmtot,rold
-      print *, 'initial cell mass?'
-c      read(*,*) deltam(1)
-      print *, totalmass, deltam(1)
+      print *, 'dmtot, rold: ', dmtot,rold
+      print *, 'initial cell mass:', deltam(1)
+      print *, 'totalmass: ', totalmass
 c
 c--nucdata is in nse5.f
 c
@@ -240,7 +239,7 @@ c
             xn(i)=xnj
             print*, "FOR NCELL, x, maxrad", x(i), maxrad
             if (x(i).gt.maxrad) then               
-               print *, enclmass(i)
+c               print *, enclmass(i)
                ncell=i
                goto 50
             end if
@@ -318,7 +317,7 @@ c
             xn(i)=xnj
             print*, "FOR NCELL, x, maxrad", i, x(i), maxrad
             if (x(i).gt.maxrad) then
-               print *, enclmass(i)
+c               print *, enclmass(i)
                ncell=i
                goto 50
             end if
@@ -350,6 +349,7 @@ c
       implicit double precision (a-h, o-z)
 c
       logical from_dump
+      integer idump
       parameter (idim=4000)
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
@@ -409,8 +409,9 @@ c--write
 c
 c      print *, nc
 c
+      idump=1
       nqn=17
-      write(29,iostat=io,err=10)nc,t,gc,rb,fe,fb,fx,
+      write(29,iostat=io,err=10) idump,nc,t,gc,rb,fe,fb,fx,
      $     shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,
      $     (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),
      $     (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),
@@ -591,7 +592,7 @@ c and yn were previously know at the SAME density and ye,
 c but different temperature
 c
 c**************************************************************
-c
+cwrite(*,*)
 c
       implicit double precision(a-h,o-z)
       parameter (tolnse=1d-5,kmax=10)
