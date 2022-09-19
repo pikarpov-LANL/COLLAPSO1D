@@ -57,7 +57,7 @@ c
 c--read options
 c      
 
-      open(521,file='setup')
+      open(521,file='setup_prep')
       read(521,*)
       read(521,522) filin
       read(521,*)
