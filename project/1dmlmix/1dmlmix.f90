@@ -72,9 +72,9 @@
           
       do while (time.lt.tmax) 
 !42   continue
-!--idump is a counter for dump files         
+        !--idump is a counter for dump files         
         idump = idump + 1              
-!                                                                       
+!                                                                    
 !--step runs the runge-kutta operator                                   
 !                                                                       
         call step(ntstep) 
@@ -325,7 +325,6 @@
           !--calculate PNS & shock radii, only in post-bounce stage
            call shock_radius(ncell,x,v,print_nuloss)
            call pns_radius(ncell,x,rho,print_nuloss)
-           !call interpolate(ncell,x,v)  
            
            !--turbulence contribution to pressure via ML in post-bounce regime
            !call turbpress(ncell,rho,x,v)
@@ -370,14 +369,15 @@
 !          
       character*128 :: mlmodel_name
       integer mlin_grid_size
-      double precision mlin_x, mlin_v, mlin_rho, pr_turb   
+      double precision mlin_x, mlin_v, mlin_rho, pr_turb  
+      double precision mlout_x, mlout_v, mlout_rho 
 !
       parameter(idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim) 
       dimension x(0:idim), v(0:idim)
-      dimension unue(idim),unueb(idim),unux(idim)       
+      dimension unue(idim),unueb(idim),unux(idim)           
 !                                                                       
       logical trapnue, trapnueb, trapnux 
       
@@ -390,7 +390,8 @@
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x       
       common /interp/ mlin_grid_size
-      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim) 
+      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)
+      common /mlout/ mlout_x(idim), mlout_v(idim), mlout_rho(idim)
       common /mloutput/ pr_turb(idim1)
 !                                         
 ! The tensor shape is exactly backwards from python: (Length,Channels,N batches)
@@ -400,6 +401,8 @@
       
       pr_turb = 0
 !      
+      call interpolate(ncell,x,v,mlin_grid_size)
+
       input(:,1,1) = mlin_v(1:mlin_grid_size)
       input(:,2,1) = mlin_rho(1:mlin_grid_size)
       print*, 'input ',shape(input)
@@ -408,11 +411,16 @@
       !output_h = mlmodel(input, trim(mlmodel_name))
       
       !pr_turb(int(shock_ind):int(pns_ind)) = output_h(:,1)
+
+      ! Re-shape output into code-shape mlout and then:
+      mlout_x = mlin_x
+      mlout_v = mlin_v
+      call interpolate(ncell,mlout_x,mlout_v,int(shock_ind-pns_ind))
       call exit(0)
       return 
       END       
 ! 
-      subroutine interpolate(ncell,x,v)
+      subroutine interpolate(ncell,x,v,interp_grid_size)
 !*******************************************************
 !                                                      *
 ! This subroutine resizes the input variables          *
@@ -433,8 +441,8 @@
 
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x  
-      common /interp/ mlin_grid_size
-      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)      
+      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)
+      common /mlout/ mlout_x(idim), mlout_v(idim), mlout_rho(idim)
       
       integer i
       integer,dimension(6) :: iflag
@@ -4924,6 +4932,7 @@
       common /cgas/ gamma 
       common /timej/ time, dt
       common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x
       common /propt/ dtime,tmax 
       logical trapnue, trapnueb, trapnux 
       common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim) 
@@ -5037,7 +5046,8 @@
       nqn=17 
 !       
       read(60) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,              &
-            shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,      &
+            pns_ind,pns_x,shock_ind,shock_x,                           &
+            from_dump,rlumnue,rlumnueb,rlumnux,                        &
             (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),  &
             (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),         &
             (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),           &
@@ -5155,6 +5165,7 @@
       common /cgas / gamma 
       common /timej / time, dt 
       common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x
       logical trapnue, trapnueb, trapnux 
       common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /ftrap/ ftrape,ftrapb,ftrapx 
@@ -5200,7 +5211,8 @@
 !      end do                                                           
 !       
       write(lu) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
-            shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,      &
+            pns_ind,pns_x,shock_ind,shock_x,                           &
+            from_dump,rlumnue,rlumnueb,rlumnux,                        &
             (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),  &
             (uint(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),      &
             (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),           &

@@ -1,6 +1,5 @@
 #If 'cmake' is not found automatically, enter its location manually below
-#CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
-CMAKE_PREFIX_PATH=/home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
+CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
 
 CONFIG:=Debug
 OPENACC:=0
@@ -14,7 +13,7 @@ INST:=$(WORKDIR)/install
 PROJECT_NAME:=1dmlmix
 PROJECT_DIR:=$(WORKDIR)/project
 EXAMPLES_DIR:=$(WORKDIR)/examples
-PREP_DATA:=prep_woosley.f#prep_sukhbold.f
+PREP_DATA:=prep_sukhbold.f
 DATA_DIR:=$(WORKDIR)/prep_data
 DATA_FILE:=$(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup_prep)
 
