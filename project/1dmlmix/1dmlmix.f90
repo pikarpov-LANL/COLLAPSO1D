@@ -437,7 +437,8 @@
       double precision mlin_x, mlin_v, mlin_rho
 
       parameter(idim=10000)   
-      dimension x(1:ncell),v(1:ncell),rho(1:ncell)
+      dimension x(0:ncell),v(0:ncell),
+      dimension rho(ncell)
 
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x  
@@ -476,7 +477,7 @@
       implicit double precision (a-h,o-z) 
 
       common /rshock/ shock_ind, shock_x    
-      dimension x(1:ncell),v(1:ncell) 
+      dimension x(0:ncell),v(0:ncell) 
       real :: initial_v, old_max_v
       real, dimension(ncell) :: v_old
       integer :: i,j, ind
@@ -522,7 +523,8 @@
       implicit double precision (a-h,o-z) 
 
       common /pns/ pns_ind, pns_x   
-      dimension x(1:ncell),rho(1:ncell) 
+      dimension x(0:ncell)
+      dimension rho(ncell) 
       real :: rho_threshold      
       integer :: i
       logical print_nuloss
@@ -5945,7 +5947,7 @@
        
       implicit double precision (a-h,o-z) 
 
-      dimension x(1:ncell),v(1:ncell) 
+      dimension x(0:ncell),v(0:ncell) 
       !integer :: i,j,shock_ind, ind
       character*30 :: rho_file, x_file
       
