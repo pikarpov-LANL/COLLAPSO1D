@@ -310,6 +310,7 @@ c************************************************************
 c
       implicit double precision (a-h, o-z)
 c
+      logical from_dump
       parameter (idim=4000)
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
