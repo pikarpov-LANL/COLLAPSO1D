@@ -19,7 +19,7 @@ c
       parameter(pi43=3.14159*4.0/3.0)
 c
       parameter(idim=4000)
-      parameter(header_length=22)
+      parameter(header_length=2)
 c
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
@@ -41,7 +41,7 @@ c
       double precision, allocatable :: vel(:),rad(:),dens(:),t9(:),
      1             yel(:),ab(:),omega(:),press(:)
       integer max,j,i,izone
-      integer nlines, nkep      
+      integer nlines, nkep
 c
       character*1024 filin,filout
       character setup_par
@@ -51,13 +51,13 @@ c      print *, 'mass cut'
 c      read *, mcut
       mcut=40.
       max=0
-      maxrad = 8.0e4
+c      maxrad = 8.0e4
+      maxrad = 6.5e4
       open (42,file='mess2')
 c      
 c--read options
 c      
-
-      open(521,file='setup')
+      open(521,file='setup_prep')
       read(521,*)
       read(521,522) filin
       read(521,*)
@@ -93,15 +93,15 @@ c
       open(11,file=trim(filin))
       do i=1,header_length
          read(11,*)ajunk
-         print *, ajunk
+c         print *, ajunk, i
       end do
       do 10 i=1,nkep
-         print *, 'in data',i
-         read(11,*) izone, djunk, djunk, drad, dvel, ddens, dtemp,
+c         print *, 'in data',i
+         read(11,*) izone, djunk, drad, dvel, ddens, dtemp,
      $        djunk,djunk,djunk,domega,dabar,dyel,
      $        (yccin(i,j),j=1,19)
          rnorm=0.
-         print *, yccin(i,1),yccin(i,2),drad,dvel,ddens,dtemp
+c         print *, yccin(i,1),yccin(i,2),drad,dvel,ddens,dtemp
          do j=1,19
             rnorm=rnorm+yccin(i,j)
          end do
@@ -133,10 +133,9 @@ c        end if
      $        dlog10(1.d9*t9(i)),
      $        5.2d8*(t9(i)/11.6)**3/2.d6/dens(i),ab(i)
       end do
-      print *, dmtot,rold
-      print *, 'initial cell mass?'
-c      read(*,*) deltam(1)
-      print *, totalmass, deltam(1)
+      print *, 'dmtot, rold: ', dmtot,rold
+      print *, 'initial cell mass:', deltam(1)
+      print *, 'totalmass: ', totalmass
 c
 c--nucdata is in nse5.f
 c
@@ -153,7 +152,7 @@ c
       x(0) = 0.d0
       v(0) = 0.d0
       enclmass(0) = 0.d0
-      do i=1,4000
+      do i=1,idim
          do k=1,nkep
             if (rad(k).gt.x(i-1)) goto 20
          end do
@@ -238,8 +237,9 @@ c
             ifleos(i)=iflag
             xp(i)=xpj
             xn(i)=xnj
-            if (x(i).gt.maxrad) then
-               print *, enclmass(i)
+            print*, "FOR NCELL, x, maxrad", x(i), maxrad
+            if (x(i).gt.maxrad) then               
+c               print *, enclmass(i)
                ncell=i
                goto 50
             end if
@@ -275,7 +275,7 @@ c--for all other k
      $              ycc(i,19)
             end if
             write(45,*) i,enclmass(i),dj(i)
-            print *,'stuff', deltam(i), enclmass(i),x(i),x(i-1),x(1)
+c            print *,'stuff', deltam(i), enclmass(i),x(i),x(i-1),x(1)
             if (enclmass(i).lt..6d0) then
                deltam(i+1) = deltam(1)*(x(i)/x(1))**1.0
             elseif (enclmass(i).lt..7d0) then
@@ -315,8 +315,9 @@ c
             ifleos(i)=iflag
             xp(i)=xpj
             xn(i)=xnj
+            print*, "FOR NCELL, x, maxrad", i, x(i), maxrad
             if (x(i).gt.maxrad) then
-               print *, enclmass(i)
+c               print *, enclmass(i)
                ncell=i
                goto 50
             end if
@@ -334,10 +335,10 @@ c
       print *,'  Input progenitor:         ', trim(filin)
       print *,'  Number of cells:  ', ncell
       print *,'  Output file name:         ', trim(filout) 
-      print *,'-----------------------------------'
+      print *,'-----------------------------------'      
       stop
       end
-c
+c  
       subroutine wdump
 c************************************************************
 c                                                           *
@@ -348,6 +349,7 @@ c
       implicit double precision (a-h, o-z)
 c
       logical from_dump
+      integer idump
       parameter (idim=4000)
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
@@ -368,21 +370,24 @@ c
       common /abun/ ycc
       common /timei/ steps(idim)
       common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x
       common /dump/ from_dump
       double precision rlumnue,rlumnueb,rlumnux      
 c      
       steps = 0
       shock_ind = 0
       shock_x = 0
+      pns_ind = 0
+      pns_x = 0
       from_dump = .false.      
 c--initialize neutrino fluxes      
       rlumnue = 0
       rlumnueb = 0
-      rlumnux = 0 
+      rlumnux = 0
 c
       nc = ncell
       do i=1,nc
-         print *, u(i)
+c         print *, u(i)
          if (u(i).eq.0) stop
          ynue(i)=0.
          ynueb(i)=0.
@@ -405,11 +410,13 @@ c
 c
 c--write
 c
-      print *, nc
+c      print *, nc
 c
+      idump=0
       nqn=17
-      write(29,iostat=io,err=10)nc,t,gc,rb,fe,fb,fx,
-     $     shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,
+      write(29,iostat=io,err=10) idump,nc,t,gc,rb,fe,fb,fx,
+     $     pns_ind,pns_x,shock_ind,shock_x,
+     $     from_dump,rlumnue,rlumnueb,rlumnux,
      $     (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),
      $     (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),
      $     (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),
@@ -419,13 +426,12 @@ c
      $     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),
      $     (dj(i),i=1,nc),
      $     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
-     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc) 
-      print *, nc,t,gc,rb,fe,fb,fx
+     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)   
 c
       do i=1,ncell
          write (43,103) (ycc(i,j),j=1,19)
       end do
-      print *, x(0),x(1)
+c      print *, x(0),x(1)
  102  format(I4,4(1pe14.4),I3)
  103  format(19(1pe12.4))
       return
@@ -590,7 +596,7 @@ c and yn were previously know at the SAME density and ye,
 c but different temperature
 c
 c**************************************************************
-c
+cwrite(*,*)
 c
       implicit double precision(a-h,o-z)
       parameter (tolnse=1d-5,kmax=10)

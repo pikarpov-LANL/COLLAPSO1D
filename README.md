@@ -57,7 +57,7 @@ Congratulations! You just blew up a star!
 
 You can setup parameters and choose which stellar progenitor data to prepare. In our case, we are using Stan Woosley's datasets.
 ```shell
-vi read_data/setup
+vi prep_data/setup
 ```
 to process and move the data to the project folder:
 ```shell

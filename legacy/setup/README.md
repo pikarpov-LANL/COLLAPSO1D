@@ -24,8 +24,8 @@ For the prompts:
 
 | Prompt              | Value  |
 | ------------------- | ------ |
-| Innermost zone mass | 0.0003 |
+| Innermost zone mass | 0.0005 |
 | Binary file name    | Data   |
 
-This will result in `grid_szie=1703`
+This will result in `grid_szie=1706`
 

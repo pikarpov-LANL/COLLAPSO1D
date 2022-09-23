@@ -19,7 +19,7 @@ c
       parameter(pi43=3.14159*4.0/3.0)
 c
       parameter(idim=4000)
-      parameter(header_length=2)
+      parameter(header_length=22)
 c
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
@@ -41,7 +41,7 @@ c
       double precision, allocatable :: vel(:),rad(:),dens(:),t9(:),
      1             yel(:),ab(:),omega(:),press(:)
       integer max,j,i,izone
-      integer nlines, nkep
+      integer nlines, nkep      
 c
       character*1024 filin,filout
       character setup_par
@@ -51,13 +51,13 @@ c      print *, 'mass cut'
 c      read *, mcut
       mcut=40.
       max=0
-c      maxrad = 8.0e4
-      maxrad = 6.5e4
+      maxrad = 8.0e4
       open (42,file='mess2')
 c      
 c--read options
 c      
-      open(521,file='setup')
+
+      open(521,file='setup_prep')
       read(521,*)
       read(521,522) filin
       read(521,*)
@@ -93,11 +93,11 @@ c
       open(11,file=trim(filin))
       do i=1,header_length
          read(11,*)ajunk
-         print *, ajunk, i
+c         print *, ajunk
       end do
       do 10 i=1,nkep
 c         print *, 'in data',i
-         read(11,*) izone, djunk, drad, dvel, ddens, dtemp,
+         read(11,*) izone, djunk, djunk, drad, dvel, ddens, dtemp,
      $        djunk,djunk,djunk,domega,dabar,dyel,
      $        (yccin(i,j),j=1,19)
          rnorm=0.
@@ -133,10 +133,9 @@ c        end if
      $        dlog10(1.d9*t9(i)),
      $        5.2d8*(t9(i)/11.6)**3/2.d6/dens(i),ab(i)
       end do
-      print *, dmtot,rold
-      print *, 'initial cell mass?'
-c      read(*,*) deltam(1)
-      print *, totalmass, deltam(1)
+      print *, 'dmtot, rold: ', dmtot,rold
+      print *, 'initial cell mass:', deltam(1)
+      print *, 'totalmass: ', totalmass
 c
 c--nucdata is in nse5.f
 c
@@ -238,9 +237,8 @@ c
             ifleos(i)=iflag
             xp(i)=xpj
             xn(i)=xnj
-            print*, "FOR NCELL, x, maxrad", x(i), maxrad
-            if (x(i).gt.maxrad) then               
-               print *, enclmass(i)
+            if (x(i).gt.maxrad) then
+c               print *, enclmass(i)
                ncell=i
                goto 50
             end if
@@ -316,9 +314,8 @@ c
             ifleos(i)=iflag
             xp(i)=xpj
             xn(i)=xnj
-            print*, "FOR NCELL, x, maxrad", i, x(i), maxrad
             if (x(i).gt.maxrad) then
-               print *, enclmass(i)
+c               print *, enclmass(i)
                ncell=i
                goto 50
             end if
@@ -336,10 +333,10 @@ c
       print *,'  Input progenitor:         ', trim(filin)
       print *,'  Number of cells:  ', ncell
       print *,'  Output file name:         ', trim(filout) 
-      print *,'-----------------------------------'      
+      print *,'-----------------------------------'
       stop
       end
-c  
+c
       subroutine wdump
 c************************************************************
 c                                                           *
@@ -350,6 +347,7 @@ c
       implicit double precision (a-h, o-z)
 c
       logical from_dump
+      integer idump
       parameter (idim=4000)
       common /celle/ x(0:idim),v(0:idim)
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim)
@@ -370,17 +368,20 @@ c
       common /abun/ ycc
       common /timei/ steps(idim)
       common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x
       common /dump/ from_dump
-      double precision rlumnue, rlumnueb, rlumnux      
+      double precision rlumnue,rlumnueb,rlumnux      
 c      
       steps = 0
       shock_ind = 0
       shock_x = 0
+      pns_ind = 0
+      pns_x = 0
       from_dump = .false.      
 c--initialize neutrino fluxes      
       rlumnue = 0
       rlumnueb = 0
-      rlumnux = 0
+      rlumnux = 0 
 c
       nc = ncell
       do i=1,nc
@@ -409,9 +410,11 @@ c--write
 c
 c      print *, nc
 c
+      idump=0
       nqn=17
-      write(29,iostat=io,err=10)nc,t,gc,rb,fe,fb,fx,
-     $     shock_ind,shock_x,from_dump,rlumnue,rlumnueb,rlumnux,
+      write(29,iostat=io,err=10) idump,nc,t,gc,rb,fe,fb,fx,
+     $     pns_ind,pns_x,shock_ind,shock_x,
+     $     from_dump,rlumnue,rlumnueb,rlumnux,
      $     (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),
      $     (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),
      $     (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),
@@ -421,7 +424,7 @@ c
      $     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),
      $     (dj(i),i=1,nc),
      $     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
-     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)   
+     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc) 
 c
       do i=1,ncell
          write (43,103) (ycc(i,j),j=1,19)
