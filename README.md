@@ -1,4 +1,4 @@
-# 1D Core-Collapse Supernovae Code
+# COLLAPSO1D - Core Collapse Supernova in 1D <a href="https://github.com/pikarpov-LANL/COLLAPSO1D"><img src="https://github.com/pikarpov-LANL/COLLAPSO1D/blob/images/docs/images/collapso1d.png?raw=true"  alt="COLLAPSO1D logo" align="right" width="80"></a>
 
 1. [Dependencies](README.md#dependencies)
 2. [Quick Start](README.md#quick-start)
