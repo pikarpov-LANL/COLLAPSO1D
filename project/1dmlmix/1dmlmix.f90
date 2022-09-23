@@ -530,7 +530,7 @@
       logical print_nuloss
 !      
 !--g/cm^3 / unit conversion
-      rho_threshold = 2.d11/2.d6
+      rho_threshold = 1.d13/2.d6
 !
       do i=size(rho), 1, -1        
           if (rho(i) .ge. rho_threshold) then                        
