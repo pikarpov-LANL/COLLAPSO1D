@@ -437,7 +437,7 @@
       double precision mlin_x, mlin_v, mlin_rho
 
       parameter(idim=10000)   
-      dimension x(0:ncell),v(0:ncell),
+      dimension x(0:ncell),v(0:ncell)
       dimension rho(ncell)
 
       common /rshock/ shock_ind, shock_x
