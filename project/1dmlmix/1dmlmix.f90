@@ -4905,7 +4905,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx,mlin_grid_size,idump
-      logical from_dump
+      logical from_dump, post_bounce      
 !                                                                       
       parameter (idim=10000) 
       parameter (idim1=idim+1) 
@@ -4960,6 +4960,7 @@
       common /dump/ from_dump
       common /idump/ idump
       common /interp/ mlin_grid_size
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
 !                                                                       
       character*1024 filin,filout 
 
@@ -5063,6 +5064,13 @@
 !        (vturb2(i),i=1,nc),                                          &
 !
       print*, 'idump as read = ', idump
+      
+      if (shock_ind.ne.0) then
+            post_bounce = .true.
+      else
+            post_bounce = .false.
+      endif
+
       ncell = nc
       time = t 
 !                                                                       
