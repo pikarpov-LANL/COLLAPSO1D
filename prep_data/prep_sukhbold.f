@@ -40,6 +40,7 @@ c
       double precision mcut
       double precision, allocatable :: vel(:),rad(:),dens(:),t9(:),
      1             yel(:),ab(:),omega(:),press(:)
+      double precision maxrad     
       integer max,j,i,izone
       integer nlines, nkep
 c
@@ -51,8 +52,7 @@ c      print *, 'mass cut'
 c      read *, mcut
       mcut=40.
       max=0
-c      maxrad = 8.0e4
-      maxrad = 6.5e4
+
       open (42,file='mess2')
 c      
 c--read options
@@ -66,6 +66,10 @@ c
       read(521,*)
       read(521,*)
       read(521,*) deltam(1)
+      read(521,*)
+      read(521,*)
+      read(521,*) maxrad
+      maxrad = maxrad / udist  
   522 format(A)      
 c
 c--get number of entries
@@ -197,6 +201,7 @@ c-- for k=1, we can not use cell k-1
      $              ,ycc(i,19)
             end if
 
+c           Adjust the grid, choose region focus (modify the 2nd set too, down below!)
             write(45,*) i,enclmass(i),dj(i)
             if (enclmass(i).lt..4d0) then
                deltam(i+1) = deltam(1)*(x(i)/x(1))**1.0
