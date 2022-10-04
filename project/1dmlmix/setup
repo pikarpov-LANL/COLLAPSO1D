@@ -3,7 +3,7 @@ Data
 <Output File>
 DataOut
 <Input PyTorch Model>
-model_scripted.pt
+MLmodel.pt
 <Input Grid Size to interpolate for PyTorch Model>
 200
 <Dump # to read>
@@ -34,7 +34,7 @@ model_scripted.pt
 1
 <Capture rate option>
 1
-<Changing the nuclear potential energy (don't touch!)>
+<Changing the nuclear potential energy (do not touch!)>
 1.0
 <yefact (not used)>
 1.0

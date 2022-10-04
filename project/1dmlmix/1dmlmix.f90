@@ -5893,7 +5893,7 @@
   
             if (post_bounce.eqv..true.) then
                 write(*,501)'[    bounce time (s)   ]',                     &
-         &           bounce_time                              
+         &           bounce_time*10                              
       501       format(A,1p,E10.3)
             endif
 !
