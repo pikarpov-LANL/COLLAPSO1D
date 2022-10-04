@@ -14,10 +14,22 @@ PyTorch is implemented based on [pytorch-fortran](https://github.com/alexeedm/py
 ## Dependencies
 
 ### GFORTRAN
-Both the main CCSN code and the PyTorch wrapper can be compiled with `gfortran >= 9.4.0`.
+Both the main CCSN code and the PyTorch wrapper can be compiled with `gfortran >= 9.4.0`. If missing, install it via:
+```
+sudo apt install gfortran
+```
 
 ### PyTorch
-To install the latest PyTorch for CPU, follow the official [instructions](https://pytorch.org/). Lastly, we need to make sure all compilers link correctly.
+To install the latest PyTorch for <ins>CPU</ins>, follow the official [instructions](https://pytorch.org/). I would highly recommend installing it in a dedicated conda environemnt. As an example, here is how to create one and install PyTorch:
+```bash
+conda create -n torch_cpu python=3.10
+conda activate torch_cpu
+
+# check the pytorch installation instructions!
+pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+```
+
+Lastly, we need to make sure all compilers link correctly.
 
 ### CMake
 Make sure you have cmake or install it by (tested on cmake==3.22.1)
@@ -44,6 +56,9 @@ To process progenitor data and to compile the code with PyTorch included, all yo
 ```shell
 make
 ```
+
+> :warning: If you encounter any errors, please check [Dependencies](README.md#dependencies) and refer to [Troubleshooting](README.md#troubleshooting).
+
 This will move the processed input data and executable to the project folder. To run the model:
 ```shell
 cd project/1dmlmix
@@ -129,6 +144,14 @@ make clean
 
 Notes on ML subgrid turbulence model implementation within this code can be found on [Overleaf](https://www.overleaf.com/read/pgsnmxgdjkrq).
 
+
+## Troubleshooting
+### `No CMAKE_CXX_COMPILER could be found`
+
+CMake can't find your C compiler. Either check your GCC path or if you are on Ubuntu, run:
+```
+sudo apt-get update && sudo apt-get install build-essential
+```
 
 -------
 1dccsn code has a BSD-style license, as found in the [LICENSE](https://github.com/pikarpov-LANL/1dccsn/blob/master/LICENSE) file.

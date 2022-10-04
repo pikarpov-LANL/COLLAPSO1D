@@ -3,7 +3,7 @@ Data
 <Output File>
 DataOut
 <Input PyTorch Model>
-traced_model.pt
+MLmodel.pt
 <Input Grid Size to interpolate for PyTorch Model>
 200
 <Dump # to read>
@@ -11,7 +11,7 @@ traced_model.pt
 <Dump time intervals [s]>
 1.d-3
 <Max time [s]>
-0.250
+1
 <Artifiicqial Viscocity #1>
 1.0
 <Artificial Viscocity #2>
@@ -34,7 +34,7 @@ traced_model.pt
 1
 <Capture rate option>
 1
-<Changing the nuclear potential energy (don't touch!)>
+<Changing the nuclear potential energy (do not touch!)>
 1.0
 <yefact (not used)>
 1.0

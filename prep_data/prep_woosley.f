@@ -40,6 +40,7 @@ c
       double precision mcut
       double precision, allocatable :: vel(:),rad(:),dens(:),t9(:),
      1             yel(:),ab(:),omega(:),press(:)
+      double precision maxrad
       integer max,j,i,izone
       integer nlines, nkep      
 c
@@ -66,6 +67,10 @@ c
       read(521,*)
       read(521,*)
       read(521,*) deltam(1)
+      read(521,*)
+      read(521,*)
+      read(521,*) maxrad  
+      maxrad = maxrad / udist        
   522 format(A)      
 c
 c--get number of entries
@@ -198,6 +203,8 @@ c-- for k=1, we can not use cell k-1
             end if
 
             write(45,*) i,enclmass(i),dj(i)
+
+c           Adjust the grid, choose region focus (modify the 2nd set too, down below!)      
             if (enclmass(i).lt..4d0) then
                deltam(i+1) = deltam(1)*(x(i)/x(1))**1.0
             elseif (enclmass(i).lt..5d0) then
