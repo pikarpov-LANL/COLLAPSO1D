@@ -154,7 +154,6 @@
       integer jtrape,jtrapb,jtrapx, mlin_grid_size
       character*128 mlmodel_name
       logical post_bounce
-      double precision mlin_x, mlin_v, mlin_rho
 
       parameter (idim=10000) 
       parameter (idim1=idim+1) 
@@ -199,7 +198,6 @@
       common /pns/ pns_ind, pns_x
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
       common /interp/ mlin_grid_size
-      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !                                        
@@ -327,7 +325,7 @@
            call pns_radius(ncell,x,rho,print_nuloss)
            
            !--turbulence contribution to pressure via ML in post-bounce regime
-           !call turbpress(ncell,rho,x,v)
+           !call turbpress(ncell,rho,x,v,temp)
       else
           !--check if bounced
           call bounce(ntstep)
@@ -356,7 +354,7 @@
       END                                           
 !
 !     
-      subroutine turbpress(ncell,rho,x,v) 
+      subroutine turbpress(ncell,rho,x,v,temp) 
 !*********************************************************               
 !                                                        *               
 ! This subroutine passes the grid to a trained           *
@@ -365,19 +363,20 @@
 !*********************************************************                
 !
       use pytorch
+      use data_functions
       implicit double precision (a-h,o-z) 
 !          
       character*128 :: mlmodel_name
       integer mlin_grid_size
-      double precision mlin_x, mlin_v, mlin_rho, pr_turb  
-      double precision mlout_x, mlout_v, mlout_rho 
+      real scale_pr, scale_pr_relative
+      double precision pr_turb
 !
       parameter(idim=10000) 
       parameter (idim1=idim+1) 
 !                                                                       
-      dimension rho(idim) 
+      dimension rho(idim), temp(idim) 
       dimension x(0:idim), v(0:idim)
-      dimension unue(idim),unueb(idim),unux(idim)           
+      dimension unue(idim),unueb(idim),unux(idim)       
 !                                                                       
       logical trapnue, trapnueb, trapnux 
       
@@ -385,86 +384,50 @@
       common /etnus/ etanue(idim),etanueb(idim),etanux(idim) 
       common /eosnu/ prnu(idim1) 
       common /mlmod/ mlmodel_name               
-      !common /ml/ prturb(idim1) 
-      common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax
+      common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x       
       common /interp/ mlin_grid_size
-      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)
-      common /mlout/ mlout_x(idim), mlout_v(idim), mlout_rho(idim)
-      common /mloutput/ pr_turb(idim1)
-!                                         
-! The tensor shape is exactly backwards from python: (Length,Channels,N batches)
-      double precision :: input(mlin_grid_size, 2, 1)
-      !real(kind=4), pointer :: output(:, :)
-      !real(kind=4), allocatable :: output_h(:, :)                  
+      common /mlout/ pr_turb(idim1)
+                                    
+      ! The tensor shape is exactly backwards from python: (Length,Channels,N batches)
+      real(real32) :: input(mlin_grid_size, 4, 1)
+      real(real32), allocatable :: output_h(:,:,:)    
+      double precision pr_relative(idim1)
+      double precision interp_x(mlin_grid_size)         
       
-      pr_turb = 0
-!      
-      call interpolate(ncell,x,v,mlin_grid_size)
+      ! Scale Pressure to fit into single precission (taken from ML training)
+      scale_pr = 1.d-8
+      scale_pr_relative = 1.d-8
 
-      input(:,1,1) = mlin_v(1:mlin_grid_size)
-      input(:,2,1) = mlin_rho(1:mlin_grid_size)
-      print*, 'input ',shape(input)
-      !input = 1.0
-      
-      !output_h = mlmodel(input, trim(mlmodel_name))
-      
-      !pr_turb(int(shock_ind):int(pns_ind)) = output_h(:,1)
+      input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
+      input(:,2,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
+      input(:,3,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size)*scale_pr
+      input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
 
-      ! Re-shape output into code-shape mlout and then:
-      mlout_x = mlin_x
-      mlout_v = mlin_v
-      call interpolate(ncell,mlout_x,mlout_v,int(shock_ind-pns_ind))
+      ! ML model (reverse the order for fortran data)
+      ! Input: ['u1','rho','Pgas', 'T'] (1, 4, 200)
+      ! Output: [pr_relative = P_turb/P_gas] (1, 1, 200)
+
+      output_h = mlmodel(input, trim(mlmodel_name))      
+      
+      ! Re-shape output into code-shape mlout:
+      pr_turb = 0   
+      pr_relative = 0
+      interp_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
+      pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
+                                                   mlin_grid_size,1,mlin_grid_size,           &
+                                                   int(shock_ind-pns_ind))*scale_pr_relative
+      pr_turb = pr_relative*pr
+      print*, 'ML prediction'      
+      print*, size(output_h), shape(output_h), shock_ind-pns_ind
+      print*, '-- pr_relative --'
+      print*, pr_relative(shock_ind-5:shock_ind)
+      print*, '-- pr_turb --'
+      print*, pr_turb(shock_ind-5:shock_ind)
       call exit(0)
       return 
       END       
-! 
-      subroutine interpolate(ncell,x,v,interp_grid_size)
-!*******************************************************
-!                                                      *
-! This subroutine resizes the input variables          *
-! through 1d linear interpolation                      *
-!                                                      *
-!*******************************************************            
-!
-      use linear_interpolation_module
-      use linspace_mod
-      
-      implicit double precision (a-h,o-z) 
-      
-      integer mlin_grid_size
-      double precision mlin_x, mlin_v, mlin_rho
-
-      parameter(idim=10000)   
-      dimension x(0:ncell),v(0:ncell)
-      dimension rho(ncell)
-
-      common /rshock/ shock_ind, shock_x
-      common /pns/ pns_ind, pns_x  
-      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)
-      common /mlout/ mlout_x(idim), mlout_v(idim), mlout_rho(idim)
-      
-      integer i
-      integer,dimension(6) :: iflag
-      type(linear_interp_1d) :: s1v,s1rho      
-      
-      mlin_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)
-      
-      !print*, 'mlin grid size', mlin_grid_size
-      !print*, 'Sizes ', size(v), size(mlin_x)
-      
-      call s1v%initialize(x,v,iflag(1))
-      call s1rho%initialize(x,rho,iflag(2))
-      do i=1, mlin_grid_size
-          call s1v%evaluate(mlin_x(i),mlin_v(i))
-          call s1rho%evaluate(mlin_x(i),mlin_rho(i))
-      end do            
-      call s1v%destroy()
-      call s1rho%destroy()      
-     
-      return
-      end
 !
 !
       subroutine shock_radius(ncell,x,v,print_nuloss)
@@ -1353,7 +1316,7 @@
       common /carac/ deltam(idim), abar(idim) 
       common /damping/ damp, dcell 
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
-      common /mloutput/ pr_turb(idim1)
+      common /mlout/ pr_turb(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
       data pi4/12.56637d0/ 
@@ -5431,7 +5394,6 @@
       character*128 mlmodel_name, rho_file, x_file      
       character*10 frmtx
       character*11 frmtrho
-      double precision mlin_x, mlin_v, mlin_rho
 !                                                                       
       parameter (idim=10000) 
       parameter (idim1=idim+1) 
@@ -5500,7 +5462,6 @@
       common /dump/ from_dump
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
       common /interp/ mlin_grid_size
-      common /mlinput/ mlin_x(idim), mlin_v(idim), mlin_rho(idim)!                                                                       
 
       save ifirst
       data ifirst/.true./      

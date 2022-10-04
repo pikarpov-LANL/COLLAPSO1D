@@ -27,35 +27,35 @@ module pytorch
 
 
     contains
-    function mlmodel(input, filename) result(output_h)
+    function mlmodel(input, filename) result(output)
     
-    real(real32), dimension(:,:,:,:)      :: input
-    real(real32), pointer                 :: output(:, :)
-    real(real32), allocatable             :: output_h(:, :)
+    real(real32)                          :: input(:,:,:)
+    real(real32), allocatable             :: input_h(:,:,:)    
+    real(real32), pointer                 :: output(:,:,:)
+    real(real32), allocatable             :: output_h(:,:,:)
 
-    character(:), allocatable, intent(in) :: filename
-    !character(:), intent(in) :: filename
-    !character(:), pointer, intent(in) :: filename
+    character(*) :: filename
     integer :: arglen, stat
-    integer :: shape_input(4)
-    !real(real32):: input2(224, 224, 3, 10)
-    real(real32), allocatable :: input2(:,:,:,:)
+    integer :: shape_input(3)
+    
 
         shape_input = shape(input)
-        allocate(input2(shape_input(1),shape_input(2),shape_input(3),shape_input(4)))
-        input2 = input    
+        allocate(input_h(shape_input(1),shape_input(2),shape_input(3)))
+        input_h = input    
 
-        print*, 'input size ', size(input), shape(input), filename, len(filename)    
+        !print*, 'input size ', size(input), shape(input), filename, len(filename)    
 
-        call in_tensor%from_array(input2)
-        call torch_mod%test(2)
+        call in_tensor%from_array(input_h)                 
         call torch_mod%load(filename)
         call torch_mod%forward(in_tensor, out_tensor)
         call out_tensor%to_array(output)
         output_h = output
 
-        print *, 'Done predicting:'
-        print *, output_h(1:5, 1)
-        
+        ! print*, 'Input for Pytorch 1', input2(1:10,1,1)
+        ! print*, 'Input for Pytorch 2', input2(1:10,2,1)
+        ! print*, 'Input for Pytorch 3', input2(1:10,3,1)
+        ! print*, 'Input for Pytorch 4', input2(1:10,4,1)
+        ! print*, 'shape output: ', shape(output_h)
+        ! print*, output_h(:10,1,1)
     end function
 end module
