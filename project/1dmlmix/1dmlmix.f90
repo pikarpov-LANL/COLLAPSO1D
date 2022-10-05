@@ -198,6 +198,7 @@
       common /pns/ pns_ind, pns_x
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
       common /interp/ mlin_grid_size
+      common /mlout/ pr_turb(idim1)
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !                                        
@@ -325,6 +326,7 @@
            call pns_radius(ncell,x,rho,print_nuloss)
            
            !--turbulence contribution to pressure via ML in post-bounce regime
+           pr_turb = 0
            !call turbpress(ncell,rho,x,v,temp)
       else
           !--check if bounced
@@ -4867,7 +4869,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      integer jtrape,jtrapb,jtrapx,mlin_grid_size,idump
+      integer jtrape,jtrapb,jtrapx,mlin_grid_size,idump,skip_dump
       logical from_dump, post_bounce      
 !                                                                       
       parameter (idim=10000) 
@@ -5000,11 +5002,18 @@
 !                                                             
       open(60,file=trim(filin),form='unformatted') 
       open(61,file=trim(filout),form='unformatted')
+!
+!--adjust position pointer relative to individual binary file
+!             
+      read(60) idummy        
+      skip_dump=idump-idummy
+      close(60)
 !                                                                       
 !--position pointer in binary file                                      
-!                                                                       
-      do i=1,idump-1 
-         read(60) idummy 
+!               
+      open(60,file=trim(filin),form='unformatted')        
+      do i=1,skip_dump
+         read(60) idummy                  
       enddo 
 !                                                                       
 !--read data                                                            
