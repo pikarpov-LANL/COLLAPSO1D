@@ -85,7 +85,7 @@
       do k=1,ndump         
          read(42) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
                pns_ind,pns_x,shock_ind,shock_x,                          &
-               from_dump,rlumnue,rlumnueb,rlumnux,                       &
+               bounce_time,from_dump,rlumnue,rlumnueb,rlumnux,           &
                (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc), &
                (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),        &
                (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),          &
@@ -155,8 +155,8 @@
             sumzn=0. 
             sumfe=0. 
             iskip=0 
-            write(69,*) 'Time [s]  R_PNS [index] R_PNS [cm] R_shock [index]  R_shock [cm] nu_e_flux [foe/s]'
-            write(69,108)10.d0*t, int(pns_ind), 1.d9*pns_x, int(shock_ind), 1.d9*shock_x, 2.d-3*rlumnue            
+            write(69,*) 'Time [s]  Bounce_Time [s] R_PNS [index] R_PNS [cm] R_shock [index]  R_shock [cm] nu_e_flux [foe/s]'
+            write(69,108)10.d0*t, 10.d0*bounce_time, int(pns_ind), 1.d9*pns_x, int(shock_ind), 1.d9*shock_x, 2.d-3*rlumnue            
             write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
                         & Ye  Pressure [g/cm/s^2] Temperature [K]'            
             do i=1,nc 
@@ -304,7 +304,7 @@
   106 format(4(1pe14.7)) 
                                                                         
   107 format(I3,24(1pe13.5)) 
-  108 format(1pe12.4,I5,1pe12.4,I5,1pe12.4,1pe12.4) 
+  108 format(1pe12.4,1pe12.4,I5,1pe12.4,I5,1pe12.4,1pe12.4) 
 
       print*,' ==============================================='       
       print*, '  Converted ',trim(adjustl(infile)),' to ',trim(adjustl(basename))

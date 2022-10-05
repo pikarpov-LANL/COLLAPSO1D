@@ -5022,7 +5022,7 @@
 !       
       read(60) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,              &
             pns_ind,pns_x,shock_ind,shock_x,                           &
-            from_dump,rlumnue,rlumnueb,rlumnux,                        &
+            bounce_time,from_dump,rlumnue,rlumnueb,rlumnux,           &
             (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),  &
             (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),         &
             (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),           &
@@ -5159,6 +5159,7 @@
       common /cent/ dj(idim)
       common /dump/ from_dump
       common /idump/ idump
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
       dimension uint(idim), s(idim) 
@@ -5194,7 +5195,7 @@
 !       
       write(lu) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
             pns_ind,pns_x,shock_ind,shock_x,                           &
-            from_dump,rlumnue,rlumnueb,rlumnux,                        &
+            bounce_time,from_dump,rlumnue,rlumnueb,rlumnux,            &
             (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),  &
             (uint(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),      &
             (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),           &
