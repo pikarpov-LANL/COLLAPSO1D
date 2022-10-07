@@ -16,7 +16,7 @@
    git clone https://github.com/evanoconnor/EOSdriver.git
    ```
 4. make driver executables
-    1. Edit `HDF5LIBS` and `HDF5INCS` with correct hdf5 paths, e.g.
+    1. Edit `HDF5LIBS` and `HDF5INCS` in `make.inc` with correct hdf5 paths, e.g.
         ```
         HDF5LIBS=-L/usr/lib/x86_64-linux-gnu/hdf5/serial -lhdf5_fortran -lhdf5 -lz
         HDF5INCS=-I/usr/include/hdf5/serial
