@@ -1,3 +1,11 @@
+# This is an analysis script that can:
+#     1. convert binary output to readable .txt
+#     2. produce time evolution plots for selected variables
+#     3. produce a plot of the convection region grid size post-bounce
+#     4. combines all of the plots into movies with ffmpeg
+    
+# -pikarpov
+
 import os
 import sys
 from subprocess import Popen, PIPE
@@ -17,17 +25,17 @@ def main():
             'P',
             'T',
            ]
-    #base_path = '/home/pkarpov/runs/1/project/1dmlmix/output/'
-    base_path = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
-    #dataset = 's12.0_4k'
-    dataset = 'DataOut'
-    base_file = f'{dataset}_read.'
+    base_path = '/home/pkarpov/scratch/1dccsn/'
+    #base_path = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
+    dataset = 's19.0_4k'
+    base_file = f'DataOut_read'
     save_name_amend = ''
     only_post_bounce = False
     save_plot = True,
     compute = False,
     rho_threshold = 1e13
     make_movies = True
+    convert2read = True
         
     # ----------------------------------------------------------------------------------------------------------------
 
@@ -35,10 +43,13 @@ def main():
     size = comm.Get_size()
     rank = comm.Get_rank()
         
-    if rank == 0:                  
-        print( '---------- Files ----------')       
+    if rank == 0:                              
         
-        numfiles = len([filename for filename in os.listdir(f'{base_path}{dataset}') if f'{dataset}_read' in filename])  
+        numfiles = get_numfiles(base_path, dataset, base_file)
+        
+        if convert2read: numfiles = readout(base_path, dataset, base_file).run_readable()
+
+        print( '---------- Files ----------')             
         print(f'Total number of files:  {numfiles}') 
         
         last_file = numfiles 
@@ -51,7 +62,7 @@ def main():
         bounce_shift = pf.bounce_ind
         if only_post_bounce: numfiles = bounce_files
         
-        print(f'Bounce at file:         {bounce_shift}')
+        print(f'Bounce at file:         {bounce_shift+1}')
         print(f'Post bounce files:      {bounce_files}')
         
         interval_size = int(numfiles/size)
@@ -75,8 +86,9 @@ def main():
     interval = comm.scatter(interval, root=0)        
 
     pf = Profiles(rank = rank, numfiles = numfiles, 
-                    base_path = base_path, base_file = base_file, dataset = dataset,
-                    save_name_amend=save_name_amend, only_post_bounce = only_post_bounce)
+                  base_path = base_path, base_file = base_file, dataset = dataset,
+                  save_name_amend=save_name_amend, only_post_bounce = only_post_bounce,                    
+                  interval = interval)
 
     print(f'rank {rank}, interval {interval}')
 
@@ -91,8 +103,8 @@ def main():
                         show_plot=False, 
                         save_plot=save_plot,
                         compute = compute,
-                        rho_threshold = rho_threshold,
-                    )     
+                        rho_threshold = rho_threshold
+                       )     
 
     pf.progress_bar(i+1, 'Done!', done = True)   
     
@@ -124,6 +136,48 @@ def spread_leftovers(interval, leftover, size):
             leftover -=1             
         interval[i,1] += shift
     return interval
+
+def get_numfiles(base_path, dataset, basefile):
+    numfiles = len([filename for filename in os.listdir(f'{base_path}{dataset}') if basefile in filename])
+    return numfiles
+
+class readout:
+    def __init__(self, base_path, dataset, base_file):
+        self.base_path = base_path
+        self.dataset = dataset
+        self.base_file = base_file
+        self.full_output_path = f'{self.base_path}{self.dataset}'
+
+    def run_readable(self):
+        print( '---- Converting Binary ----')           
+        
+        self.setup_readout()
+        
+        p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        output = p.stdout.read()
+        p.stdout.close()
+        print(f'Files are now readable for {self.dataset}!')
+                
+        return get_numfiles(self.base_path, self.dataset, self.base_file)
+        
+    def setup_readout(self):            
+        
+        # Edit setup
+        filepath = f'setup_readout' 
+        with open(filepath, 'r') as file:    
+            data = file.readlines()            
+            for i, line in enumerate(data):                
+                if 'Data File Name' in line: 
+                    data[i+1] = f'{self.full_output_path}/DataOut\n' 
+                if 'Output Basename' in line:                     
+                    data[i+1] = f'{self.full_output_path}/{self.base_file}\n'                    
+                    
+        self.write_data(filepath, data)               
+    
+    def write_data(self, filepath, data):
+        with open(filepath, 'w') as file:   
+            file.writelines(data)                  
+        
    
 class routines:
     def __init__(self, x, rho, v):
@@ -150,7 +204,8 @@ class routines:
         return self.pns_ind, self.pns_x        
 
 class Profiles:
-    def __init__(self, rank, numfiles, base_path, base_file, dataset, save_name_amend='', only_post_bounce = False):
+    def __init__(self, rank, numfiles, base_path, base_file, dataset, 
+                 save_name_amend='', only_post_bounce = False, interval=[0,0]):
         self.numfiles = numfiles
         self.lumnue = np.zeros((self.numfiles))
         self.times = np.zeros((self.numfiles))
@@ -159,6 +214,7 @@ class Profiles:
         self.base_save_path = f'{self.base_path}{self.dataset}/plots/'
         self.save_name_amend = save_name_amend
         self.only_post_bounce = only_post_bounce
+        self.interval = interval
         #self.progress_bar(0)
         
         self.shock_ind_ar = np.zeros(self.numfiles)
@@ -166,13 +222,15 @@ class Profiles:
         self.pns_ind_ar = np.zeros(self.numfiles)
         self.pns_x_ar = np.zeros(self.numfiles)
         self.time_ar = np.zeros(self.numfiles)
-        self.ind_ar = np.arange(self.numfiles)
+        self.ind_ar = np.arange(1, self.numfiles+1)
         self.bounce_ind = 0
         self.rank = rank
         self.base_file = base_file 
         
     def progress_bar(self, current, val='', done = False, bar_length=20):
-        fraction = current / self.numfiles
+        current -= self.interval[0]
+        lastfile = self.interval[1]-self.interval[0]
+        fraction = current / lastfile
 
         arrow = int(fraction * bar_length - 1) * '-' + '>'
         padding = int(bar_length - len(arrow)) * ' '
@@ -180,7 +238,7 @@ class Profiles:
 
         ending = '\n' if done == True else '\r'
 
-        print(f'rank {self.rank}: [{arrow}{padding}] {current}/{self.numfiles}, val: {val}{padding_val}', end=ending) 
+        print(f'rank {self.rank}: [{arrow}{padding}] {current}/{lastfile}, val: {val}{padding_val}', end=ending) 
 
     def set_paths(self, val, versus):
         self.plot_path = f'{self.base_save_path}{val}'
@@ -211,10 +269,11 @@ class Profiles:
     def plot_convection(self):
         ax = line_plot([[self.ind_ar, self.shock_ind_ar-self.pns_ind_ar]])
         ax.get_legend().remove()        
-        ax.set_xlim(self.bounce_ind,self.numfiles)
+        ax.set_xlim(self.bounce_ind+1,self.numfiles)
         ax.set_xlabel('index')
         ax.set_ylabel('Convection Grid Size')
-        ax.set_title(f'Bounce index = {self.bounce_ind}')
+        ax.set_title(f'Bounce index = {self.bounce_ind+1}')
+        ax.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
         plt.tight_layout()
         save_convection_path = f'{self.base_save_path}{self.save_name_amend}convgrid.png'
         plt.savefig(save_convection_path)
@@ -226,7 +285,7 @@ class Profiles:
 
     def check_bounce(self):                
         for i in range(self.numfiles):
-            file = f'{self.base_file}{i+1}'
+            file = f'{self.base_file}.{i+1}'
             file1d = f'{self.base_path}{self.dataset}/{file}' 
 
             with open(file1d, "r") as file:
@@ -240,13 +299,14 @@ class Profiles:
             if shock_ind > 0: 
                 self.bounce_ind = i
                 return self.numfiles - self.bounce_ind
-                    
+        
+        
         sys.exit("ERROR: Bounce has not been found :(")
                 
     def plot_profile(self, i, vals, versus,
                      show_plot=True, save_plot=False, 
                      compute=False, rho_threshold = 2e11):
-        file = f'{self.base_file}{i+1}'
+        file = f'{self.base_file}.{i+1}'
         file1d = f'{self.base_path}{self.dataset}/{file}'                        
 
         with open(file1d, "r") as file:
@@ -313,7 +373,7 @@ class Profiles:
             
             # check if after bounce                
             if shock_ind > 0:
-                if self.bounce_ind == 0: self.bounce_ind = i                
+                if self.bounce_ind == 0: self.bounce_ind = i
                 
                 if compute and vals.index(val)==0:
                     rt = routines(ps[x_ind], ps[3], ps[4])

@@ -1,3 +1,10 @@
+# The script prepares and launches multiple COLLPASO1D runs,
+# each running independently on the cores provided. 
+# Run initialization is performed in serial, but compilation
+# and execution is spread between all available cores via MPI.
+
+# -pikarpov
+
 import numpy as np
 import os
 import sys
