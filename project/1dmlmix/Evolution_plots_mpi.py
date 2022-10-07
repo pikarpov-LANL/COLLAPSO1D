@@ -30,14 +30,14 @@ def main():
     dataset = 's19.0_4k'
     base_file = f'DataOut_read'
     save_name_amend = ''
-    only_post_bounce = False
+    convert2read = False
+    only_post_bounce = True
     save_plot = True,
     compute = False,
     rho_threshold = 1e13
-    make_movies = True
-    convert2read = True
+    make_movies = True    
         
-    # ----------------------------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------
 
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
@@ -107,11 +107,10 @@ def main():
                        )     
 
     pf.progress_bar(i+1, 'Done!', done = True)   
-    
-    comm.Barrier()
-    
+        
     gather_pns = comm.gather(pf.pns_ind_ar, root=0)
     gather_shock = comm.gather(pf.shock_ind_ar, root=0)
+    
     if rank == 0: 
         if save_plot:
             print( '\n--------- Plot Path --------', flush=True)

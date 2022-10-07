@@ -7,7 +7,6 @@
 
 import numpy as np
 import os
-import sys
 import shutil
 from subprocess import Popen, PIPE
 from mpi4py import MPI
@@ -18,7 +17,6 @@ def main():
     size = comm.Get_size()
     rank = comm.Get_rank()    
     
-    
     mr = multirun(suffix = '_4k',
                   masses = [19.0,20.0],
                   deltam = [9.2e-5,1.05e-4],
@@ -26,13 +24,12 @@ def main():
                   base_path = '/home/pkarpov/runs',
                   output_path = '/home/pkarpov/scratch/1dccsn',
                   )
+    
     if rank == 0:
         mr.initialize()
         if len(mr.masses) != size:
             print(f'Ranks are not distributed well!\nRank size {size} for {len(mr.masses)} datasets')
             comm.Abort()
-    else: 
-        mr.full_output_path = None
     
     comm.Barrier()
     
