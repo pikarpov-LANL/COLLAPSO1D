@@ -321,13 +321,16 @@
 !     
       !post_bounce = .true.
       if (post_bounce.eqv..true.) then
-          !--calculate PNS & shock radii, only in post-bounce stage
-           call shock_radius(ncell,x,v,print_nuloss)
-           call pns_radius(ncell,x,rho,print_nuloss)
+            !--calculate PNS & shock radii, only in post-bounce stage
+            call shock_radius(ncell,x,v,print_nuloss)
+            call pns_radius(ncell,x,rho,print_nuloss)
            
-           !--turbulence contribution to pressure via ML in post-bounce regime
-           pr_turb = 0
-           !call turbpress(ncell,rho,x,v,temp)
+            !--turbulence contribution to pressure via ML in post-bounce regime
+            if (mlmodel_name == 'None') then
+                  pr_turb = 0
+            else
+                  call turbpress(ncell,rho,x,v,temp)
+            endif
       else
           !--check if bounced
           call bounce(ntstep)
@@ -5186,12 +5189,7 @@
       endif 
       t=time 
       nc=ncell 
-      nqn=17 
-!                                                                       
-!                                                                       
-!      do i=1,1                                                         
-!         write (12,*) i, nc,t,gamma,tkin,tterm                         
-!      end do                                                           
+      nqn=17                                                                                                                            
 !       
       write(lu) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
             pns_ind,pns_x,shock_ind,shock_x,                           &
