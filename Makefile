@@ -1,5 +1,6 @@
 #If 'cmake' is not found automatically, enter its location manually below
 CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
+#CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
 
 CONFIG:=Debug
 OPENACC:=0
@@ -16,14 +17,33 @@ EXAMPLES_DIR:=$(WORKDIR)/examples
 PREP_DATA:=prep_sukhbold.f
 DATA_DIR:=$(WORKDIR)/prep_data
 DATA_FILE:=$(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup_prep)
+EOSDRIVER_DIR:=EOSdriver
 
-.PHONY: all project examples data clean
+# --- for eos tables ---
+F90_FILES=eosmodule.F90 readtable.F90 nuc_eos.F90 bisection.F90 findtemp.F90 findrho.F90 linterp_many.F90
+F_FILES=linterp.f
+
+SOURCES=$(foreach F90_FILES,$(F90_FILES),$(EOSDRIVER_DIR)/$(F90_FILES))
+FSOURCES=$(foreach F_FILES,$(F_FILES),$(EOSDRIVER_DIR)/$(F_FILES))
+
+OBJECTS=$(SOURCES:.F90=.o)
+FOBJECTS=$(FSOURCES:.f=.o)
+
+F90FLAGS= -O3 -g
+LDFLAGS= -O3 -g
+
+HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
+HDF5INCS=-I/usr/include/hdf5/serial
+# --- end eos table ---
+
+.PHONY: all project examples data eos clean_eos clean
 
 all:
 	mkdir -p build/proxy build/fortproxy build/projectproxy
+	make eos
 	make cpp_wrappers
 	make fort_bindings
-	make fort_project
+	make fort_project	
 	make data
 	make readout
 	@echo "=== Compilation Successful ==="
@@ -44,7 +64,7 @@ fort_bindings:
 
 fort_project:
 	cd build/projectproxy && \
-	cmake -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=${COMPILER} -DCMAKE_INSTALL_PREFIX=$(INST) $(PROJECT_DIR) && \
+	cmake -DHDF5PATH=$(HDF5PATH) -DOPENACC=$(OPENACC) -DCMAKE_Fortran_COMPILER=${COMPILER} -DCMAKE_INSTALL_PREFIX=$(INST) $(PROJECT_DIR) && \
 	cmake --build . && \
 	make install
 	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(PROJECT_DIR)/$${f}; done
@@ -80,5 +100,26 @@ readout:
 	cd ${PROJECT_DIR}/${PROJECT_NAME} && \
         gfortran readout.f90 -o readout
 
+eos: $(OBJECTS) $(FOBJECTS) 
+	ar r $(EOSDRIVER_DIR)/nuc_eos.a $(EOSDRIVER_DIR)/*.o 	
+	if [ -s  eosmodule.mod ]; then mv eosmodule.mod $(EOSDRIVER_DIR)/; fi	
+	cp $(EOSDRIVER_DIR)/nuc_eos.a $(PROJECT_DIR)
+	cp $(EOSDRIVER_DIR)/eosmodule.mod $(PROJECT_DIR)/$(PROJECT_NAME)
+	@echo "=== Compiled EOS Tables ==="
+
+$(OBJECTS): %.o: %.F90 $(EXTRADEPS)
+	$(COMPILER) $(F90FLAGS) $(HDF5INCS) -c $< -o $@
+
+$(FOBJECTS): %.o: %.f $(EXTRADEPS)
+	$(COMPILER) $(F90FLAGS) $(HDF5INCS) -c $< -o $@			
+
+clean_eos:
+	rm -rf $(EOSDRIVER_DIR)/*.o $(EOSDRIVER_DIR)/*.mod $(EOSDRIVER_DIR)/*.a
+
 clean:
 	rm -rf build/ install/ CMakeFiles/
+	rm -rf $(EOSDRIVER_DIR)/*.o $(EOSDRIVER_DIR)/*.mod $(EOSDRIVER_DIR)/*.a
+	rm -rf $(PROJECT_DIR)/*.a $(PROJECT_DIR)/$(PROJECT_NAME)/*.mod
+	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/fort.* $(PROJECT_DIR)/$(PROJECT_NAME)/$(PROJECT_NAME)
+
+
