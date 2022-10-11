@@ -24,7 +24,10 @@ def main():
             'v',
             'P',
             'T',
+            #'mach'
            ]
+    versus = 'r'
+    #versus = '(v/vsound)^2'
     base_path = '/home/pkarpov/scratch/1dccsn/'
     #base_path = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
     dataset = 's19.0_4k'
@@ -99,7 +102,7 @@ def main():
         #i = 247 #hrg looks good! from 50 cells to 300+ while res diffs from ~1800 to ~3600
         #versus can be either 'r' or 'encm'
         pf.plot_profile(i = i, vals = vals, 
-                        versus = 'r', 
+                        versus = versus, 
                         show_plot=False, 
                         save_plot=save_plot,
                         compute = compute,
@@ -327,43 +330,55 @@ class Profiles:
         
         for val in vals:
             if versus=='encm':
-                x_ind = 1
+                x = ps[1]
                 xlabel = r'$M_{enc} \; [M_{sol}]$'
                 xlim = (0,3) #or (0,4)
                 plot_type = 'semilogy'
                 unit = 1        
             elif versus=='r':
-                x_ind = 2
+                x = ps[2]
                 xlabel = r'$Radius \; [km]$'
                 xlim = (1e0,1e5)
                 plot_type = 'loglog'
                 unit = 1e-5
+            elif versus=='Placeholder':
+                x = ps[2]
+                xlabel = r'$(V/V_{sound})^2$'
+                xlim = None
+                plot_type = 'plot'
+                unit = 1
+            else: print("ERROR: unknown 'versus' {versus}, trying to exit"); sys.exit()
 
             #Cell M_enclosed Position Rho V Ye Pressure Temperature
             if val == 'rho': 
-                ps_ind = 3
+                y = ps[3]
                 ylabel = r'Density $[g/cm^3]$'
                 ylim = (1e4,1e15)
             elif val == 'v':
-                ps_ind = 4
+                y = ps[4]
                 ylabel = r'Velocity $[cm/s]$'
                 ylim = (-6e9, 2.5e9)
                 if versus == 'r': plot_type = 'semilogx'
                 elif versus == 'encm': plot_type = 'plot'
             elif val == 'P':
-                ps_ind = 6
+                y = ps[6]
                 ylabel = r'$P_{gas} \; [\frac{g}{cm\;s^2}]$'
                 ylim = (1e20,1e36)   
             elif val == 'T':
-                ps_ind = 7
+                y = ps[7]
                 ylabel = r'Temperature $[K]$'
                 ylim = (1e5,4e11)
-            else: print("ERROR: unknown val, trying to exit"); sys.exit()            
+            elif val == 'Placeholder':
+                y = ps[7]
+                ylabel = r'$P_{turb}/P_{gas}$'
+                ylim = None
+                sys.exit('Nope')
+            else: sys.exit(f"ERROR: unknown val {val}, trying to exit")            
 
             #print('diff shock', shock_ind, np.argmin(ps[4]), shock_ind-np.argmin(ps[4]))
             #shock_ind = np.argmin(ps[4])
 
-            ax = line_plot([[ps[x_ind]*unit, ps[ps_ind]],],
+            ax = line_plot([[x*unit, y],],
                             #[ps[2,:504]*1e0, ps[ps_ind,:504]],
                            plot_type = plot_type,
                            label = [f'ind     {i+1}'],
@@ -372,17 +387,17 @@ class Profiles:
             
             # check if after bounce                
             if shock_ind > 0:
-                if self.bounce_ind == 0: self.bounce_ind = i
+                if self.bounce_ind == 0: self.bounce_ind = i                
                 
                 if compute and vals.index(val)==0:
-                    rt = routines(ps[x_ind], ps[3], ps[4])
+                    rt = routines(x, ps[3], ps[4])
                     shock_ind, shock_x = rt.shock_radius()
                     pns_ind, pns_x = rt.pns_radius(rho_threshold = rho_threshold)   
                     
                 #print(f'shock {ps[2,int(shock_ind)]:.3e}, {shock_x:.3e}')
                 
                 pns_edge = pns_x*unit
-                shock_front = ps[x_ind,int(shock_ind)]*unit
+                shock_front = x[int(shock_ind)]*unit
                 if versus == 'r': line_label = '%.2e km'          
                 if versus == 'encm': line_label = '%.3f $M_{sol}$'               
                 ax.axvline(x=pns_edge,linestyle='-',color='r',linewidth=1,

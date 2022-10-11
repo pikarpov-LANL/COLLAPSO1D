@@ -220,6 +220,7 @@
       if(ieos.eq.1)call eospg(ncell,rho,u) 
       if(ieos.eq.2)call eospgr(ncell,rho,u) 
       if(ieos.eq.3.or.ieos.eq.4)call eos3(ncell,rho,u,ye) 
+      if(ieos.eq.5)call eos5(ncell,rho,u,ye) 
 !                                                                       
 !--do gravity                                                           
 !  --------------------------------------------------------             
@@ -321,16 +322,16 @@
 !     
       !post_bounce = .true.
       if (post_bounce.eqv..true.) then
-            !--calculate PNS & shock radii, only in post-bounce stage
-            call shock_radius(ncell,x,v,print_nuloss)
-            call pns_radius(ncell,x,rho,print_nuloss)
-           
-            !--turbulence contribution to pressure via ML in post-bounce regime
-            if (mlmodel_name == 'None') then
-                  pr_turb = 0
-            else
-                  call turbpress(ncell,rho,x,v,temp)
-            endif
+        !--calculate PNS & shock radii, only in post-bounce stage
+        call shock_radius(ncell,x,v,print_nuloss)
+        call pns_radius(ncell,x,rho,print_nuloss)
+        
+        !--turbulence contribution to pressure via ML in post-bounce regime
+        if (mlmodel_name == 'None') then
+            pr_turb = 0
+        else
+            call turbpress(ncell,rho,x,v,temp)
+        endif
       else
           !--check if bounced
           call bounce(ntstep)
@@ -784,7 +785,7 @@
 ! this subroutine determines what kind of eos to use:                   
 !       eosflg = 1: freeze-out, just Ocean's eos + Coul corr.           
 !       eosflg = 2: NSE with Raph's routines, + Ocean eos + Coul        
-!       eosflg = 3: Swesty's eos                                        
+!       eosflg = 3: Swesty's eos   
 !                                                                       
 ! and if e-neutrinos or x-neutrinos are trapped                         
 !                                                                       
@@ -796,8 +797,8 @@
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       parameter (avokb=6.02e23*1.381e-16) 
-!                                                                       
-      real ycc,yccave 
+!                                                                                     
+      real ycc,yccave       
       double precision umass 
       double precision rhok, dens, tempk, yek, xpk, xnk, xak, xhk, yehk 
       double precision zbark, abark, abar2, ubind, dubind 
@@ -962,7 +963,7 @@
 !-- we subtract the energy added to the neutrino field                  
                du(k)=-pdv/deltam(k) + 0.5*dq(k) - dunu(k) 
             endif 
-            !print *,'change occured at cell',k,ifleos(k)               
+            !print *,'change occured at cell',k,ifleos(k)
          endif 
 !                                                                       
       enddo 
@@ -1090,7 +1091,8 @@
       print*,'eospgr:max,min temp(K)',tempmx*1e9,tempmn*1e9 
 !                                                                       
       return 
-      END                                           
+      END        
+                                         
       subroutine eos3(ncell,rho,u,ye) 
 !*************************************************************          
 !                                                                       
@@ -1175,7 +1177,7 @@
             yeh(k)=yehk 
             xmue(k)=etak*tempk 
             xmuhat(k)=0.0 
-            ifign(k)=.false. 
+            ifign(k)=.false.                      
 !                                                                       
 !--Swesty and Lattimer eos                                              
 !                                                                       
@@ -1226,7 +1228,132 @@
       !print *,'eta(1),ifleos(1),temp(1):',eta(1),ifleos(1),temp(1)     
       return 
       END                                           
-!                                                                       
+!          
+      
+      subroutine eos5(ncell,rho,u,ye_spho) 
+        !*************************************************************          
+        !                                                                       
+        !     compute pressures and temperatures with the                       
+        !     SFHo tables                                           
+        !                                                                       
+        !************************************************************           
+        !                                            
+              use eosmodule                           
+              implicit double precision (a-h,o-z) 
+        !                                                                       
+              parameter (idim=10000) 
+              parameter (idim1=idim+1)                           
+            
+              real*8 xrho,xye,xtemp,xtemp2
+              real*8 xenr,xprs,xent,xcs2,xdedt,xmunu
+              real*8 xdpderho,xdpdrhoe
+              real*8 xabar,xzbar,xmu_e,xmu_n,xmu_p,xmuhat_spho
+              real*8 xxa,xxh,xxn,xxp              
+              integer keytemp,keyerr
+        !                                                                       
+              double precision umass 
+              double precision rhok, uk, tempk, yek, ptot, cs, etak,            &
+             &                 abark, xpk, xnk, xak, xhk, yehk, rholdk,         &
+             &                 yeoldk,xpfk, p2k, p3k, p4k, xmuhk, stot          
+        !                                                                       
+              dimension rho(idim), u(idim), ye_spho(idim) 
+        !                                                                       
+              common /prev/ xold(0:idim),vold(0:idim),rhold(idim),              &
+             &              prold(idim), tempold(idim), yeold(idim),            &
+             &              xnold(idim), xpold(idim)                            
+              common /cases/ t9nse, rhoswe, rhonue, rhonux 
+              common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
+              common /eosnu/ prnu(idim1) 
+              common /carac/ deltam(idim), abar(idim) 
+              common /tempe/ temp(idim) 
+              common /therm/ xmu(idim) 
+              common /state/ xp(idim),xn(idim),eta(idim),ifleos(idim) 
+              common /swesty/ xpf(idim), pvar2(idim), pvar3(idim), pvar4(idim) 
+              common /cpots/ xmue(idim), xmuhat(idim) 
+              common /hnucl/ xalpha(idim),xheavy(idim), yeh(idim) 
+              common /cgas / gamma 
+              common /const/ gg, clight, arad, bigr, xsecnn, xsecne 
+              common /units/ umass, udist, udens, utime, uergg, uergcc 
+              common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
+              logical ifign 
+              common /ign  / ifign(idim) 
+
+              data ggcgs/6.67e-8/, avo/6.02e23/ 
+              data aradcgs /7.565e-15/, boltzk/1.381e-16/ 
+              data hbar/1.055e-27/, ccgs/3e10/ 
+              data emssmev/0.511e0/, boltzmev/8.617e-11/ 
+              data ergmev /6.2422e5/, sigma1/9d-44/, sigma2/5.6d-45/ 
+              data c2cgs /6.15e-4/, c3cgs /5.04e-10/, fermi/1d-13/
+        !                                                                       
+              tempmx=  -1e20 !? 
+              tempmn=   1e20 !?
+              vsmax=    0. !?
+              keytemp = 1
+              keyerr  = 0
+              
+              urho = umass/udist**3
+              upr = umass/udist/utime**2
+              uv = udist/utime
+              uent = 1!uergg/utemp
+              ueta = ergmev/utemp
+              
+              print*, 'uergg ', uergg
+              print*, 'urho ', urho            
+              print*, 'uergg ', uergg 
+
+              call readtable("Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
+
+              do k=1,ncell 
+                 xrho=rho(k)*urho
+                 xenr=u(k)*uergg
+                 xtemp=temp(k)*utemp*boltzmev
+                 xye=ye_spho(k) 
+
+                 if (xye.lt.0.) then 
+                    print *,'k,yek',k,xye 
+                    stop 
+                 endif 
+        !                                                                       
+        !--SFHo EoS tables                                               
+        !                     
+                 call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,             &
+                    xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
+                    xmuhat_spho,keytemp,keyerr,precision)    
+                 !                                                                       
+                 !--store values - CHECK UNITS!!!                                                        
+                 !                 
+                 abar(k)=   xabar !
+                 xalpha(k)= xxa   !
+                 xheavy(k)= xxh   !
+                 yeh(k)=    xye   !
+                 xmue(k)=   xmu_e/ergmev  !?                 
+                 xmuhat(k)= xmuhat_spho/ergmev !?
+                 ifign(k)=  .false. !?
+
+                 if (xxp.le.1d-20) then 
+                    xxp=0. 
+                 end if 
+                 if (xxn.le.1d-20) then 
+                    xxn=0. 
+                 end if 
+
+                 xp(k)=     xxp !
+                 xn(k)=     xxn !
+                 eta(k)=    (xmu_e/xtemp)/ueta !? code units ?
+                 temp(k)=   xtemp/utemp/boltzmev
+                 prold(k) = pr(k) 
+                 pr(k)=     xprs/upr
+                 u2(k)=     xent/uent ! kb per nucleon
+                 vsound(k)= sqrt(xcs2)/uv
+
+                 ! zbar would be nice but not completely *necessary*
+                 vsmax=dmax1(vsmax,vsound(k)) 
+                 tempmx=dmax1(tempmx,temp(k)) 
+                 tempmn=dmin1(tempmn,temp(k))                                                                     
+        !                                                                       
+              enddo 
+              return 
+              END        
                                                                         
                                                                         
       subroutine turbulence(ncell,x,f,q,v,rho,fmix) 
@@ -4672,7 +4799,7 @@
 !     a Newton-Raphson procedure coupled with                           
 !     bissection to prevent convergence problems.                       
 !                                                                       
-!******************************************************                 
+!**************************************************************                 
       implicit double precision (a-h,o-z) 
 !                                                                       
       parameter(itmax=80) 
@@ -4741,7 +4868,8 @@
   100 format(A28,5(1g10.3)) 
       return 
       END                                           
-!                                                                       
+!                    
+!      
       subroutine rooteta(k,tmev,rho,ynu,unu,eta,temp) 
 !***********************************************************            
 !                                                                       
@@ -4861,7 +4989,8 @@
       abar=a 
 !                                                                       
       return 
-      END                                           
+      END
+!
 !                                                                       
       subroutine readini
 !*************************************************************          
@@ -5662,13 +5791,15 @@
 !--this because in NSE, we can have u(i)< lt 0                          
 !--so take energy with respect to iron                                  
                   usi=u(i)+8.8*umevnuc 
-               else 
+               elseif (ifleos(i).eq.3.or.ifleos(i).eq.4) then
                   if (ieos.eq.3) then 
                      usi=u(i)+8.8*umevnuc 
                   else 
 !--variable of state is entropy                                         
                      usi=u(i)*temp(i) 
                   endif 
+               else
+                  usi=u(i)                   
                endif 
                erx=abs(dumv(i))/dxi 
                erv=abs(f1v(i)-f2v(i))/(abs(v(i))+vsi) 
@@ -5844,8 +5975,10 @@
 !         end if                                                        
 !                                                                       
 !--flag particles according to physical state                           
-!                                                                       
-         call eosflg(ncell,rho,ye,u,f1ye,f1u) 
+!
+         if (ieos.ne.5) then                                                                       
+            call eosflg(ncell,rho,ye,u,f1ye,f1u) 
+         endif
 !                                                                       
 !--do various neutrino flagging and checking                            
 !--skip neutrino                                                        
