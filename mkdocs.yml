@@ -1,0 +1,117 @@
+site_name: COLLAPSO1D
+repo_url: https://github.com/pikarpov-LANL/COLLAPSO1D
+repo_name: COLLAPSO1D
+site_description: >-
+  Wiki for COLLAPSO1D: 1D Core Collapse Supernova code with ML turbulence
+theme:
+  name: material  
+  icon:
+    repo: fontawesome/brands/git-alt   
+  palette: 
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7 
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode  
+  font:
+    text: Noto Sans
+    code: JetBrains Mono
+  features:
+    - content.tooltips
+    - navigation.instant  
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.tabs 
+    - navigation.tabs.sticky       
+    - search.highlight
+    - search.suggest
+    - search.share
+    - header.autohide
+    - content.code.annotate    
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji 
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true   
+  - pymdownx.inlinehilite
+  - pymdownx.smartsymbols  
+  - pymdownx.keys
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde  
+  - pymdownx.snippets:
+      url_download: true
+      auto_append:
+        - includes/abbreviations.md  
+  - abbr
+  - admonition
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - footnotes
+  - pymdownx.details
+  - pymdownx.tasklist:
+      custom_checkbox: true   
+  - attr_list
+  - md_in_html  
+
+plugins:
+  - tags
+  - search
+  - glightbox
+
+extra:
+  version:
+    provider: mike
+    default: latest 
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/pikarpov-LANL
+      name: Platon Karpov on GitHub
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/in/pikarpov/
+      name: Platon Karpov on LinkedIn  
+
+extra_css:
+  - stylesheets/extra.css
+
+copyright: Copyright &copy; 2020 - 2022 Tried National Security (Los Alamos National Laboratory), BSD
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js  
+
+nav:
+    - Home: 
+      - index.md
+      - installation.md
+      - quick_start.md
+      - setup.md
+      - eosdriver.md
+      - units.md
+      - Legacy:
+        - legacy/legacy.md
+        - legacy/data_prep.md
