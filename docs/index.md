@@ -1,4 +1,4 @@
-# Welcome to COLLAPSO1D
+# Welcome
 
 COLLAPSO1D is a 1D lagrangian code for Core-Collapse Supernova (CCSN) modeling. For progenitors, it takes [KEPLER](https://2sn.org/kepler/doc/Introduction.html) generated data. Currently, there is support for [Heger & Woosley, 2000:](https://2sn.org/stellarevolution/) and [Sukhbold et al, 2016](https://arxiv.org/abs/1510.04643).
 
@@ -15,7 +15,7 @@ Notes on ML subgrid turbulence model implementation within this code can be foun
 
 
 ??? danger "License"
-    1dccsn code has a BSD-style license, as found in the [LICENSE](https://github.com/pikarpov-LANL/1dccsn/blob/master/LICENSE) file.
+    COLLAPSO1D code has a BSD-style license, as found in the [LICENSE](https://github.com/pikarpov-LANL/COLLAPSO1D/blob/master/LICENSE) file.
 
     © 2020. Triad National Security, LLC. All rights reserved.
     This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos
