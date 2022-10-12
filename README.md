@@ -6,7 +6,9 @@ Turbulence is treated through mixing length theory (MLT) and Machine Learning (M
 
 PyTorch is implemented based on [pytorch-fortran](https://github.com/alexeedm/pytorch-fortran).
 
-For installation, quick start, and the details of the code please refer to the [Wiki](https://pikarpov-LANL.github.io/COLLAPSO1D/).
+
+## [Documentation](https://pikarpov-LANL.github.io/COLLAPSO1D/)
+For installation, quick start, and the details of the code please refer to the documentation.
 
 -------
 
