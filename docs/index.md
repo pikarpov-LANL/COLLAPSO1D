@@ -14,7 +14,7 @@ PyTorch is implemented based on [pytorch-fortran](https://github.com/alexeedm/py
 Notes on ML subgrid turbulence model implementation within this code can be found on [Overleaf](https://www.overleaf.com/read/pgsnmxgdjkrq).
 
 
-??? danger "License"
+??? abstract "License"
     COLLAPSO1D code has a BSD-style license, as found in the [LICENSE](https://github.com/pikarpov-LANL/COLLAPSO1D/blob/master/LICENSE) file.
 
     © 2020. Triad National Security, LLC. All rights reserved.
