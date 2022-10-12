@@ -21,13 +21,13 @@ subroutine readtable(eos_filename)
   real*8 buffer1,buffer2,buffer3,buffer4
   accerr=0
 
-  write(*,*) "Reading EOS Table"
+  !write(*,*) "Reading EOS Table"
 
   call h5open_f(error)
 
   call h5fopen_f (trim(adjustl(eos_filename)), H5F_ACC_RDONLY_F, file_id, error)
 
-  write(6,*) trim(adjustl(eos_filename))
+  !write(6,*) trim(adjustl(eos_filename))
 
 ! read scalars
   dims1(1)=1
@@ -58,9 +58,9 @@ subroutine readtable(eos_filename)
   endif
 
   write(message,"(a25,i5,i5,i5)") "We have nrho ntemp nye: ", nrho,ntemp,nye
-  write(*,*) message
+  !write(*,*) message
 
-  allocate(alltables(nrho,ntemp,nye,nvars))
+  if (.not.allocated(alltables)) allocate(alltables(nrho,ntemp,nye,nvars))
 
   ! index variable mapping:
   !  1 -> logpress
@@ -179,21 +179,21 @@ subroutine readtable(eos_filename)
   call h5dclose_f(dset_id,error)
   accerr=accerr+error
 
-  allocate(logrho(nrho))
+  if (.not.allocated(logrho)) allocate(logrho(nrho))
   dims1(1)=nrho
   call h5dopen_f(file_id, "logrho", dset_id, error)
   call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, logrho, dims1, error)
   call h5dclose_f(dset_id,error)
   accerr=accerr+error
 
-  allocate(logtemp(ntemp))
+  if (.not.allocated(logtemp)) allocate(logtemp(ntemp))
   dims1(1)=ntemp
   call h5dopen_f(file_id, "logtemp", dset_id, error)
   call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, logtemp, dims1, error)
   call h5dclose_f(dset_id,error)
   accerr=accerr+error
 
-  allocate(ye(nye))
+  if (.not.allocated(ye)) allocate(ye(nye))
   dims1(1)=nye
   call h5dopen_f(file_id, "ye", dset_id, error)
   call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, ye, dims1, error)
@@ -226,7 +226,7 @@ subroutine readtable(eos_filename)
   eos_tempmin = 10.0d0**logtemp(1)
   eos_tempmax = 10.0d0**logtemp(ntemp)
 
-  write(6,*) "Done reading eos tables"
+  !write(6,*) "Done reading eos tables"
 
 
 end subroutine readtable

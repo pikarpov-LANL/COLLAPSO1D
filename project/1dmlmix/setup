@@ -1,13 +1,13 @@
 <Input File>
 Data
 <Output File>
-DataOut
+Test
 <Input PyTorch Model>
-MLmodel.pt
+None
 <Input Grid Size to interpolate for PyTorch Model>
 200
 <Dump # to read>
-1
+0
 <Dump time intervals [s]>
 1.d-3
 <Max time [s]>
@@ -19,7 +19,7 @@ MLmodel.pt
 <External Force (not default)>
 1
 <EoS option>
-4
+5
 <If > 1, include core mass>
 2.d0
 <delp (not default)>

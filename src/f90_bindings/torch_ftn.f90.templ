@@ -39,7 +39,6 @@ module torch_ftn
         type(c_ptr) :: handle
         type(c_ptr) :: h_optimizer
     contains
-        procedure :: test                 => torch_test    
         procedure :: load                 => torch_module_load
         procedure :: forward              => torch_module_forward
         procedure :: train                => torch_module_train
@@ -213,12 +212,6 @@ module torch_ftn
     !!======================================================================================
     !! Module member subroutines
     !!======================================================================================
-
-    subroutine torch_test(this,i)
-        class(torch_module), intent(out) :: this
-        integer :: i
-        print*, 'Testing...', i
-    end subroutine
 
     subroutine torch_module_load(this, file_name, flags)
         class(torch_module), intent(out) :: this

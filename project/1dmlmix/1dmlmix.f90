@@ -13,7 +13,7 @@
       integer jtrape,jtrapb,jtrapx,ntstep
       character*128 mlmodel_name
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       common /bstuf/ rb, dumrb, f1rb, f2rb 
@@ -155,7 +155,7 @@
       character*128 mlmodel_name
       logical post_bounce
 
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (tiny=-1e-5) 
 !                                                                       
@@ -377,7 +377,7 @@
       real scale_pr, scale_pr_relative
       double precision pr_turb
 !
-      parameter(idim=10000) 
+      parameter(idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim), temp(idim) 
@@ -530,7 +530,7 @@
 
       logical post_bounce
 
-      parameter (idim=10000) 
+      parameter (idim=4000) 
 
       common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
            &               enue, enueb, enux, e2nue, e2nueb, e2nux
@@ -563,7 +563,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension x(0:idim),v(0:idim) 
@@ -647,7 +647,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
 !                                                                       
       dimension x(0:idim),rho(idim) 
       common /carac/ deltam(idim), abar(idim) 
@@ -676,7 +676,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (avokb=6.02e23*1.381e-16) 
 !                                                                       
@@ -793,7 +793,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       parameter (avokb=6.02e23*1.381e-16) 
@@ -984,7 +984,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim), u(idim) 
@@ -1037,7 +1037,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim), u(idim) 
@@ -1103,7 +1103,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       double precision umass 
@@ -1241,7 +1241,7 @@
               use eosmodule                           
               implicit double precision (a-h,o-z) 
         !                                                                       
-              parameter (idim=10000) 
+              parameter (idim=4000) 
               parameter (idim1=idim+1)                           
             
               real*8 xrho,xye,xtemp,xtemp2
@@ -1291,23 +1291,30 @@
               keytemp = 1
               keyerr  = 0
               
-              urho = umass/udist**3
               upr = umass/udist/utime**2
               uv = udist/utime
               uent = 1!uergg/utemp
               ueta = ergmev/utemp
               
-              print*, 'uergg ', uergg
-              print*, 'urho ', urho            
-              print*, 'uergg ', uergg 
+              !print*, 'uergg ', uergg
+              !print*, 'udens ', udens            
 
               call readtable("Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
+              !print*, 'rho ', rho*udens
+              !print*, 'ye ', ye
+              !call EXIT
 
               do k=1,ncell 
-                 xrho=rho(k)*urho
+                 !print*, 'rho ', rho(k)*udens, udens, k, ncell
+                 !print*, 'ye ', ye_spho(k+1), k+1, ncell                 
+                 xrho=rho(k)*udens
                  xenr=u(k)*uergg
                  xtemp=temp(k)*utemp*boltzmev
-                 xye=ye_spho(k) 
+                 xye=ye_spho(k)
+                 
+                 ! set upper and lower bounds
+                 if (xye.ge.0.6) xye=0.599
+                 if (xrho.lt.166.5) xrho=166.5                 
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
@@ -1367,7 +1374,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension x(0:idim),f(0:idim),v(0:idim) 
@@ -1437,7 +1444,7 @@
 !             
       logical post_bounce
       double precision pr_turb
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension x(0:idim),f(0:idim),v(0:idim) 
@@ -1512,7 +1519,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
 !                                                                       
       dimension x(0:idim),f(0:idim) 
       dimension gpot(idim),deltam(idim) 
@@ -1573,7 +1580,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
 !                                                                       
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim) 
       common /numb/ ncell, ncell1 
@@ -1879,7 +1886,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
 !                                                                       
-      parameter(idim=10000) 
+      parameter(idim=4000) 
       parameter (delta=0.783) 
       parameter (deltab=1.805) 
 !-- tffac=(6pi^2/2)^2/3 hbar*2/(2 mp kb)*avo^2/3                        
@@ -2086,7 +2093,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=10000) 
+      parameter(idim=4000) 
 !                                                                       
       parameter(sinw2=0.23) 
       parameter(fe=(1.+4.*sinw2+8.*sinw2*sinw2)/(6.*3.14159)) 
@@ -2171,7 +2178,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !--1/(2.*avo*pi**2*(hbar*c)**3 in Mev-3 cm-3 nucleon g-1)               
       parameter (prefac=1.09e7) 
@@ -2272,7 +2279,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (tiny=1d-15) 
       parameter (rcrit=1.) 
 !                                                                       
@@ -2436,7 +2443,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=10000) 
+      parameter(idim=4000) 
       parameter(fs=1./(12.*3.14159)) 
 !-- cross section Gf / gram is 6.02e23*5.29e-44=3.2e-20                 
       parameter(sigma=fs*3.2e-20) 
@@ -2582,7 +2589,7 @@
 !                                                                       
       integer ncell 
       parameter (tiny=1.d-10) 
-      parameter (idim=10000) 
+      parameter (idim=4000) 
 !                                                                       
       dimension x(0:idim), rho(idim), ye(idim) 
       dimension dynue(idim),dynueb(idim),dynux(idim),                   &
@@ -2972,7 +2979,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=10000) 
+      parameter(idim=4000) 
       parameter (idim1=idim+1) 
 !--1/(avo*pi**2*(hbar*c)**3 in Mev-3 cm-3 nucleon g-1)                  
 !      parameter(prefac=2.19e7)                                         
@@ -3153,7 +3160,7 @@
       integer jtrape,jtrapb,jtrapx 
 !                                                                       
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (small=1d-20) 
       parameter (rcrit=1.) 
 !                                                                       
@@ -3533,7 +3540,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=10000) 
+      parameter(idim=4000) 
 !                                                                       
       dimension rho(idim), ye(idim) 
       dimension dynue(idim), dynueb(idim), dynux(idim),                 &
@@ -3646,7 +3653,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=10000) 
+      parameter(idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension rho(idim) 
@@ -3700,7 +3707,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=10000) 
+      parameter(idim=4000) 
 !                                                                       
       parameter(sinw2=0.23) 
       parameter(ga=-0.5) 
@@ -3979,7 +3986,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=10000) 
+      parameter(idim=4000) 
       parameter(tiny=1d-15) 
 !                                                                       
       dimension x(0:idim) 
@@ -4104,7 +4111,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       dimension x(0:idim),rho(idim),v(0:idim) 
@@ -4256,7 +4263,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
 !                                                                       
 !                                                                       
       common /carac/ deltam(idim), abar(idim) 
@@ -4328,7 +4335,7 @@
 !************************************************************           
 !                                                                       
       implicit double precision (a-h,o-z) 
-      parameter(idim=10000) 
+      parameter(idim=4000) 
 !                                                                       
       dimension x(0:idim), v(0:idim),u(idim),                           &
      &     rho(idim), ye(idim)                                          
@@ -4437,7 +4444,7 @@
 !************************************************************           
 !                                                                       
       implicit double precision (a-h,o-z) 
-      parameter(idim=10000) 
+      parameter(idim=4000) 
       parameter(idim1=idim+1) 
 !                                                                       
       dimension x(0:idim), v(0:idim),u(idim),                           &
@@ -5004,7 +5011,7 @@
       integer jtrape,jtrapb,jtrapx,mlin_grid_size,idump,skip_dump
       logical from_dump, post_bounce      
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       real ycc,yccave
@@ -5254,7 +5261,7 @@
       integer jtrape,jtrapb,jtrapx 
       logical from_dump
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
 !                                                                       
@@ -5532,7 +5539,7 @@
       character*10 frmtx
       character*11 frmtrho
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
 !                                                                       
       logical ifirst, reset(idim)
@@ -6274,7 +6281,7 @@
 !                                                                *      
 !*****************************************************************      
 !                                                                       
-      parameter (idim=10000) 
+      parameter (idim=4000) 
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       parameter (nel=14) 
