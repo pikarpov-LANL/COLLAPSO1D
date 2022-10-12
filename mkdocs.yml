@@ -32,10 +32,8 @@ theme:
     - content.tooltips
     - navigation.instant  
     - navigation.tracking
-    - navigation.sections
-    - navigation.top
-    - navigation.tabs 
-    - navigation.tabs.sticky       
+    - navigation.sections  
+    - navigation.top    
     - search.highlight
     - search.suggest
     - search.share
@@ -107,14 +105,14 @@ extra_javascript:
 nav:
     - Home: 
       - index.md
-      - Overview:
-        - installation.md
-        - quick_start.md
-        - setup.md
-        - eosdriver.md
-        - units.md
-      - Legacy:
-        - legacy/legacy.md
-        - legacy/data_prep.md
-      - Other:
-        - wiki/wiki_setup.md
+    - Overview:
+      - installation.md
+      - quick_start.md
+      - setup.md
+      - eosdriver.md
+      - units.md
+    - Legacy:
+      - legacy/legacy.md
+      - legacy/data_prep.md
+    - Other:
+      - wiki/wiki_setup.md
