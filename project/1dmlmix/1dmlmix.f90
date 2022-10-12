@@ -1307,11 +1307,14 @@
               do k=1,ncell 
                  !print*, 'rho ', rho(k)*udens, udens, k, ncell
                  !print*, 'ye ', ye_spho(k+1), k+1, ncell                 
-                 xrho=rho(k)*udens+3 !that's a hack, please remove!
+                 xrho=rho(k)*udens
                  xenr=u(k)*uergg
                  xtemp=temp(k)*utemp*boltzmev
                  xye=ye_spho(k)
+                 
+                 ! set upper and lower bounds
                  if (xye.ge.0.6) xye=0.599
+                 if (xrho.lt.166.5) xrho=166.5                 
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
