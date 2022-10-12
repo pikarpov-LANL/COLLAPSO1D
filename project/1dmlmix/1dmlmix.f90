@@ -1299,11 +1299,6 @@
               !print*, 'uergg ', uergg
               !print*, 'udens ', udens            
 
-              call readtable("Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
-              !print*, 'rho ', rho*udens
-              !print*, 'ye ', ye
-              !call EXIT
-
               do k=1,ncell 
                  !print*, 'rho ', rho(k)*udens, udens, k, ncell
                  !print*, 'ye ', ye_spho(k+1), k+1, ncell                 
@@ -5245,6 +5240,8 @@
              ynux(i)=0.0 
          endif 
       enddo 
+
+      if (ieos.eq.5) call readtable("Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
 !                                                                       
       return 
       END                                           

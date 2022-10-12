@@ -60,7 +60,7 @@ subroutine readtable(eos_filename)
   write(message,"(a25,i5,i5,i5)") "We have nrho ntemp nye: ", nrho,ntemp,nye
   !write(*,*) message
 
-  if (.not.allocated(alltables)) allocate(alltables(nrho,ntemp,nye,nvars))
+  allocate(alltables(nrho,ntemp,nye,nvars))
 
   ! index variable mapping:
   !  1 -> logpress
@@ -179,21 +179,21 @@ subroutine readtable(eos_filename)
   call h5dclose_f(dset_id,error)
   accerr=accerr+error
 
-  if (.not.allocated(logrho)) allocate(logrho(nrho))
+  allocate(logrho(nrho))
   dims1(1)=nrho
   call h5dopen_f(file_id, "logrho", dset_id, error)
   call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, logrho, dims1, error)
   call h5dclose_f(dset_id,error)
   accerr=accerr+error
 
-  if (.not.allocated(logtemp)) allocate(logtemp(ntemp))
+  allocate(logtemp(ntemp))
   dims1(1)=ntemp
   call h5dopen_f(file_id, "logtemp", dset_id, error)
   call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, logtemp, dims1, error)
   call h5dclose_f(dset_id,error)
   accerr=accerr+error
 
-  if (.not.allocated(ye)) allocate(ye(nye))
+  allocate(ye(nye))
   dims1(1)=nye
   call h5dopen_f(file_id, "ye", dset_id, error)
   call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, ye, dims1, error)
