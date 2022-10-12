@@ -50,6 +50,8 @@ pip show torch
 ```
 Then set `CMAKE_PREFIX_PATH={Locaton}/torch/share/cmake` in `Makefile`.
 
+### Issues? Check out [Troubleshoot](README.md#troubleshooting) section.
+
 ---
 ## Quick Start
 To process progenitor data and to compile the code with PyTorch included, all you need to do is run:
@@ -145,7 +147,7 @@ make clean
 Notes on ML subgrid turbulence model implementation within this code can be found on [Overleaf](https://www.overleaf.com/read/pgsnmxgdjkrq).
 
 
-## Troubleshooting
+## Troubleshoot
 ### `No CMAKE_CXX_COMPILER could be found`
 
 CMake can't find your C compiler. Either check your GCC path or if you are on Ubuntu, run:

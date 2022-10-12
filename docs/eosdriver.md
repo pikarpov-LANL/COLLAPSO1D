@@ -1,21 +1,24 @@
 
-# COLLAPSO1D with SFHo EoS tables
+# EOS Tables
+
+COLLAPSO1D supports a EOS tables through the integrated [EOSdriver](https://github.com/evanoconnor/EOSdriver) by [Evan O'Connor](https://github.com/evanoconnor/EOSdriver). By default, the code is set up with [SFHo](http://adsabs.harvard.edu/abs/2012arXiv1207.2184S) tables in mind ([download link](https://su.drive.sunet.se/index.php/s/FQkikyGcRnHTZNL)). For a full list of supported tables, their format, and how they are interpolated upon read-in, please refer to Evan's [official website](https://github.com/evanoconnor/EOSdriver) and the corresponding GitHub repos. You will be able to download the formatted tables from there as well.
 
 ## Installation
 
-1. Install COLLAPSO1D (follow setup instructions in README)
-   ```
-   git clone https://github.com/pikarpov-LANL/COLLAPSO1D.git
-   ```
-2. Install hdf5 on linux (make sure it is serial, which is default)
+!!! Tip
+    COLLAPSO1D already inlcudes EOSdriver, so you don't need to perform this step.
+
+Here are the instructions to install standalone EOSdriver.
+
+1. Install hdf5 on linux (make sure it is serial, which is default)
     ```
     sudo apt-get install libhdf5-dev
     ```
-3. Get EOSdriver
+2. Get EOSdriver
    ```
    git clone https://github.com/evanoconnor/EOSdriver.git
    ```
-4. make driver executables
+3. make driver executables
     1. Edit `HDF5LIBS` and `HDF5INCS` in `make.inc` with correct hdf5 paths, e.g.
         ```
         HDF5LIBS=-L/usr/lib/x86_64-linux-gnu/hdf5/serial -lhdf5_fortran -lhdf5 -lz
@@ -26,19 +29,21 @@
 ## Where to integrate?
 
 Subroutines :
+
 * energ (?)
-  * it decides whether to use energy or entropy
-  * don't touch it if using energy is fine
+    * it decides whether to use energy or entropy
+    * don't touch it if using energy is fine
 * eosflg (?) - not needed
 * printout - `s` and `uint` are swapped for eos4
-  * probably want all entropy (s) as primary, but need to check
-  * no need to swap
+    * probably want all entropy (s) as primary, but need to check
+    * no need to swap
 * step - a few `u` adjusting `if` statements based on `ieos`
-  * line 5831 & 6013
-  * usi = u(i) # same as ifleos==1
+    * line 5831 & 6013
+    * usi = u(i) # same as ifleos==1
 * unit - units specific based on eos (check `!--3b) Conversion to the Swesty-Lattimer units from code units:  `)
 
 New subroutines:
+
 * eos5
 * ~~rootemp5~~
 * ~~sfhowrap~~
@@ -72,6 +77,7 @@ New subroutines:
 | rfeps        |                          |   in   | root finding relative accuracy, set around 1.0d-10 |
 
 keytemp: 
+
 * 0 -> coming in with rho,eps,ye (solve for temp)
 * 1 -> coming in with rho,temperature,ye
 * 2 -> coming in with rho,entropy,ye (solve for temp)
@@ -80,28 +86,28 @@ keytemp:
 
 Comparison of the EOSdriver with COLLAPSO1D variables:
 
-| nuc_eos_full | Units                    | COLLAPSO1D | Units             |
-| :----------- | :----------------------- | :--------- | :---------------- |
-| xrho         | $g/cm^3$                 | rho(k)        | 2.d6 $g/cm^3$    |
-| xtemp        | $MeV$                    | temp(k)  | 1.d9 $K$     |
-| xye          | number fraction / baryon | ye(k)       | same              |
-| xenr         | $erg/g$                  | u(k)  | uergg  |
-| xprs         | $dyn/cm^2$               | pr(k)        | 2.d22 $dyn/cm^2$ |
-| xent         | $k_B / baryon$           | u2       | uergg/utemp?
-| xcs2         | $cm^2/s^2$               | vsound     | 1.d8 $cm/s$      |
-| xdedt        | $erg/g/MeV$              | dusl(?)    | does it matter?
-| xdpderho     | $dynes \; g/cm^2/erg$    | | does it matter?
-| xdpdrhoe     | $dynes \; cm^3/cm^2/g$   | | does it matter?
-| xxa          | mass fraction            | xalpha(k)        | same              |
-| xxh          | mass fraction            | xheavy(k)        | same              |
-| xxn          | mass fraction            | xn(k)        | same              |
-| xxp          | mass fraction            | xp(k)        | same              |
-| xabar        | A                        | abar(k)      | same
-| xzbar        | Z                        | zbar(k)      | does it matter?
-| xmu_e        | $MeV$                    | xmue(k)       | erg? No, convert based on T
-| xmu_n        | $MeV$                    | | does it matter?
-| xmu_p        | $MeV$                    | | does it matter?
-| xmuhat       | $MeV$                    | xmuhat(k)       | erg? $\eta T$, code    |
+| nuc_eos_full | Units                    | COLLAPSO1D | Units                       |
+| :----------- | :----------------------- | :--------- | :-------------------------- |
+| xrho         | $g/cm^3$                 | rho(k)     | 2.d6 $g/cm^3$               |
+| xtemp        | $MeV$                    | temp(k)    | 1.d9 $K$                    |
+| xye          | number fraction / baryon | ye(k)      | same                        |
+| xenr         | $erg/g$                  | u(k)       | uergg                       |
+| xprs         | $dyn/cm^2$               | pr(k)      | 2.d22 $dyn/cm^2$            |
+| xent         | $k_B / baryon$           | u2         | uergg/utemp?                |
+| xcs2         | $cm^2/s^2$               | vsound     | 1.d8 $cm/s$                 |
+| xdedt        | $erg/g/MeV$              | dusl(?)    | does it matter?             |
+| xdpderho     | $dynes \; g/cm^2/erg$    |            | does it matter?             |
+| xdpdrhoe     | $dynes \; cm^3/cm^2/g$   |            | does it matter?             |
+| xxa          | mass fraction            | xalpha(k)  | same                        |
+| xxh          | mass fraction            | xheavy(k)  | same                        |
+| xxn          | mass fraction            | xn(k)      | same                        |
+| xxp          | mass fraction            | xp(k)      | same                        |
+| xabar        | A                        | abar(k)    | same                        |
+| xzbar        | Z                        | zbar(k)    | does it matter?             |
+| xmu_e        | $MeV$                    | xmue(k)    | erg? No, convert based on T |
+| xmu_n        | $MeV$                    |            | does it matter?             |
+| xmu_p        | $MeV$                    |            | does it matter?             |
+| xmuhat       | $MeV$                    | xmuhat(k)  | erg? $\eta T$, code         |
 | keytemp      | 0,1,2,3                  |
 | keyerr       |                          |
 | rfeps        |                          |
@@ -126,22 +132,22 @@ Comparison of the EOSdriver with COLLAPSO1D variables:
 
 ## Questions
 
-* What is the actual difference between EoS 3 and 4? 
-  * Former has two if statements in the code
-  * !-- switch back to internal energy variable of state 
+* What is the actual difference between EOS 3 and 4? 
+    * Former has two if statements in the code
+    * !-- switch back to internal energy variable of state 
 * Need help testing correctness of the table integration (units and etc.)
-  * feed a range of densities [up to $10^{14}$] into EOS: check pressure, chemical potential, and other.
+    * feed a range of densities [up to $10^{14}$] into EOS: check pressure, chemical potential, and other.
 * What about proton and neutron chemical potential? Should I use them anywhere? - No
 * Also, any use for `xdpderho` & `xdpdrhoe`? - No
 * What is the difference between `ieos` and `ifleos`?
-  *  just to flag when to use what eos given specific conditions? - Yes
+    *  just to flag when to use what eos given specific conditions? - Yes
 * Should I use `subroutine eosflg` for SFHo tables? Meaning apply other EOS based on conditions?
 * What is `xpf`, some proton fraction? Seems to exclusive to LS EOS
-  * xpf(k)=    !rho(i)*uslrho or pprev
+    * xpf(k)=    !rho(i)*uslrho or pprev
 * Is this right? `eta(k)=xmu_e/xtemp`
-  * `ifign(k)= .false.`, not used?
+    * `ifign(k)= .false.`, not used?
 * What should `u2` be? Energy (xenr) or entropy (xent)? It seems to be entropy when ioes=4. - It is entropy
-  * what are the units of entropy in the code?
+    * what are the units of entropy in the code?
 * Units of chemical potential (mu_hat)? erg? - No...
 * Burning is turned off; why? - No need
 
