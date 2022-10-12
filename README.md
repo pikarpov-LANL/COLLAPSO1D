@@ -9,7 +9,8 @@ PyTorch is implemented based on [pytorch-fortran](https://github.com/alexeedm/py
 For installation, quick start, and the details of the code please refer to the [Wiki](https://pikarpov-LANL.github.io/COLLAPSO1D/).
 
 -------
-1dccsn code has a BSD-style license, as found in the [LICENSE](https://github.com/pikarpov-LANL/1dccsn/blob/master/LICENSE) file.
+
+COLLAPSO1D has a BSD-style license, as found in the [LICENSE](https://github.com/pikarpov-LANL/COLLAPSO1D/blob/master/LICENSE) file.
 
 © 2020. Triad National Security, LLC. All rights reserved.
 This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos
