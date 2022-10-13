@@ -26,3 +26,7 @@ dist/*
 d.*
 e.*
 fort.*
+
+mlmodel/mlruns
+mlmodel/logs
+mlmodel/data
