@@ -45,8 +45,6 @@ Subroutines :
 New subroutines:
 
 * eos5
-* ~~rootemp5~~
-* ~~sfhowrap~~
 
 ## Variable compatability
 
@@ -86,28 +84,28 @@ keytemp:
 
 Comparison of the EOSdriver with COLLAPSO1D variables:
 
-| nuc_eos_full | Units                    | COLLAPSO1D | Units                       |
-| :----------- | :----------------------- | :--------- | :-------------------------- |
-| xrho         | $g/cm^3$                 | rho(k)     | 2.d6 $g/cm^3$               |
-| xtemp        | $MeV$                    | temp(k)    | 1.d9 $K$                    |
-| xye          | number fraction / baryon | ye(k)      | same                        |
-| xenr         | $erg/g$                  | u(k)       | uergg                       |
-| xprs         | $dyn/cm^2$               | pr(k)      | 2.d22 $dyn/cm^2$            |
-| xent         | $k_B / baryon$           | u2         | uergg/utemp?                |
-| xcs2         | $cm^2/s^2$               | vsound     | 1.d8 $cm/s$                 |
-| xdedt        | $erg/g/MeV$              | dusl(?)    | does it matter?             |
-| xdpderho     | $dynes \; g/cm^2/erg$    |            | does it matter?             |
-| xdpdrhoe     | $dynes \; cm^3/cm^2/g$   |            | does it matter?             |
-| xxa          | mass fraction            | xalpha(k)  | same                        |
-| xxh          | mass fraction            | xheavy(k)  | same                        |
-| xxn          | mass fraction            | xn(k)      | same                        |
-| xxp          | mass fraction            | xp(k)      | same                        |
-| xabar        | A                        | abar(k)    | same                        |
-| xzbar        | Z                        | zbar(k)    | does it matter?             |
-| xmu_e        | $MeV$                    | xmue(k)    | erg? No, convert based on T |
-| xmu_n        | $MeV$                    |            | does it matter?             |
-| xmu_p        | $MeV$                    |            | does it matter?             |
-| xmuhat       | $MeV$                    | xmuhat(k)  | erg? $\eta T$, code         |
+| nuc_eos_full | Units                    | COLLAPSO1D | Units            |
+| :----------- | :----------------------- | :--------- | :--------------- |
+| xrho         | $g/cm^3$                 | rho(k)     | 2.d6 $g/cm^3$    |
+| xtemp        | $MeV$                    | temp(k)    | 1.d9 $K$         |
+| xye          | number fraction / baryon | ye(k)      | same             |
+| xenr         | $erg/g$                  | u(k)       | uergg            |
+| xprs         | $dyn/cm^2$               | pr(k)      | 2.d22 $dyn/cm^2$ |
+| xent         | $k_B / baryon$           | u2         | same             |
+| xcs2         | $cm^2/s^2$               | vsound     | 1.d8 $cm/s$      |
+| xdedt        | $erg/g/MeV$              | dusl(?)    | does it matter?  |
+| xdpderho     | $dynes \; g/cm^2/erg$    |            | does it matter?  |
+| xdpdrhoe     | $dynes \; cm^3/cm^2/g$   |            | does it matter?  |
+| xxa          | mass fraction            | xalpha(k)  | same             |
+| xxh          | mass fraction            | xheavy(k)  | same             |
+| xxn          | mass fraction            | xn(k)      | same             |
+| xxp          | mass fraction            | xp(k)      | same             |
+| xabar        | A                        | abar(k)    | same             |
+| xzbar        | Z                        | zbar(k)    | does it matter?  |
+| xmu_e        | $MeV$                    | xmue(k)    | 1.d9 $K$         |
+| xmu_n        | $MeV$                    |            | does it matter?  |
+| xmu_p        | $MeV$                    |            | does it matter?  |
+| xmuhat       | $MeV$                    | xmuhat(k)  | 1.d9 $K$         |
 | keytemp      | 0,1,2,3                  |
 | keyerr       |                          |
 | rfeps        |                          |
@@ -154,7 +152,6 @@ Comparison of the EOSdriver with COLLAPSO1D variables:
 Perhaps use energy (keytemp=0); entropy probs not needed (keytemp=2)
 
 call integrals
-
 
 # Outdated Notes
 
