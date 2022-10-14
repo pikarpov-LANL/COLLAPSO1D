@@ -1310,7 +1310,8 @@
                  
                  ! set upper and lower bounds
                  if (xye.ge.0.6) xye=0.599
-                 if (xrho.lt.166.5) xrho=166.5                 
+                 if (xrho.lt.166.5 ) xrho=166.5 
+                 if (xtemp.lt.0.011) xtemp=0.011                  
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
@@ -5243,7 +5244,9 @@
          endif 
       enddo 
 
-      if (ieos.eq.5) call readtable("Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
+      if (ieos.eq.5) then 
+        call readtable("/home/pkarpov/COLLAPSO1D/project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
+      endif
 !                                                                       
       return 
       END                                           
