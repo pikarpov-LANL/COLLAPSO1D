@@ -1293,11 +1293,12 @@
               
               upr = umass/udist/utime**2
               uv = udist/utime
-              uent = 1!uergg/utemp
-              ueta = ergmev/utemp
+              !uent = 1!uergg/utemp ! not needed
+              !ueta = ergmev/utemp ! not needed
               
               !print*, 'uergg ', uergg
-              !print*, 'udens ', udens            
+              !print*, 'udens ', udens     
+              ifign(:) = .false.       
 
               do k=1,ncell 
                  !print*, 'rho ', rho(k)*udens, udens, k, ncell
@@ -1328,9 +1329,8 @@
                  xalpha(k)= xxa   !
                  xheavy(k)= xxh   !
                  yeh(k)=    xye   !
-                 xmue(k)=   xmu_e/ergmev  !?                 
-                 xmuhat(k)= xmuhat_spho/ergmev !?
-                 ifign(k)=  .false. !?
+                 xmue(k)=   xmu_e/utemp/boltzmev  ! Units: 1e9 K -> MeV               
+                 xmuhat(k)= xmuhat_spho/utemp/boltzmev                 
 
                  if (xxp.le.1d-20) then 
                     xxp=0. 
@@ -1341,19 +1341,21 @@
 
                  xp(k)=     xxp !
                  xn(k)=     xxn !
-                 eta(k)=    (xmu_e/xtemp)/ueta !? code units ?
+                 eta(k)=    (xmu_e/xtemp) !
                  temp(k)=   xtemp/utemp/boltzmev
                  prold(k) = pr(k) 
                  pr(k)=     xprs/upr
-                 u2(k)=     xent/uent ! kb per nucleon
+                 u2(k)=     xent ! kb per nucleon
                  vsound(k)= sqrt(xcs2)/uv
+
+                 
 
                  ! zbar would be nice but not completely *necessary*
                  vsmax=dmax1(vsmax,vsound(k)) 
                  tempmx=dmax1(tempmx,temp(k)) 
                  tempmn=dmin1(tempmn,temp(k))                                                                     
         !                                                                       
-              enddo 
+              enddo
               return 
               END        
                                                                         
