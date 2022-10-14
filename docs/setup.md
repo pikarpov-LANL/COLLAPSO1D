@@ -41,18 +41,18 @@ Parameters for near ~4k resolution based on Sukhbold 2016 data. Maximum radius i
     | 11              | 3.1e-5            | 3955             |
     | 12              | 4e-5              | 3975             |
     | 13              | 4.75e-5           | 3958             |
-    | 14              |
-    | 15              |                   |                  |
-    | 16              |
-    | 17              |                   |                  |
-    | 18              |
+    | 14              | 5.7e-5            | 3982             |
+    | 15              | 6.9e-5            | 3980             |
+    | 16              | 7.5e-5            | 3962             |
+    | 17              | 8e-5              | 3982             |
+    | 18              | 9.3e-5            | 3958             |
     | 19              | 9.2e-5            | 3966             |
     | 20              | 1.05e-4           | 3955             |
-    | 21              |
-    | 22              |
-    | 23              |
-    | 24              |
-    | 25              |
+    | 21              | 1.15e-4           | 4000             |
+    | 22              | 1.2e-4            | 3955             |
+    | 23              | 1.31e-4           | 3984             |
+    | 24              | 1.43e-4           | 3991             |
+    | 25              | 1.6e-4            | 3943             |
 
 ??? Abstract "variable maxrad"
     | Progenitor Mass | Initial Cell Mass | maxrad | Result Grid Size |
