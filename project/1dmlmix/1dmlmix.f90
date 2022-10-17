@@ -334,7 +334,7 @@
         endif
       else
           !--check if bounced
-          call bounce(ntstep)
+          call bounce(ntstep,rho)
       endif
 !
 !--compute forces on the particles                                      
@@ -519,7 +519,7 @@
       end
 !
 !
-      subroutine bounce(ntstep)
+      subroutine bounce(ntstep,rho)
 !***********************************************************            
 !                                                          *            
 !  This subroutine identifies if the bounce has occured    *            
@@ -527,29 +527,23 @@
 !***********************************************************            
 !            
       implicit double precision (a-h,o-z) 
-
-      logical post_bounce
-
-      parameter (idim=4000) 
-
-      common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
-           &               enue, enueb, enux, e2nue, e2nueb, e2nux
+          
+      parameter (idim=4000)   
+      dimension rho(idim)
+  
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
-      common /timej / time, dt
+      common /timej / time, dt! 
+      common /units/ umass, udist, udens, utime, uergg, uergcc   
+      
+      logical post_bounce
       
       post_bounce = .false.
       
-      if (ntstep==1) then
-          rlumnue_max = rlumnue
-      endif
-      
-      if (rlumnue>(2*rlumnue_max)) then
+      if (maxval(rho)*udens > 2.d14) then
           post_bounce = .true.
           bounce_ntstep = ntstep
           bounce_time = time
-      else if (rlumnue > rlumnue_max) then
-          rlumnue_max = rlumnue
-      endif                  
+      endif                
       
       end
 !
@@ -6060,6 +6054,30 @@
       end if 
 !                                                                       
       END  
+
+
+      subroutine write_value(t,x)
+       
+        implicit double precision (a-h,o-z) 
+
+        double precision :: t, x
+        character*30 :: xfile
+        logical :: exist
+                
+        xfile = 'lumnue.txt'      
+
+        inquire(file=xfile, exist=exist)
+        if (exist) then
+            open(unit=996, file=trim(xfile), status="old", position="append", action="write")
+        else
+            open(unit=996, file=trim(xfile), status="new", action="write")
+        end if
+                
+        write(996,*), t, x
+
+        close(unit=996)
+
+      end 
 
 
       subroutine write_data(ntstep, ncell,x, v)
