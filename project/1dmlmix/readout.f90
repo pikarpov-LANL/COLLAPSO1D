@@ -18,7 +18,7 @@
       dimension temp(idim), ye(idim), xp(idim), xn(idim) 
       dimension ynue(idim), ynueb(idim), ynux(idim) 
       dimension unue(idim), unueb(idim), unux(idim) 
-      dimension ufreez(idim), pr(idim), u2(idim) 
+      dimension ufreez(idim), pr(idim), u2(idim), pr_turb(idim) 
       real ycc(idim,19) 
       dimension eta(idim) 
       dimension vsound(idim) 
@@ -96,7 +96,7 @@
                (dj(i),i=1,nc),                                           &
                (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),            &
                (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),            &                  
-               (vsound(i),i=1,nc)                                        
+               (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)                                       
 !        
          !print*, 'rho(1)  ftrape  ftrapb  ftrapx'
          !print*, rho(1),ftrape,ftrapb,ftrapx 

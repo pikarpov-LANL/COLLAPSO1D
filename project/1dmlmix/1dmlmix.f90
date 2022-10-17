@@ -328,7 +328,7 @@
         
         !--turbulence contribution to pressure via ML in post-bounce regime
         if (mlmodel_name == 'None') then
-            pr_turb = 0
+            pr_turb(:) = 0
         else
             call turbpress(ncell,rho,x,v,temp)
         endif
@@ -418,8 +418,8 @@
       output_h = mlmodel(input, trim(mlmodel_name))      
       
       ! Re-shape output into code-shape mlout:
-      pr_turb = 0   
-      pr_relative = 0
+      pr_turb(:) = 0   
+      pr_relative(:) = 0
       interp_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
       pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
                                                    mlin_grid_size,1,mlin_grid_size,           &
@@ -5057,6 +5057,7 @@
       common /idump/ idump
       common /interp/ mlin_grid_size
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /mlout/ pr_turb(idim1)
 !                                                                       
       character*1024 filin,filout 
 
@@ -5164,7 +5165,7 @@
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
             (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
-            (vsound(i),i=1,nc)             
+            (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
 !        (vturb2(i),i=1,nc),                                          &
 !
       print*, 'idump as read = ', idump
@@ -5296,6 +5297,7 @@
       common /dump/ from_dump
       common /idump/ idump
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /mlout/ pr_turb(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
       dimension uint(idim), s(idim) 
@@ -5337,7 +5339,7 @@
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
             (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
-            (vsound(i),i=1,nc)             
+            (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
 !          (vturb2(i),i=1,nc),                                          &
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
 !               
