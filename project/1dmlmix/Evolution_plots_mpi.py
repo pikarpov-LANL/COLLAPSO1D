@@ -30,105 +30,123 @@ def main():
     #versus = '(v/vsound)^2'
     base_path = '/home/pkarpov/scratch/1dccsn/'
     #base_path = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
-    dataset = 's19.0_4k'
+    masses = [10.0,11.0,12.0,13.0,15.0,
+              16.0,17.0,18.0,19.0,20.0]    
+    datasets = [f's{m}_4k' for m in masses]
     base_file = f'DataOut_read'
-    save_name_amend = ''
-    convert2read = False
-    only_post_bounce = True
-    save_plot = True,
-    compute = False,
     rho_threshold = 1e13
-    make_movies = True    
-        
+    save_name_amend = ''
+    convert2read = False#True
+    
+    only_post_bounce = False
+    save_plot = True,
+    compute = True #False,
+
+    make_movies = True 
+    fps = 10   
+    
     # -----------------------------------------------------------------------------------
 
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
     rank = comm.Get_rank()
-        
-    if rank == 0:                              
-        
-        numfiles = get_numfiles(base_path, dataset, base_file)
-        
-        if convert2read: numfiles = readout(base_path, dataset, base_file).run_readable()
-
-        print( '---------- Files ----------')             
-        print(f'Total number of files:  {numfiles}') 
-        
-        last_file = numfiles 
-                   
-        pf = Profiles(rank = rank, numfiles = numfiles, 
-                        base_path = base_path, base_file = base_file, dataset = dataset,
-                        save_name_amend=save_name_amend, only_post_bounce = only_post_bounce)
-        
-        bounce_files = pf.check_bounce()
-        bounce_shift = pf.bounce_ind
-        if only_post_bounce: numfiles = bounce_files
-        
-        print(f'Bounce at file:         {bounce_shift+1}')
-        print(f'Post bounce files:      {bounce_files}')
-        
-        interval_size = int(numfiles/size)
-        leftover = numfiles%size
-        
-        print(f'Average interval size:  {interval_size}')
-        print(f'Leftover to distribute: {leftover}')
-        print( '\n-------- Intervals --------')
-
-        interval = np.array([[i*interval_size,i*interval_size+interval_size] for i in range(size)])
-        
-        if leftover != 0: interval = spread_leftovers(interval, leftover, size)
-        
-        if only_post_bounce: interval+=bounce_shift
-        
-    else:
-        last_file = 0
-        interval = 0        
-          
-    numfiles = comm.bcast(last_file, root=0)
-    interval = comm.scatter(interval, root=0)        
-
-    pf = Profiles(rank = rank, numfiles = numfiles, 
-                  base_path = base_path, base_file = base_file, dataset = dataset,
-                  save_name_amend=save_name_amend, only_post_bounce = only_post_bounce,                    
-                  interval = interval)
-
-    print(f'rank {rank}, interval {interval}')
-
-    comm.Barrier()
-    if rank == 0: print( '\n-------- Progress ---------', flush=True)
-
-    for i in range(interval[0], interval[1]):  
-        #i = 247 #hrg looks good! from 50 cells to 300+ while res diffs from ~1800 to ~3600
-        #versus can be either 'r' or 'encm'
-        pf.plot_profile(i = i, vals = vals, 
-                        versus = versus, 
-                        show_plot=False, 
-                        save_plot=save_plot,
-                        compute = compute,
-                        rho_threshold = rho_threshold
-                       )     
-
-    pf.progress_bar(i+1, 'Done!', done = True)   
-        
-    gather_pns = comm.gather(pf.pns_ind_ar, root=0)
-    gather_shock = comm.gather(pf.shock_ind_ar, root=0)
     
-    if rank == 0: 
-        if save_plot:
-            print( '\n--------- Plot Path --------', flush=True)
-            print(pf.base_save_path) 
-                  
-        pf.pns_ind_ar = sum(gather_pns)
-        pf.shock_ind_ar = sum(gather_shock)
+    for dataset in datasets:
         
-        pf.bounce_ind = bounce_shift
-        ax = pf.plot_convection()
-                
-        if make_movies:
-            print( '\n---------- Movies ----------')
-            for val in vals: pf.movie(val,fps=2) 
+        if rank == 0:                              
+            
+            numfiles = get_numfiles(base_path, dataset, base_file)
+            
+            if convert2read: numfiles = readout(base_path, dataset, base_file).run_readable()
+
+            print(f'---------- {dataset} ----------')             
+            print(f'Total number of files:  {numfiles}') 
+            
+            last_file = numfiles 
                     
+            pf = Profiles(rank = rank, numfiles = numfiles, 
+                            base_path = base_path, base_file = base_file, dataset = dataset,
+                            save_name_amend=save_name_amend, only_post_bounce = only_post_bounce)
+            
+            bounce_files = pf.check_bounce(compute=compute)
+            bounce_shift = pf.bounce_ind
+            if only_post_bounce: numfiles = bounce_files
+            
+            print(f'Bounce at file:         {bounce_shift+1}')
+            print(f'Post bounce files:      {bounce_files}')
+            
+            interval_size = int(numfiles/size)
+            leftover = numfiles%size
+            
+            print(f'Average interval size:  {interval_size}')
+            print(f'Leftover to distribute: {leftover}')
+            print( '\n-------- Intervals --------')
+
+            interval = np.array([[i*interval_size,i*interval_size+interval_size] for i in range(size)])
+            
+            if leftover != 0: interval = spread_leftovers(interval, leftover, size)
+            
+            if only_post_bounce: interval+=bounce_shift
+            
+            # creates (if needed) directories to store all plots
+            if save_plot: [pf.set_paths(val, versus, check_path=True) for val in vals]
+            
+        else:
+            last_file = 0
+            interval = 0   
+            bounce_shift = 0   
+            
+        numfiles = comm.bcast(last_file, root=0)
+        interval = comm.scatter(interval, root=0)                
+
+        pf = Profiles(rank = rank, numfiles = numfiles, 
+                    base_path = base_path, base_file = base_file, dataset = dataset,
+                    save_name_amend=save_name_amend, only_post_bounce = only_post_bounce,                    
+                    interval = interval)
+        
+        pf.bounce_ind = comm.bcast(bounce_shift, root=0)
+
+        print(f'rank {rank}, interval {interval}')
+
+        comm.Barrier()
+        if rank == 0: print( '\n-------- Progress ---------', flush=True)
+
+        for i in range(interval[0], interval[1]):  
+            #i = 247 #hrg looks good! from 50 cells to 300+ while res diffs from ~1800 to ~3600
+            #versus can be either 'r' or 'encm'
+            pf.plot_profile(i = i, vals = vals, 
+                            versus = versus, 
+                            show_plot=False, 
+                            save_plot=save_plot,
+                            compute = compute,
+                            rho_threshold = rho_threshold
+                        )     
+
+        pf.progress_bar(i+1, 'Done!', done = True)   
+            
+        gather_pns = comm.gather(pf.pns_ind_ar, root=0)
+        gather_shock = comm.gather(pf.shock_ind_ar, root=0)
+        gather_lumnue = comm.gather(pf.lumnue, root=0)
+        
+        if rank == 0: 
+            if save_plot:
+                print( '\n--------- Plot Path --------', flush=True)
+                print(pf.base_save_path) 
+                    
+            pf.pns_ind_ar = sum(gather_pns)
+            pf.shock_ind_ar = sum(gather_shock)
+            pf.lumnue = sum(gather_lumnue)
+            
+            pf.bounce_ind = bounce_shift
+            ax = pf.plot_convection()
+            ax = pf.plot_lumnue()
+                    
+            if make_movies:
+                print( '\n---------- Movies ----------')
+                for val in vals: pf.movie(val,fps=fps) 
+
+# -----------------------------------------------------------------
+                        
 def spread_leftovers(interval, leftover, size):    
     shift = 0
     for i in range(size):        
@@ -214,6 +232,7 @@ class Profiles:
         self.base_path = base_path
         self.dataset = dataset
         self.base_save_path = f'{self.base_path}{self.dataset}/plots/'
+        self.movie_save_path = f'{self.base_path}{self.dataset}/movies/'
         self.save_name_amend = save_name_amend
         self.only_post_bounce = only_post_bounce
         self.interval = interval
@@ -242,12 +261,16 @@ class Profiles:
 
         print(f'rank {self.rank}: [{arrow}{padding}] {current}/{lastfile}, val: {val}{padding_val}', end=ending) 
 
-    def set_paths(self, val, versus):
+    def set_paths(self, val, versus, check_path=False):
         self.plot_path = f'{self.base_save_path}{val}'
         
-        if not os.path.exists(self.plot_path): os.makedirs(self.plot_path)
-        if versus=='r': self.plot_file = f'{self.plot_path}/{val}_r'
-        elif versus=='encm': self.plot_file = f'{self.plot_path}/{val}_encm'    
+        if check_path: 
+            if not os.path.exists(self.plot_path): os.makedirs(self.plot_path)
+            
+        if versus=='r': self.versus_name = '_r'
+        elif versus=='encm': self.versus_name = '_encm'    
+        
+        self.plot_file = f'{self.plot_path}/{val}{self.versus_name}'
 
     def movie(self, val, versus='r', fps=15, start=0, printout=False):      
         self.set_paths(val,versus)
@@ -259,17 +282,20 @@ class Profiles:
         else: name_amend = ''
             
         name = f'{self.plot_file}{self.save_name_amend}'
+        
+        movie_name = f'{self.movie_save_path}{val}{self.versus_name}{self.save_name_amend}'
+        if not os.path.exists(self.movie_save_path): os.makedirs(self.movie_save_path)
             
-        print(f'{val}{padding_val}: {name}{name_amend}.mp4')
+        print(f'{val}{padding_val}: {movie_name}{name_amend}.mp4')
         result = Popen(['ffmpeg', '-r', f'{fps}', '-start_number', f'{start}',
                         '-i', f'{name}_%d.png', 
-                        '-vcodec', 'libx264', f'{name}{name_amend}.mp4', '-y'],
+                        '-vcodec', 'libx264', f'{movie_name}{name_amend}.mp4', '-y'],
                         stdin=PIPE, stdout=PIPE, stderr=PIPE)   
         output, error = result.communicate()
         if printout: print(output, error)       
         
-    def plot_convection(self):
-        ax = line_plot([[self.ind_ar, self.shock_ind_ar-self.pns_ind_ar]])
+    def plot_convection(self, show_plot=False):
+        ax = line_plot([[self.ind_ar, self.shock_ind_ar-self.pns_ind_ar]], figsize=(10,6))
         ax.get_legend().remove()        
         ax.set_xlim(self.bounce_ind+1,self.numfiles)
         ax.set_xlabel('index')
@@ -277,36 +303,62 @@ class Profiles:
         ax.set_title(f'Bounce index = {self.bounce_ind+1}')
         ax.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
         plt.tight_layout()
-        save_convection_path = f'{self.base_save_path}{self.save_name_amend}convgrid.png'
-        plt.savefig(save_convection_path)
+        save_path = f'{self.base_save_path}{self.save_name_amend}convgrid.png'
+        plt.savefig(save_path)
+        if not show_plot: plt.close()
         
-        print( '\n-------- Convection --------')
-        print(save_convection_path, flush=True) 
+        print( '\n-------- Convection --------')        
+        print(save_path, flush=True) 
         
         return ax
+    
+    def plot_lumnue(self, show_plot=False):
+        ax = line_plot([[self.ind_ar, self.lumnue]], figsize=(10,6), plot_type='semilogy')
+        ax.get_legend().remove()                
+        ax.set_xlabel('index')
+        ax.set_ylabel(r'$F_{\nu_{e}} \; [foe/s]$')
+        ax.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+        plt.tight_layout()
+        save_path = f'{self.base_save_path}{self.save_name_amend}lumnue.png'
+        plt.savefig(save_path)
+        if not show_plot: plt.close()
+        
+        print( '\n---------- lumnue ----------')
+        print(save_path, flush=True) 
+        
+        return ax    
 
-    def check_bounce(self):                
+    def check_bounce(self, compute=False):     
+        self.bounce_ind = -1           
         for i in range(self.numfiles):
             file = f'{self.base_file}.{i+1}'
             file1d = f'{self.base_path}{self.dataset}/{file}' 
 
-            with open(file1d, "r") as file:
-                line = file.readline()        
-                header_vals = file.readline()
-                vals_strip = header_vals[:-1].split(' ')        
-                time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
+            if compute: 
+                ps = np.loadtxt(file1d, skiprows=3)
+                ps = np.moveaxis(ps,0,1) 
+                rho = ps[3]
+                if np.amax(rho) > 2e14: 
+                    self.bounce_ind = i
+                    return self.numfiles - self.bounce_ind                            
+            else:
+                with open(file1d, "r") as file:
+                    line = file.readline()        
+                    header_vals = file.readline()
+                    vals_strip = header_vals[:-1].split(' ')        
+                    time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
+                    
+                pns_ind = int(pns_ind)-1              
                 
-            pns_ind = int(pns_ind)-1            
-            
-            if shock_ind > 0: 
-                self.bounce_ind = i
-                return self.numfiles - self.bounce_ind
-        
-        
-        sys.exit("ERROR: Bounce has not been found :(")
-                
+                if shock_ind > 0: 
+                    self.bounce_ind = i
+                    return self.numfiles - self.bounce_ind
+                                                                                
+        print("WARNING: Bounce has not been found :(")
+        return -1
+                    
     def plot_profile(self, i, vals, versus,
-                     show_plot=True, save_plot=False, 
+                     show_plot=False, save_plot=False, 
                      compute=False, rho_threshold = 2e11):
         file = f'{self.base_file}.{i+1}'
         file1d = f'{self.base_path}{self.dataset}/{file}'                        
@@ -357,7 +409,7 @@ class Profiles:
             elif val == 'v':
                 y = ps[4]
                 ylabel = r'Velocity $[cm/s]$'
-                ylim = (-6e9, 2.5e9)
+                ylim = (-8e9, 2.5e9)
                 if versus == 'r': plot_type = 'semilogx'
                 elif versus == 'encm': plot_type = 'plot'
             elif val == 'P':
@@ -386,8 +438,7 @@ class Profiles:
                            figsize=(10,6))    
             
             # check if after bounce                
-            if shock_ind > 0:
-                if self.bounce_ind == 0: self.bounce_ind = i                
+            if i >= self.bounce_ind:                
                 
                 if compute and vals.index(val)==0:
                     rt = routines(x, ps[3], ps[4])
@@ -412,7 +463,7 @@ class Profiles:
 
             plt.legend()
             plt.tight_layout()
-            if save_plot:
+            if save_plot:        
                 self.set_paths(val, versus)                
                 plt.savefig(f'{self.plot_file}{self.save_name_amend}_{i+1}.png')
                 
