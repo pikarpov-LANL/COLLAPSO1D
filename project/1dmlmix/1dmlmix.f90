@@ -5163,7 +5163,8 @@
             (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),          &
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
-            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)
+            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
+            (vsound(i),i=1,nc)             
 !        (vturb2(i),i=1,nc),                                          &
 !
       print*, 'idump as read = ', idump
@@ -5335,7 +5336,8 @@
             (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),           &
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
-            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)             
+            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
+            (vsound(i),i=1,nc)             
 !          (vturb2(i),i=1,nc),                                          &
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
 !               

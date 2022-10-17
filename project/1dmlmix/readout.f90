@@ -95,8 +95,8 @@
                (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),         &
                (dj(i),i=1,nc),                                           &
                (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),            &
-               (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)                  
-!             (vsound(i),i=1,nc)                                        
+               (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),            &                  
+               (vsound(i),i=1,nc)                                        
 !        
          !print*, 'rho(1)  ftrape  ftrapb  ftrapx'
          !print*, rho(1),ftrape,ftrapb,ftrapx 
@@ -158,7 +158,7 @@
             write(69,*) 'Time [s]  Bounce_Time [s] R_PNS [index] R_PNS [cm] R_shock [index]  R_shock [cm] nu_e_flux [foe/s]'
             write(69,108)10.d0*t, 10.d0*bounce_time, int(pns_ind), 1.d9*pns_x, int(shock_ind), 1.d9*shock_x, 2.d-3*rlumnue            
             write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
-                        & Ye  Pressure [g/cm/s^2] Temperature [K]'            
+                        & Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s] '            
             do i=1,nc 
 !               write(69,103)i,encm(i),x(i),rho(i),v(i),ye(i),          
 !     $           vsound(i)                                             
@@ -228,10 +228,9 @@
 ! Pressure: converting the units, you get a 2.d22 factor, so where did 1.d16 come from?
 
                      write(69,103)i,encm(i),1.d9*x(i),2.d6*rho(i),      &
-!     &                    1.d8*v(i),ye(i),1.d16*pr(i)!,                  &
-     &                    1.d8*v(i),ye(i),2.d22*pr(i),                  &
-     &                    1.d9*temp(i)     
-!     &                    1.d8*vsound(i)                                
+!                         1.d8*v(i),ye(i),1.d16*pr(i)!,                  &
+                         1.d8*v(i), ye(i),2.d22*pr(i),                  &
+                         1.d9*temp(i), 1.d8*vsound(i)                                     
 !                  if (i.gt.1) then                                     
                      if (ufreez(i).lt.1.d-10) then 
                        dene2=dene2+                                     &
