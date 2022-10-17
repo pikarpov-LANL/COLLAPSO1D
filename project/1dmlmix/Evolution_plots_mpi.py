@@ -30,7 +30,7 @@ def main():
     #versus = '(v/vsound)^2'
     base_path = '/home/pkarpov/scratch/1dccsn/'
     #base_path = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
-    masses = [10.0,11.0,12.0,13.0,15.0,
+    masses = [9.0, 10.0,11.0,12.0,13.0,15.0,
               16.0,17.0,18.0,19.0,20.0]    
     datasets = [f's{m}_4k' for m in masses]
     base_file = f'DataOut_read'
@@ -200,10 +200,11 @@ class readout:
         
    
 class routines:
-    def __init__(self, x, rho, v):
+    def __init__(self, x, rho, v, vsound=None):
         self.x = x
         self.rho = rho
-        self.v = v        
+        self.v = v  
+        self.vsound = vsound      
         self.shock_ind = 0
         self.shock_x = 0
         self.pns_ind = 0
@@ -212,6 +213,13 @@ class routines:
     def shock_radius(self):        
         self.shock_ind = np.argmin(self.v)
         self.shock_x = self.x[self.shock_ind]
+                        
+        # mach = abs(self.v/self.vsound)
+        # for i in range(np.argmin(self.v),-1,-1):
+        #     if mach[i] < 1:
+        #         self.shock_ind = i
+        #         self.shock_x = self.x[self.shock_i]
+        #         break
     
         #print('shock position: %.2e'%self.shock_x, self.shock_ind)
         return self.shock_ind, self.shock_x
@@ -329,30 +337,33 @@ class Profiles:
         return ax    
 
     def check_bounce(self, compute=False):     
-        self.bounce_ind = -1           
+        self.bounce_ind = -1
+        bounced = 0           
         for i in range(self.numfiles):
             file = f'{self.base_file}.{i+1}'
             file1d = f'{self.base_path}{self.dataset}/{file}' 
-
+                      
+            with open(file1d, "r") as file:
+                line = file.readline()        
+                header_vals = file.readline()
+                vals_strip = header_vals[:-1].split(' ')        
+                time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
+                
+            pns_ind = int(pns_ind)-1              
+            
             if compute: 
                 ps = np.loadtxt(file1d, skiprows=3)
                 ps = np.moveaxis(ps,0,1) 
                 rho = ps[3]
-                if np.amax(rho) > 2e14: 
-                    self.bounce_ind = i
-                    return self.numfiles - self.bounce_ind                            
-            else:
-                with open(file1d, "r") as file:
-                    line = file.readline()        
-                    header_vals = file.readline()
-                    vals_strip = header_vals[:-1].split(' ')        
-                    time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
-                    
-                pns_ind = int(pns_ind)-1              
-                
-                if shock_ind > 0: 
-                    self.bounce_ind = i
-                    return self.numfiles - self.bounce_ind
+                if np.amax(rho) > 2e14:
+                    if bounced==0: bounced = time1d 
+                    if (time1d-bounced) > 2e-3:
+                        self.bounce_ind = i
+                        return self.numfiles - self.bounce_ind 
+                     
+            elif shock_ind > 0: 
+                self.bounce_ind = i
+                return self.numfiles - self.bounce_ind
                                                                                 
         print("WARNING: Bounce has not been found :(")
         return -1
