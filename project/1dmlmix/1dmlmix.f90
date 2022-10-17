@@ -86,7 +86,7 @@
         print*,' '    
         print*,'****************' 
         print*,' idump        = ', idump
-        print*,' savetime (s) = ', time*10
+        print*,' savetime (s) = ', time*utime
         print*,'****************' 
         print*,' ' 
 !      if (time.gt.4.0) dtime = .0001                                   
@@ -323,7 +323,7 @@
       !post_bounce = .true.
       if (post_bounce.eqv..true.) then
         !--calculate PNS & shock radii, only in post-bounce stage
-        call shock_radius(ncell,x,v,print_nuloss)
+        call shock_radius(ncell,x,v,vsound,print_nuloss)
         call pns_radius(ncell,x,rho,print_nuloss)
         
         !--turbulence contribution to pressure via ML in post-bounce regime
@@ -436,7 +436,7 @@
       END       
 !
 !
-      subroutine shock_radius(ncell,x,v,print_nuloss)
+      subroutine shock_radius(ncell,x,v,vsound,print_nuloss)
 !***********************************************************            
 !                                                          *            
 !  This subroutine identifies the shock radius             *            
@@ -446,32 +446,24 @@
       implicit double precision (a-h,o-z) 
 
       common /rshock/ shock_ind, shock_x    
-      dimension x(0:ncell),v(0:ncell) 
+      dimension x(0:ncell),v(0:ncell),vsound(0:ncell),mach(0:ncell)
+      double precision :: mach
+      double precision :: mach_threshold
       real :: initial_v, old_max_v
       real, dimension(ncell) :: v_old
       integer :: i,j, ind
       logical print_nuloss
-!                              
-      !initial_v = v(size(v))      
 
-      !do i=size(v), 1, -1
-      !    if (v(i).le.(initial_v-(initial_v-minval(v))*0.1)) then
-      !        old_max_v = v(i)
-      !        do j=i-1,0,-1
-      !            if (v(j) .le. old_max_v) then
-      !                old_max_v = v(j)
-      !            else
-      !                shock_x = x(j)
-      !                shock_ind = j
-      !                EXIT
-      !            end if 
-      !        end do
-      !        EXIT
-      !    end if
-      !end do
-      
-      shock_ind = minloc(v, dim=1)
-      shock_x = x(shock_ind)
+      mach_threshold = 1.0
+!                                    
+      mach = ABS(v/vsound)
+      do i=minloc(v, dim=1),1,-1
+        if (mach(i).lt.mach_threshold) then
+            shock_ind = i
+            shock_x = x(shock_ind)
+            EXIT
+        endif
+      enddo
 
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
@@ -536,13 +528,18 @@
       common /units/ umass, udist, udens, utime, uergg, uergcc   
       
       logical post_bounce
+      real bounce_delay
       
       post_bounce = .false.
+      bounce_delay = 2.d-3/utime !delay of 2 ms
       
-      if (maxval(rho)*udens > 2.d14) then
-          post_bounce = .true.
-          bounce_ntstep = ntstep
-          bounce_time = time
+      if (maxval(rho)*udens.gt.2.d14) then
+          if (bounce_time.eq.0) bounce_time=time
+          if (time-bounce_time.ge.bounce_delay) then
+            post_bounce = .true.
+            bounce_ntstep = ntstep
+            bounce_time = time
+          endif
       endif                
       
       end
@@ -6036,12 +6033,12 @@
             print 520,'<',ntstep,                                       &
      &      '          > ----------------------------------'            
             write(*,500)'[    time/tmax, dt (s) ]',                     &
-     &           time*10,'/',tmax*10,steps(1)*10                              
+     &           time*utime,'/',tmax*utime,steps(1)*utime                              
   500       format(A,1p,E10.3,A,E9.3,E15.3)
   
             if (post_bounce.eqv..true.) then
                 write(*,501)'[    bounce time (s)   ]',                     &
-         &           bounce_time*10                              
+         &           bounce_time*utime                              
       501       format(A,1p,E10.3)
             endif
 !
