@@ -91,7 +91,7 @@ Comparison of the EOSdriver with COLLAPSO1D variables:
 | xye          | number fraction / baryon | ye(k)      | same             |
 | xenr         | $erg/g$                  | u(k)       | uergg            |
 | xprs         | $dyn/cm^2$               | pr(k)      | 2.d22 $dyn/cm^2$ |
-| xent         | $k_B / baryon$           | u2         | same             |
+| xent         | $k_B / baryon$           | u2         | sfac             |
 | xcs2         | $cm^2/s^2$               | vsound     | 1.d8 $cm/s$      |
 | xdedt        | $erg/g/MeV$              | dusl(?)    | does it matter?  |
 | xdpderho     | $dynes \; g/cm^2/erg$    |            | does it matter?  |
