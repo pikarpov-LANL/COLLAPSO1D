@@ -1237,7 +1237,8 @@
               implicit double precision (a-h,o-z) 
         !                                                                       
               parameter (idim=4000) 
-              parameter (idim1=idim+1)                           
+              parameter (idim1=idim+1)
+              parameter (avokb=6.02e23*1.381e-16)                            
             
               real*8 xrho,xye,xtemp,xtemp2
               real*8 xenr,xprs,xent,xcs2,xdedt,xmunu
@@ -1280,33 +1281,43 @@
               data ergmev /6.2422e5/, sigma1/9d-44/, sigma2/5.6d-45/ 
               data c2cgs /6.15e-4/, c3cgs /5.04e-10/, fermi/1d-13/
         !                                                                       
-              tempmx=  -1e20 !? 
-              tempmn=   1e20 !?
-              vsmax=    0. !?
+              tempmx  =-1e20 !? 
+              tempmn  = 1e20 !?
+              vsmax   = 0.   !?
               keytemp = 1
               keyerr  = 0
               
               upr = umass/udist/utime**2
-              uv = udist/utime
+              uv  = udist/utime
+              sfac= avokb*utemp/uergg
               !uent = 1!uergg/utemp ! not needed
               !ueta = ergmev/utemp ! not needed
               
               !print*, 'uergg ', uergg
               !print*, 'udens ', udens     
-              ifign(:) = .false.       
+              ifign(:) = .false.  
+              
+              276 format(A,I4,1p,20(E10.3))
 
-              do k=1,ncell 
-                 !print*, 'rho ', rho(k)*udens, udens, k, ncell
-                 !print*, 'ye ', ye_spho(k+1), k+1, ncell                 
+              do k=1,ncell             
                  xrho=rho(k)*udens
                  xenr=u(k)*uergg
                  xtemp=temp(k)*utemp*boltzmev
                  xye=ye_spho(k)
+
+                !  if (k==ncell) then
+                !     write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye_spho(k), &
+                !     xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
+                !     abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
+                !  endif
                  
                  ! set upper and lower bounds
-                 if (xye.ge.0.6) xye=0.599
-                 if (xrho.lt.166.5 ) xrho=166.5 
-                 if (xtemp.lt.0.011) xtemp=0.011                  
+                 if (xye  .ge.0.6  ) xye  = 0.599
+                 if (xrho .lt.166.5) xrho = 166.5 
+                 if (xtemp.lt.0.011) then
+                     !print*, 'print? ',xtemp
+                     xtemp= 0.011                  
+                 endif
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
@@ -1341,17 +1352,22 @@
                  temp(k)=   xtemp/utemp/boltzmev
                  prold(k) = pr(k) 
                  pr(k)=     xprs/upr
-                 u2(k)=     xent ! kb per nucleon
-                 vsound(k)= sqrt(xcs2)/uv
-
-                 
+                 u2(k)=     xent*sfac ! kb per nucleon
+                 vsound(k)= sqrt(xcs2)/uv                 
 
                  ! zbar would be nice but not completely *necessary*
                  vsmax=dmax1(vsmax,vsound(k)) 
                  tempmx=dmax1(tempmx,temp(k)) 
-                 tempmn=dmin1(tempmn,temp(k))                                                                     
-        !                                                                       
+                 tempmn=dmin1(tempmn,temp(k))                    
+        !                          
               enddo
+
+            !   k = k-1              
+            !   write(*,276),'aftr: ', k, rho(k), temp(k), u(k), ye_spho(k), &
+            !   xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
+            !   abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
+            !   call EXIT
+
               return 
               END        
                                                                         
