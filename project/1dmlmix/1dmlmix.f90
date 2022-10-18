@@ -446,7 +446,10 @@
       implicit double precision (a-h,o-z) 
 
       common /rshock/ shock_ind, shock_x    
+      common /units/ umass, udist, udens, utime, uergg, uergcc
+
       dimension x(0:ncell),v(0:ncell),vsound(0:ncell),mach(0:ncell)
+
       double precision :: mach
       double precision :: mach_threshold
       real :: initial_v, old_max_v
@@ -459,8 +462,8 @@
       mach = ABS(v/vsound)
       do i=minloc(v, dim=1),1,-1
         if (mach(i).lt.mach_threshold) then
+            shock_x = x(i)
             shock_ind = i
-            shock_x = x(shock_ind)
             EXIT
         endif
       enddo
@@ -468,7 +471,7 @@
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
           write(*,511)'[ shock radius (i, km) ]', int(shock_ind),               &
-          '                    ', 1.d4*shock_x          
+          '                    ', shock_x*udist/1.d5           
       end if 
       
       return
@@ -483,7 +486,8 @@
 !            
       implicit double precision (a-h,o-z) 
 
-      common /pns/ pns_ind, pns_x   
+      common /pns/ pns_ind, pns_x
+      common /units/ umass, udist, udens, utime, uergg, uergcc   
       dimension x(0:ncell)
       dimension rho(ncell) 
       real :: rho_threshold      
@@ -491,7 +495,7 @@
       logical print_nuloss
 !      
 !--g/cm^3 / unit conversion
-      rho_threshold = 1.d13/2.d6
+      rho_threshold = 1.d13/udens
 !
       do i=size(rho), 1, -1        
           if (rho(i) .ge. rho_threshold) then                        
@@ -504,7 +508,7 @@
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
           write(*,511)'[   PNS radius (i, km) ]', int(pns_ind),               &
-          '                    ', 1.d4*pns_x          
+          '                    ', pns_x*udist/1.d5          
       end if 
       
       return
