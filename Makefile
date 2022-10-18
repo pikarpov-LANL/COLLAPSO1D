@@ -91,7 +91,7 @@ examples:
 data:
 	@echo "=== Using prep_data/setup ==="
 	cd prep_data && \
-	gfortran -std=legacy $(PREP_DATA) -o prep_data && \
+	gfortran -std=legacy $(PREP_DATA) nuc_eos.a -L$(HDF5PATH) -lhdf5_fortran -lhdf5 -lz -o prep_data && \
 	./prep_data
 	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
 	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="
@@ -104,7 +104,9 @@ eos: $(OBJECTS) $(FOBJECTS)
 	ar r $(EOSDRIVER_DIR)/nuc_eos.a $(EOSDRIVER_DIR)/*.o 	
 	if [ -s  eosmodule.mod ]; then mv eosmodule.mod $(EOSDRIVER_DIR)/; fi	
 	cp $(EOSDRIVER_DIR)/nuc_eos.a $(PROJECT_DIR)
+	cp $(EOSDRIVER_DIR)/nuc_eos.a $(DATA_DIR)
 	cp $(EOSDRIVER_DIR)/eosmodule.mod $(PROJECT_DIR)/$(PROJECT_NAME)
+	cp $(EOSDRIVER_DIR)/eosmodule.mod $(DATA_DIR)
 	@echo "=== Compiled EOS Tables ==="
 
 $(OBJECTS): %.o: %.F90 $(EXTRADEPS)

@@ -1,12 +1,18 @@
 <Input File>
-sukhbold2016/s20.0_presn
+sukhbold2016/s12.0_presn
 
 <Output File>
 Data
 
 <Initial Cell Mass>
-3e-4
+4e-5
 
 <Maximum Radius of the Grid (cm)>
 1e10
+
+<EOS option>
+5
+
+<EOS Table Path>
+../project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5
 

@@ -18,8 +18,10 @@ None
 .25
 <External Force (not default)>
 1
-<EoS option>
+<EOS option>
 5
+<EOS Table Path>
+Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5
 <If > 1, include core mass>
 2.d0
 <delp (not default)>

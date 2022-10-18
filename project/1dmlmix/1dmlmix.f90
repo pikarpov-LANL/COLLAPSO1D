@@ -11,7 +11,7 @@
 !                                                                       
 !--ntstep counts the number of timesteps                                
       integer jtrape,jtrapb,jtrapx,ntstep
-      character*128 mlmodel_name
+      character*1024 mlmodel_name
 !                                                                       
       parameter (idim=4000) 
       parameter (idim1=idim+1) 
@@ -152,7 +152,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx, mlin_grid_size
-      character*128 mlmodel_name
+      character*1024 mlmodel_name
       logical post_bounce
 
       parameter (idim=4000) 
@@ -355,7 +355,7 @@
 !--skip neutrino                                                        
       call nuwork(ncell,x,v,rho,                                        &
      &            unue,unueb,unux,dunue,dunueb,dunux)                   
-!                                                                       
+!                                                                            
    99 return 
       END                                           
 !
@@ -372,7 +372,7 @@
       use data_functions
       implicit double precision (a-h,o-z) 
 !          
-      character*128 :: mlmodel_name
+      character*1024 :: mlmodel_name
       integer mlin_grid_size
       real scale_pr, scale_pr_relative
       double precision pr_turb
@@ -1131,7 +1131,15 @@
       tempmx=-1e20 
       tempmn=1e20 
       vsmax=0. 
+      276 format(A,I4,1p,20(E10.3))
       do k=1,ncell 
+        if (k==ncell) then
+        !    write(*,276),'vars: ', k, abar(k)
+        !     write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye(k), &
+        !     xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
+        !     abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
+         endif
+
          rhok=rho(k) 
          uk=u(k) 
          tempk=temp(k) 
@@ -1219,8 +1227,17 @@
          tempmn=dmin1(tempmn,temp(k)) 
 !                                                                       
       enddo 
+
+    !  k = k-1              
+    !  write(*,276),'aftr: ', k, abar(k)
+    !   write(*,276),'aftr: ', k, rho(k), temp(k), u(k), ye(k), &
+    !   xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
+    !   abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
+
       !print *,'eos3: tempmn, tempmx',tempmn,tempmx                     
-      !print *,'eta(1),ifleos(1),temp(1):',eta(1),ifleos(1),temp(1)     
+      !print *,'eta(1),ifleos(1),temp(1):',eta(1),ifleos(1),temp(1)    
+      !print*, abar
+      !call EXIT 
       return 
       END                                           
 !          
@@ -1290,11 +1307,7 @@
               upr = umass/udist/utime**2
               uv  = udist/utime
               sfac= avokb*utemp/uergg
-              !uent = 1!uergg/utemp ! not needed
-              !ueta = ergmev/utemp ! not needed
-              
-              !print*, 'uergg ', uergg
-              !print*, 'udens ', udens     
+
               ifign(:) = .false.  
               
               276 format(A,I4,1p,20(E10.3))
@@ -1305,26 +1318,24 @@
                  xtemp=temp(k)*utemp*boltzmev
                  xye=ye_spho(k)
 
-                !  if (k==ncell) then
-                !     write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye_spho(k), &
-                !     xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
-                !     abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
-                !  endif
+                 if (k==ncell) then
+                    ! write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye_spho(k), &
+                    ! xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
+                    ! abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
+                    ! write(*,276),'vars: ', k, abar(k)
+                 endif
                  
                  ! set upper and lower bounds
                  if (xye  .ge.0.6  ) xye  = 0.599
                  if (xrho .lt.166.5) xrho = 166.5 
-                 if (xtemp.lt.0.011) then
-                     !print*, 'print? ',xtemp
-                     xtemp= 0.011                  
-                 endif
+                 if (xtemp.lt.0.011) xtemp= 0.011                  
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
                     stop 
                  endif 
         !                                                                       
-        !--SFHo EoS tables                                               
+        !--SFHo EOS tables                                               
         !                     
                  call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,             &
                     xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
@@ -1348,11 +1359,11 @@
 
                  xp(k)=     xxp !
                  xn(k)=     xxn !
-                 eta(k)=    (xmu_e/xtemp) !
+                 eta(k)=    xmu_e/xtemp !
                  temp(k)=   xtemp/utemp/boltzmev
                  prold(k) = pr(k) 
                  pr(k)=     xprs/upr
-                 u2(k)=     xent*sfac ! kb per nucleon
+                 u2(k)=     xent*sfac ! not used anywhere when ieos=5
                  vsound(k)= sqrt(xcs2)/uv                 
 
                  ! zbar would be nice but not completely *necessary*
@@ -1362,11 +1373,13 @@
         !                          
               enddo
 
-            !   k = k-1              
+            !  k = k-1              
+            !  write(*,276),'aftr: ', k, abar(k)
             !   write(*,276),'aftr: ', k, rho(k), temp(k), u(k), ye_spho(k), &
             !   xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
             !   abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
-            !   call EXIT
+            !  print*, abar
+            !  call EXIT        
 
               return 
               END        
@@ -3533,7 +3546,7 @@
 !     &  '               ',enux
   510   format(A,1p,E10.3,A,E10.3) 
       endif 
-!                                                                       
+!                                                                            
       return 
       END                                             
 !                                                                       
@@ -5024,7 +5037,7 @@
       parameter (idim1=idim+1) 
       parameter (iqn=17) 
       real ycc,yccave
-      character*128 mlmodel_name
+      character*1024 mlmodel_name
 !                                                                       
       common /cc   / ycc(idim,iqn), yccave(iqn) 
       common /ener1/ dq(idim), dunu(idim) 
@@ -5076,7 +5089,7 @@
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
       common /mlout/ pr_turb(idim1)
 !                                                                       
-      character*1024 filin,filout 
+      character*1024 filin,filout,eos_table      
 
       data pi4/12.56637d0/ 
       gg=13.34 
@@ -5084,15 +5097,15 @@
       from_dump=.false.
 !                                                                       
 !--read options                                                         
-!                                                                       
+!     
+   10 format(A)                                                                        
       open(11,file='setup') 
       read(11,*)
       read(11,10) filin 
       read(11,*)
       read(11,10) filout 
       read(11,*)
-      read(11,10) mlmodel_name
-   10 format(A) 
+      read(11,10) mlmodel_name    
       read(11,*)
       read(11,*) mlin_grid_size
       read(11,*)      
@@ -5109,6 +5122,8 @@
       read(11,*) iextf
       read(11,*)
       read(11,*) ieos
+      read(11,*)
+      read(11,10) eos_table
       read(11,*)
       read(11,*) dcore 
       read(11,*)
@@ -5137,6 +5152,8 @@
       print*, 'Dump # to read:        ', idump
       print*, 'Dump time interval (s):', dtime
       print*, 'Max time (s):          ', tmax
+      print*, 'EOS:                   ', ieos
+      print*, 'EOS Table Path:        ', trim(eos_table)
       !print*, cq,cl
       !print*, iextf,ieos,dcore
       !print*, ncell,delp,nups,damp,dcell
@@ -5194,13 +5211,15 @@
       endif
 
       ncell = nc
-      time = t 
+      time = t       
 !                                                                       
       !print *, nc, t, xmcore, rb, ftrape,ftrapb,ftrapx 
       !do k=1,nc 
       !   write(44,*)k,temp(k),u(k),u2(k) 
       !end do 
+      
       do k=1,nc 
+        print*, k
          if (ifleos(k).lt.0.6) stop 
          if (ifleos(k).eq.3) then 
             ifign(k)=.false. 
@@ -5209,7 +5228,8 @@
          end if 
 !         u(k)=0.9*u(k)                                                 
 !         u2(k)=0.9*u2(k)                                               
-      end do 
+      end do       
+
       !do k=1,3 
       !   print *,u2(k),pr(k),ufreez(k) 
       !   print *, unue(k),unueb(k),unux(k) 
@@ -5257,8 +5277,9 @@
          endif 
       enddo 
 
+      
       if (ieos.eq.5) then 
-        call readtable("/home/pkarpov/COLLAPSO1D/project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
+        call readtable(trim(eos_table))
       endif
 !                                                                       
       return 
@@ -5552,7 +5573,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx, ntstep, ind, mlin_grid_size
       logical from_dump, post_bounce
-      character*128 mlmodel_name, rho_file, x_file      
+      character*1024 mlmodel_name, rho_file, x_file      
       character*10 frmtx
       character*11 frmtrho
 !                                                                       
