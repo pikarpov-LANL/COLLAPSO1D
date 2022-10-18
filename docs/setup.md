@@ -4,7 +4,7 @@
 
 Parameters in the `project/1dmlmix/setup`
 
-??? Quote "setup"
+???+ Quote "setup"
     ```html
     --8<-- "project/1dmlmix/setup"
     ```
@@ -26,7 +26,7 @@ Parameters in the `project/1dmlmix/setup`
 
 Edit `prep_data/setup_prep` for initial parameters, then run `make data` from root directory.
 
-??? Quote "setup_prep"
+???+ Quote "setup_prep"
     ```html
     --8<-- "prep_data/setup_prep"
     ```
@@ -70,7 +70,7 @@ Parameters for near ~4k resolution based on Sukhbold 2016 data. Maximum radius i
 
 Parameters in the `project/1dmlmix/setup_read`
 
-??? Quote "setup_readout"
+???+ Quote "setup_readout"
     ```html
     --8<-- "project/1dmlmix/setup_readout"
     ```
