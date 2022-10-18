@@ -1,0 +1,3 @@
+mlmodel/*.ipynb linguist-documentation
+project/1dmlmix/*.ipynb linguist-documentation
+docs/ linguist-documentation

@@ -86,7 +86,7 @@
         print*,' '    
         print*,'****************' 
         print*,' idump        = ', idump
-        print*,' savetime (s) = ', time*10
+        print*,' savetime (s) = ', time*utime
         print*,'****************' 
         print*,' ' 
 !      if (time.gt.4.0) dtime = .0001                                   
@@ -323,18 +323,18 @@
       !post_bounce = .true.
       if (post_bounce.eqv..true.) then
         !--calculate PNS & shock radii, only in post-bounce stage
-        call shock_radius(ncell,x,v,print_nuloss)
+        call shock_radius(ncell,x,v,vsound,print_nuloss)
         call pns_radius(ncell,x,rho,print_nuloss)
         
         !--turbulence contribution to pressure via ML in post-bounce regime
         if (mlmodel_name == 'None') then
-            pr_turb = 0
+            pr_turb(:) = 0
         else
             call turbpress(ncell,rho,x,v,temp)
         endif
       else
           !--check if bounced
-          call bounce(ntstep)
+          call bounce(ntstep,rho)
       endif
 !
 !--compute forces on the particles                                      
@@ -418,8 +418,8 @@
       output_h = mlmodel(input, trim(mlmodel_name))      
       
       ! Re-shape output into code-shape mlout:
-      pr_turb = 0   
-      pr_relative = 0
+      pr_turb(:) = 0   
+      pr_relative(:) = 0
       interp_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
       pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
                                                    mlin_grid_size,1,mlin_grid_size,           &
@@ -436,7 +436,7 @@
       END       
 !
 !
-      subroutine shock_radius(ncell,x,v,print_nuloss)
+      subroutine shock_radius(ncell,x,v,vsound,print_nuloss)
 !***********************************************************            
 !                                                          *            
 !  This subroutine identifies the shock radius             *            
@@ -446,37 +446,32 @@
       implicit double precision (a-h,o-z) 
 
       common /rshock/ shock_ind, shock_x    
-      dimension x(0:ncell),v(0:ncell) 
+      common /units/ umass, udist, udens, utime, uergg, uergcc
+
+      dimension x(0:ncell),v(0:ncell),vsound(0:ncell),mach(0:ncell)
+
+      double precision :: mach
+      double precision :: mach_threshold
       real :: initial_v, old_max_v
       real, dimension(ncell) :: v_old
       integer :: i,j, ind
       logical print_nuloss
-!                              
-      !initial_v = v(size(v))      
 
-      !do i=size(v), 1, -1
-      !    if (v(i).le.(initial_v-(initial_v-minval(v))*0.1)) then
-      !        old_max_v = v(i)
-      !        do j=i-1,0,-1
-      !            if (v(j) .le. old_max_v) then
-      !                old_max_v = v(j)
-      !            else
-      !                shock_x = x(j)
-      !                shock_ind = j
-      !                EXIT
-      !            end if 
-      !        end do
-      !        EXIT
-      !    end if
-      !end do
-      
-      shock_ind = minloc(v, dim=1)
-      shock_x = x(shock_ind)
+      mach_threshold = 1.0
+!                                    
+      mach = ABS(v/vsound)
+      do i=minloc(v, dim=1),1,-1
+        if (mach(i).lt.mach_threshold) then
+            shock_x = x(i)
+            shock_ind = i
+            EXIT
+        endif
+      enddo
 
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
           write(*,511)'[ shock radius (i, km) ]', int(shock_ind),               &
-          '                    ', 1.d4*shock_x          
+          '                    ', shock_x*udist/1.d5           
       end if 
       
       return
@@ -491,7 +486,8 @@
 !            
       implicit double precision (a-h,o-z) 
 
-      common /pns/ pns_ind, pns_x   
+      common /pns/ pns_ind, pns_x
+      common /units/ umass, udist, udens, utime, uergg, uergcc   
       dimension x(0:ncell)
       dimension rho(ncell) 
       real :: rho_threshold      
@@ -499,7 +495,7 @@
       logical print_nuloss
 !      
 !--g/cm^3 / unit conversion
-      rho_threshold = 1.d13/2.d6
+      rho_threshold = 1.d13/udens
 !
       do i=size(rho), 1, -1        
           if (rho(i) .ge. rho_threshold) then                        
@@ -512,14 +508,14 @@
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
           write(*,511)'[   PNS radius (i, km) ]', int(pns_ind),               &
-          '                    ', 1.d4*pns_x          
+          '                    ', pns_x*udist/1.d5          
       end if 
       
       return
       end
 !
 !
-      subroutine bounce(ntstep)
+      subroutine bounce(ntstep,rho)
 !***********************************************************            
 !                                                          *            
 !  This subroutine identifies if the bounce has occured    *            
@@ -527,29 +523,28 @@
 !***********************************************************            
 !            
       implicit double precision (a-h,o-z) 
-
-      logical post_bounce
-
-      parameter (idim=4000) 
-
-      common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
-           &               enue, enueb, enux, e2nue, e2nueb, e2nux
+          
+      parameter (idim=4000)   
+      dimension rho(idim)
+  
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
-      common /timej / time, dt
+      common /timej / time, dt! 
+      common /units/ umass, udist, udens, utime, uergg, uergcc   
+      
+      logical post_bounce
+      real bounce_delay
       
       post_bounce = .false.
+      bounce_delay = 2.d-3/utime !delay of 2 ms
       
-      if (ntstep==1) then
-          rlumnue_max = rlumnue
-      endif
-      
-      if (rlumnue>(2*rlumnue_max)) then
-          post_bounce = .true.
-          bounce_ntstep = ntstep
-          bounce_time = time
-      else if (rlumnue > rlumnue_max) then
-          rlumnue_max = rlumnue
-      endif                  
+      if (maxval(rho)*udens.gt.2.d14) then
+          if (bounce_time.eq.0) bounce_time=time
+          if (time-bounce_time.ge.bounce_delay) then
+            post_bounce = .true.
+            bounce_ntstep = ntstep
+            bounce_time = time
+          endif
+      endif                
       
       end
 !
@@ -1242,7 +1237,8 @@
               implicit double precision (a-h,o-z) 
         !                                                                       
               parameter (idim=4000) 
-              parameter (idim1=idim+1)                           
+              parameter (idim1=idim+1)
+              parameter (avokb=6.02e23*1.381e-16)                            
             
               real*8 xrho,xye,xtemp,xtemp2
               real*8 xenr,xprs,xent,xcs2,xdedt,xmunu
@@ -1285,32 +1281,43 @@
               data ergmev /6.2422e5/, sigma1/9d-44/, sigma2/5.6d-45/ 
               data c2cgs /6.15e-4/, c3cgs /5.04e-10/, fermi/1d-13/
         !                                                                       
-              tempmx=  -1e20 !? 
-              tempmn=   1e20 !?
-              vsmax=    0. !?
+              tempmx  =-1e20 !? 
+              tempmn  = 1e20 !?
+              vsmax   = 0.   !?
               keytemp = 1
               keyerr  = 0
               
               upr = umass/udist/utime**2
-              uv = udist/utime
+              uv  = udist/utime
+              sfac= avokb*utemp/uergg
               !uent = 1!uergg/utemp ! not needed
               !ueta = ergmev/utemp ! not needed
               
               !print*, 'uergg ', uergg
               !print*, 'udens ', udens     
-              ifign(:) = .false.       
+              ifign(:) = .false.  
+              
+              276 format(A,I4,1p,20(E10.3))
 
-              do k=1,ncell 
-                 !print*, 'rho ', rho(k)*udens, udens, k, ncell
-                 !print*, 'ye ', ye_spho(k+1), k+1, ncell                 
+              do k=1,ncell             
                  xrho=rho(k)*udens
                  xenr=u(k)*uergg
                  xtemp=temp(k)*utemp*boltzmev
                  xye=ye_spho(k)
+
+                !  if (k==ncell) then
+                !     write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye_spho(k), &
+                !     xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
+                !     abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
+                !  endif
                  
                  ! set upper and lower bounds
-                 if (xye.ge.0.6) xye=0.599
-                 if (xrho.lt.166.5) xrho=166.5                 
+                 if (xye  .ge.0.6  ) xye  = 0.599
+                 if (xrho .lt.166.5) xrho = 166.5 
+                 if (xtemp.lt.0.011) then
+                     !print*, 'print? ',xtemp
+                     xtemp= 0.011                  
+                 endif
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
@@ -1345,17 +1352,22 @@
                  temp(k)=   xtemp/utemp/boltzmev
                  prold(k) = pr(k) 
                  pr(k)=     xprs/upr
-                 u2(k)=     xent ! kb per nucleon
-                 vsound(k)= sqrt(xcs2)/uv
-
-                 
+                 u2(k)=     xent*sfac ! kb per nucleon
+                 vsound(k)= sqrt(xcs2)/uv                 
 
                  ! zbar would be nice but not completely *necessary*
                  vsmax=dmax1(vsmax,vsound(k)) 
                  tempmx=dmax1(tempmx,temp(k)) 
-                 tempmn=dmin1(tempmn,temp(k))                                                                     
-        !                                                                       
+                 tempmn=dmin1(tempmn,temp(k))                    
+        !                          
               enddo
+
+            !   k = k-1              
+            !   write(*,276),'aftr: ', k, rho(k), temp(k), u(k), ye_spho(k), &
+            !   xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
+            !   abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
+            !   call EXIT
+
               return 
               END        
                                                                         
@@ -5062,6 +5074,7 @@
       common /idump/ idump
       common /interp/ mlin_grid_size
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /mlout/ pr_turb(idim1)
 !                                                                       
       character*1024 filin,filout 
 
@@ -5168,7 +5181,8 @@
             (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),          &
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
-            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)
+            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
+            (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
 !        (vturb2(i),i=1,nc),                                          &
 !
       print*, 'idump as read = ', idump
@@ -5243,7 +5257,9 @@
          endif 
       enddo 
 
-      if (ieos.eq.5) call readtable("Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
+      if (ieos.eq.5) then 
+        call readtable("/home/pkarpov/COLLAPSO1D/project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
+      endif
 !                                                                       
       return 
       END                                           
@@ -5298,6 +5314,7 @@
       common /dump/ from_dump
       common /idump/ idump
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /mlout/ pr_turb(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
       dimension uint(idim), s(idim) 
@@ -5338,7 +5355,8 @@
             (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),           &
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
-            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc)             
+            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
+            (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
 !          (vturb2(i),i=1,nc),                                          &
       !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
 !               
@@ -6035,12 +6053,12 @@
             print 520,'<',ntstep,                                       &
      &      '          > ----------------------------------'            
             write(*,500)'[    time/tmax, dt (s) ]',                     &
-     &           time*10,'/',tmax*10,steps(1)*10                              
+     &           time*utime,'/',tmax*utime,steps(1)*utime                              
   500       format(A,1p,E10.3,A,E9.3,E15.3)
   
             if (post_bounce.eqv..true.) then
                 write(*,501)'[    bounce time (s)   ]',                     &
-         &           bounce_time*10                              
+         &           bounce_time*utime                              
       501       format(A,1p,E10.3)
             endif
 !
@@ -6057,6 +6075,30 @@
       end if 
 !                                                                       
       END  
+
+
+      subroutine write_value(t,x)
+       
+        implicit double precision (a-h,o-z) 
+
+        double precision :: t, x
+        character*30 :: xfile
+        logical :: exist
+                
+        xfile = 'lumnue.txt'      
+
+        inquire(file=xfile, exist=exist)
+        if (exist) then
+            open(unit=996, file=trim(xfile), status="old", position="append", action="write")
+        else
+            open(unit=996, file=trim(xfile), status="new", action="write")
+        end if
+                
+        write(996,*), t, x
+
+        close(unit=996)
+
+      end 
 
 
       subroutine write_data(ntstep, ncell,x, v)

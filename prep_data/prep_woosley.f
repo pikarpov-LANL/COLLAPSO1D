@@ -377,7 +377,8 @@ c
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x
       common /dump/ from_dump
-      double precision rlumnue,rlumnueb,rlumnux,bounce_time     
+      double precision rlumnue,rlumnueb,rlumnux,bounce_time 
+      double precision pr_turb(idim)     
 c      
       steps = 0
       shock_ind = 0
@@ -391,6 +392,7 @@ c--initialize neutrino fluxes
       rlumnue = 0
       rlumnueb = 0
       rlumnux = 0 
+      pr_turb(:) = 0
 c
       nc = ncell
       do i=1,nc
@@ -430,7 +432,8 @@ c
      $     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),
      $     (dj(i),i=1,nc),
      $     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),
-     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc) 
+     $     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),
+     $     (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)
 c
       do i=1,ncell
          write (43,103) (ycc(i,j),j=1,19)
