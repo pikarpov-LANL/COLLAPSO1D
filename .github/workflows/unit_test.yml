@@ -18,6 +18,9 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }} 
+    - name: Download EOS tables
+      run: |
+        wget https://su.drive.sunet.se/index.php/s/FQkikyGcRnHTZNL/download/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5 -P ./project/1dmlmix/
     - name: Install essentials
       run: |
         sudo apt-get update
