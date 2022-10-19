@@ -25,6 +25,18 @@ Make sure you have cmake or install it by (tested on cmake==3.22.1)
 sudo apt install cmake
 ```
 
+### HDF5
+EOS tables (SFHo by default) require an hdf5 installation. If missing, get it via:
+```
+sudo apt-get install libhdf5-dev
+```
+Then you need to provide paths to the hdf5 libraries in the `Makefile`. If yours differ from default, edit the following variables:
+```
+HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
+HDF5INCS=-I/usr/include/hdf5/serial
+```
+
+
 ### ~/.bashrc
 Add the following to you `~/.bashrc` and then `source ~/.bashrc`:
 ```bash

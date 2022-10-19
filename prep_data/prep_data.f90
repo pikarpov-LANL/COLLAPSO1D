@@ -19,7 +19,6 @@
       parameter(pi43=3.14159*4.0/3.0) 
 !                                                                       
       parameter(idim=4000) 
-      parameter(header_length=2) 
 !                                                                       
       common /celle/ x(0:idim),v(0:idim) 
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
@@ -36,22 +35,6 @@
       real ycc(idim,20) 
       common /abun/ ycc 
 
-      data ggcgs/6.67e-8/, avo/6.02e23/ 
-      data aradcgs /7.565e-15/, boltzk/1.381e-16/ 
-      data hbar/1.055e-27/, ccgs/3e10/ 
-      data emssmev/0.511e0/, boltzmev/8.617e-11/ 
-      data ergmev /6.2422e5/, sigma1/9d-44/, sigma2/5.6d-45/ 
-      data c2cgs /6.15e-4/, c3cgs /5.04e-10/, fermi/1d-13/
-
-      ! --- for eos tables ---
-      real*8 xrho,xye,xtemp,xtemp2
-      real*8 xenr,xprs,xent,xcs2,xdedt,xmunu
-      real*8 xdpderho,xdpdrhoe
-      real*8 xabar,xzbar,xmu_e,xmu_n,xmu_p,xmuhat_spho
-      real*8 xxa,xxh,xxn,xxp              
-      integer keytemp,keyerr      
-      ! ----------------------
-
       double precision rhocgs, tkelv, yej, abarj, ucgs, pcgs, xpj, xnj 
       double precision f3, totalmass,enclmass(0:idim) 
       double precision mcut 
@@ -59,20 +42,16 @@
      &             yel(:),ab(:),omega(:),press(:)                       
       double precision maxrad 
       integer max,j,i,izone,ieos 
-      integer nlines, nkep 
+      integer nlines, nkep, header_length 
 !                                                                       
       character*1024 filin,filout,eos_table
       character setup_par 
       character*1 ajunk 
-!                                                                       
-!      print *, 'mass cut'                                              
-!      read *, mcut                                                     
+!                                                                                                                           
       mcut=40. 
       max=0 
-      keytemp = 1
-      keyerr  = 0
                                                                         
-      open (42,file='mess2') 
+      open (42,file='mess') 
 !                                                                       
 !--read options                                                         
 !                                                                       
@@ -96,6 +75,17 @@
       read(521,522) eos_table      
       maxrad = maxrad / udist 
   522 format(A) 
+!
+!--check whether sukhbold's or woosley's progenitors are used
+!
+      if (verify('woosley',filin).eq.0) then
+          header_length=22
+      elseif (verify('sukhbold',filin).eq.0) then
+          header_length=2
+      else
+          print*, "ERROR: unknown dataset is used. Input should have either 'woosley' or 'sukhbold' in its path."
+          call exit
+      endif
 !                                                                       
 !--get number of entries                                                
 !                                                                       
@@ -122,22 +112,22 @@
       open(11,file=trim(filin)) 
       do i=1,header_length 
          read(11,*)ajunk 
-!         print *, ajunk, i                                             
       end do 
       do 10 i=1,nkep 
-!         print *, 'in data',i                                          
-         read(11,*) izone, djunk, drad, dvel, ddens, dtemp,             &
-     &        djunk,djunk,djunk,domega,dabar,dyel,                      &
-     &        (yccin(i,j),j=1,19)                                       
+          if (verify('woosley',filin).eq.0) then
+            read(11,*) izone, djunk, djunk, drad, dvel, ddens, dtemp,      &
+                djunk,djunk,djunk,domega,dabar,dyel,(yccin(i,j),j=1,19)
+          elseif (verify('sukhbold',filin).eq.0) then
+            read(11,*) izone, djunk, drad, dvel, ddens, dtemp,             &
+                djunk,djunk,djunk,domega,dabar,dyel,(yccin(i,j),j=1,19)
+          endif                                               
          rnorm=0. 
-!         print *, yccin(i,1),yccin(i,2),drad,dvel,ddens,dtemp          
          do j=1,19 
             rnorm=rnorm+yccin(i,j) 
          end do 
          do j=1,19 
             yccin(i,j)=yccin(i,j)/rnorm 
          end do 
-!         write(51,102)(ycc(i,j),j=1,19),rnorm                          
 !--rescale to correct units                                             
          rad(i)=drad/udist 
          dens(i)=ddens/udens 
@@ -162,9 +152,9 @@
      &        dlog10(1.d9*t9(i)),                                       &
      &        5.2d8*(t9(i)/11.6)**3/2.d6/dens(i),ab(i)                  
       end do 
-      print *, 'dmtot, rold: ', dmtot,rold 
+      print *, 'dmtot, rold:      ', dmtot,rold 
       print *, 'initial cell mass:', deltam(1) 
-      print *, 'totalmass: ', totalmass 
+      print *, 'totalmass:        ', totalmass 
 !                                                                       
 !--nucdata is in nse5.f                                                 
 !                                                                       
@@ -258,40 +248,8 @@
                 call eosgen(i,iflag,rhocgs,tkelv,yej,abarj,                 &
         &           ucgs,pcgs,xpj,xnj,scgs)                                
             elseif (ieos.eq.5) then
-                xrho  = rho(i)*udens
-                xenr  = u(i)*uergg
-                xtemp = temp(i)*utemp*boltzmev
-                xye   = ye(i)
-
-                if (xye  .ge.0.6  ) then
-                    print*, "WARNING: ye > yemax, setting ye to maxye"
-                    xye  = 0.599
-                endif
-                if (xrho .lt.166.5) then
-                    print*, "WARNING: rho < rhomin, setting rho to rhomin"
-                    xrho = 166.5 
-                endif
-                if (xtemp.lt.0.011) then
-                    print*, "WARNING: temp < tempmin, setting temp to tempmin"
-                    xtemp= 0.011                                
-                endif                
-                !                                                                       
-                !--SFHo EOS tables                                               
-                !                     
-                call eos5(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,               &
-                xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-                xmuhat_spho,keytemp,keyerr)  
-
-                rhocgs = xrho
-                tkelv  = xtemp/boltzmev
-                yej    = xye
-                abarj  = xabar
-                ucgs   = xenr
-                pcgs   = xprs
-                xpj    = xxp
-                xnj    = xxn
-                scgs   = xent  
-                iflag  = 5         
+                call eos5(i,rho,u,temp,ye,rhocgs,tkelv,yej,            &
+                    abarj,ucgs,pcgs,xpj,xnj,scgs,iflag)       
             endif
             u(i)=ucgs/uergg 
             pr(i)=pcgs/uergg/udens 
@@ -374,40 +332,8 @@
                 call eosgen(i,iflag,rhocgs,tkelv,yej,abarj,                 &
                 &           ucgs,pcgs,xpj,xnj,scgs)                                 
             elseif (ieos.eq.5) then
-                xrho  = rho(i)*udens
-                xenr  = u(i)*uergg
-                xtemp = temp(i)*utemp*boltzmev
-                xye   = ye(i)
-
-                if (xye  .ge.0.6  ) then
-                    print*, "WARNING: ye > yemax, setting ye to maxye"
-                    xye  = 0.599
-                endif
-                if (xrho .lt.166.5) then
-                    print*, "WARNING: rho < rhomin, setting rho to rhomin"
-                    xrho = 166.5 
-                endif
-                if (xtemp.lt.0.011) then
-                    print*, "WARNING: temp < tempmin, setting temp to tempmin"
-                    xtemp= 0.011                                
-                endif
-                !                                                                       
-                !--SFHo EOS tables                                               
-                !                     
-                call eos5(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,               &
-                xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-                xmuhat_spho,keytemp,keyerr)  
-
-                rhocgs = xrho
-                tkelv  = xtemp/boltzmev
-                yej    = xye
-                abarj  = xabar
-                ucgs   = xenr
-                pcgs   = xprs
-                xpj    = xxp
-                xnj    = xxn
-                scgs   = xent  
-                iflag  = 5         
+                call eos5(i,rho,u,temp,ye,rhocgs,tkelv,yej,            &
+                    abarj,ucgs,pcgs,xpj,xnj,scgs,iflag)        
             endif                                  
             u(i)=ucgs/uergg 
             pr(i)=pcgs/uergg/udens 
@@ -559,20 +485,75 @@
       return 
       END                                           
       
-      subroutine eos5(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,               &
-        xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-        xmuhat_spho,keytemp,keyerr)
+      subroutine eos5(i,rho,u,temp,ye_table,rhocgs,tkelv,yej,            &
+                    abarj,ucgs,pcgs,xpj,xnj,scgs,iflag)
 
       use eosmodule
+      
       implicit double precision (a-h,o-z)
 
+      parameter(idim=4000)
+      parameter(utemp=1e9) 
+      parameter(udens=2e6) 
+      parameter(uvel=1e8) 
+      parameter(udist=1e9) 
+      parameter(utime=1e1) 
+      parameter(uergg=1e16) 
+      parameter(pi43=3.14159*4.0/3.0)  
+!     
+      dimension u(idim),rho(idim),ye_table(idim),temp(idim)
+
+      data ggcgs/6.67e-8/, avo/6.02e23/ 
+      data aradcgs /7.565e-15/, boltzk/1.381e-16/ 
+      data hbar/1.055e-27/, ccgs/3e10/ 
+      data emssmev/0.511e0/, boltzmev/8.617e-11/ 
+      data ergmev /6.2422e5/, sigma1/9d-44/, sigma2/5.6d-45/ 
+      data c2cgs /6.15e-4/, c3cgs /5.04e-10/, fermi/1d-13/
+
+      real*8 xrho,xye,xtemp,xtemp2
+      real*8 xenr,xprs,xent,xcs2,xdedt,xmunu
+      real*8 xdpderho,xdpdrhoe
+      real*8 xabar,xzbar,xmu_e,xmu_n,xmu_p,xmuhat_table
+      real*8 xxa,xxh,xxn,xxp              
+      integer keytemp,keyerr 
+      
+      keytemp = 1
+      keyerr  = 0
+
+      xrho  = rho(i)*udens
+      xenr  = u(i)*uergg
+      xtemp = temp(i)*utemp*boltzmev
+      xye   = ye_table(i)
+
+      if (xye  .ge.0.6  ) then
+          print*, "WARNING: ye > yemax, setting ye to maxye"
+          xye  = 0.599
+      endif
+      if (xrho .lt.166.5) then
+          print*, "WARNING: rho < rhomin, setting rho to rhomin"
+          xrho = 166.5 
+      endif
+      if (xtemp.lt.0.011) then
+          print*, "WARNING: temp < tempmin, setting temp to tempmin"
+          xtemp= 0.011                                
+      endif
       !                                                                       
       !--SFHo EOS tables                                               
       !                     
       call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,               &
             xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-            xmuhat_spho,keytemp,keyerr,precision) 
+            xmuhat_table,keytemp,keyerr,precision)  
 
+      rhocgs = xrho
+      tkelv  = xtemp/boltzmev
+      yej    = xye
+      abarj  = xabar
+      ucgs   = xenr
+      pcgs   = xprs
+      xpj    = xxp
+      xnj    = xxn
+      scgs   = xent  
+      iflag  = 5 
       end
 
       subroutine eosgen(izone,iflag,rhocgs,tkelv,ye,abar,               &

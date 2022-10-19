@@ -1,3 +1,5 @@
+# API
+
 This is the main core-collapse code. It contains the following subroutines:
 
 | Subroutine | Description                                                                                                                                                                              |

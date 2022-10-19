@@ -2,6 +2,9 @@
 CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
 #CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
 
+HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
+HDF5INCS=-I/usr/include/hdf5/serial
+
 CONFIG:=Debug
 OPENACC:=0
 COMPILER:= gfortran
@@ -30,9 +33,6 @@ FOBJECTS=$(FSOURCES:.f=.o)
 
 F90FLAGS= -O3 -g
 LDFLAGS= -O3 -g
-
-HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
-HDF5INCS=-I/usr/include/hdf5/serial
 # --- end eos table ---
 
 .PHONY: all project examples data eos clean_eos clean
