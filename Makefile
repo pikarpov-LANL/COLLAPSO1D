@@ -14,7 +14,6 @@ INST:=$(WORKDIR)/install
 PROJECT_NAME:=1dmlmix
 PROJECT_DIR:=$(WORKDIR)/project
 EXAMPLES_DIR:=$(WORKDIR)/examples
-PREP_DATA:=prep_sukhbold.f90
 DATA_DIR:=$(WORKDIR)/prep_data
 DATA_FILE:=$(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup_prep)
 EOSDRIVER_DIR:=EOSdriver
@@ -91,7 +90,7 @@ examples:
 data:
 	@echo "=== Using prep_data/setup ==="
 	cd prep_data && \
-	gfortran -std=legacy $(PREP_DATA) nuc_eos.a -L$(HDF5PATH) -lhdf5_fortran -lhdf5 -lz -o prep_data && \
+	gfortran -std=legacy prep_data.f90 nuc_eos.a -L$(HDF5PATH) -lhdf5_fortran -lhdf5 -lz -o prep_data && \
 	./prep_data
 	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
 	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="
