@@ -47,15 +47,15 @@ jobs:
     - name: Test compilation
       run: |
         make        
-    - name: Run polynomial example
-      run: |
-        make examples
-        cd examples/polynomial/
-        python setup_model.py
-        ./polynomial traced_model.pt test.pt
-    - name: Run resnet-forward example
-      run: |
-        make examples
-        cd examples/resnet-forward/
-        python setup_model.py
-        ./resnet-forward traced_model.pt        
+    # - name: Run polynomial example
+    #   run: |
+    #     make examples
+    #     cd examples/polynomial/
+    #     python setup_model.py
+    #     ./polynomial traced_model.pt test.pt
+    # - name: Run resnet-forward example
+    #   run: |
+    #     make examples
+    #     cd examples/resnet-forward/
+    #     python setup_model.py
+    #     ./resnet-forward traced_model.pt        
