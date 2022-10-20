@@ -32,7 +32,6 @@ module pytorch
     real(real32)                          :: input(:,:,:)
     real(real32), allocatable             :: input_h(:,:,:)    
     real(real32), pointer                 :: output(:,:,:)
-    real(real32), allocatable             :: output_h(:,:,:)
 
     character(*) :: filename
     integer :: arglen, stat
@@ -49,13 +48,10 @@ module pytorch
         call torch_mod%load(filename)
         call torch_mod%forward(in_tensor, out_tensor)
         call out_tensor%to_array(output)
-        output_h = output
 
         ! print*, 'Input for Pytorch 1', input2(1:10,1,1)
         ! print*, 'Input for Pytorch 2', input2(1:10,2,1)
         ! print*, 'Input for Pytorch 3', input2(1:10,3,1)
         ! print*, 'Input for Pytorch 4', input2(1:10,4,1)
-        ! print*, 'shape output: ', shape(output_h)
-        ! print*, output_h(:10,1,1)
     end function
 end module

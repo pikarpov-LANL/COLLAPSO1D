@@ -86,6 +86,7 @@ examples:
 	make install	
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(EXAMPLES_DIR)/$${f}; done
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(EXAMPLES_DIR)/$${f}; done
+	@echo "=== Prepared examples ==="
 
 data:
 	@echo "=== Using prep_data/setup ==="
@@ -122,5 +123,7 @@ clean:
 	rm -rf $(EOSDRIVER_DIR)/*.o $(EOSDRIVER_DIR)/*.mod $(EOSDRIVER_DIR)/*.a
 	rm -rf $(PROJECT_DIR)/*.a $(PROJECT_DIR)/$(PROJECT_NAME)/*.mod
 	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/fort.* $(PROJECT_DIR)/$(PROJECT_NAME)/$(PROJECT_NAME)
+	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/*.so $(EXAMPLES_DIR)/*/*.so
+	rm -rf $(EXAMPLES_DIR)/*/*.pt
 
 
