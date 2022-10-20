@@ -9,9 +9,9 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [3.10]
+        python-version: ['3.10']
         gcc_v: [11]
-        torch_v: [1.11.0]
+        torch_v: ['1.11.0']
 
     steps:
     - uses: actions/checkout@v1
