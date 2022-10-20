@@ -49,10 +49,12 @@ jobs:
         make
         make examples
     - name: Run polynomial example
+      run: |
         cd examples/polynomial/
         python setup_model.py
         ./polynomial traced_model.pt test.pt
     - name: Run resnet-forward example
+      run: |
         cd examples/resnet-forward/
         python setup_model.py
         ./resnet-forward traced_model.pt        
