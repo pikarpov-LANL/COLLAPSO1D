@@ -46,15 +46,16 @@ jobs:
         wget https://su.drive.sunet.se/index.php/s/FQkikyGcRnHTZNL/download/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5 -P ./project/1dmlmix/        
     - name: Test compilation
       run: |
-        make
-        make examples
+        make        
     - name: Run polynomial example
       run: |
+        make examples
         cd examples/polynomial/
         python setup_model.py
         ./polynomial traced_model.pt test.pt
     - name: Run resnet-forward example
       run: |
+        make examples
         cd examples/resnet-forward/
         python setup_model.py
         ./resnet-forward traced_model.pt        
