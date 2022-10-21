@@ -17,7 +17,7 @@ conda activate py310
 pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 ```
 !!! Warning
-    torch>=1.12.0 will work for inferencing, hence for the CCSN code just fine, but loading and training the model will fail. Thus, `resnet_forward` will still work, but `polynomial` example will fail.
+    `torch>=1.12.0` will work for inferencing, hence for the CCSN code will be fine, but loading and training the model will fail. Thus, `resnet_forward` will still work, but `polynomial` example will fail.
 
 ### CMake
 Make sure you have cmake or install it by (tested on cmake==3.22.1)

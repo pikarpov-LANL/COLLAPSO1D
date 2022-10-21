@@ -41,7 +41,7 @@
       double precision, allocatable :: vel(:),rad(:),dens(:),t9(:),     &
      &             yel(:),ab(:),omega(:),press(:)                       
       double precision maxrad 
-      integer max,j,i,izone,ieos 
+      integer max,j,i,izone,ieos,r_counter,one_counter
       integer nlines, nkep, header_length 
 !                                                                       
       character*1024 filin,filout,eos_table
@@ -50,6 +50,8 @@
 !                                                                                                                           
       mcut=40. 
       max=0 
+      r_counter = 0
+      one_counter = 0
                                                                         
       open (42,file='mess') 
 !                                                                       
@@ -184,184 +186,126 @@
             if (rad(k).gt.x(i-1)) goto 20 
          end do 
    20    continue 
-!-- for k=1, we can not use cell k-1                                    
-         if (k.eq.1) then 
-            write(47,115) k,fac 
-            fac=x(i-1)/rad(1) 
-            rho(i)=(1-fac)*0.5*dens(k) +                                &
-     &           0.5*dens(k)+fac*0.5*dens(k+1)                          
-            v(i)=(1-fac)*0.5*vel(k) +                                   &
-     &           0.5*vel(k)+fac*0.5*vel(k+1)                            
-            temp(i)=(1-fac)*0.5*t9(k) +                                 &
-     &           0.5*t9(k)+fac*0.5*t9(k+1)                              
-            ye(i)=(1-fac)*0.5*yel(k) +                                  &
-     &           0.5*yel(k)+fac*0.5*yel(k+1)                            
-            abar(i)=(1-fac)*0.5*ab(k) +                                 &
-     &           0.5*ab(k)+fac*0.5*ab(k+1)                              
-            x(i)=(x(i-1)**3+deltam(i)/(pi43*rho(i)))**0.3333333333 
-            do j=1,19 
-               ycc(i,j)=(1-fac)*0.5*yccin(k,j) +                        &
-     &           0.5*yccin(k,j)+fac*0.5*yccin(k+1,j)                    
-            end do 
-                                                                        
+
+         write(47,115) k,fac                                  
+         if (k.eq.1) then !-- for k=1, we can not use cell k-1                         
+            ind      = k
+            fac      = x(i-1)/rad(1) 
+            fac1     = 1-fac
+            fac2     = fac
+            facomei1 = fac1
+            facomei2 = fac2
+         else !--for all other k      
+            ind      = k-1
+            fac      =-(x(i-1)-rad(k))/(rad(k)-rad(k-1)) 
+            fac1     = fac
+            fac2     = 1-fac
+            facomei1 = fac2
+            facomei2 = fac1
+         endif
+
+        rho(i)=fac1*0.5*dens(ind) +                                &
+    &           0.5*dens(k)+fac2*0.5*dens(k+1)
+        v(i)=fac1*0.5*vel(ind) +                                   &
+    &           0.5*vel(k)+fac2*0.5*vel(k+1)
+        temp(i)=fac1*0.5*t9(ind) +                                 &
+    &           0.5*t9(k)+fac2*0.5*t9(k+1)
+        ye(i)=fac1*0.5*yel(ind) +                                  &
+    &           0.5*yel(k)+fac2*0.5*yel(k+1)
+        abar(i)=fac1*0.5*ab(ind) +                                 &
+    &           0.5*ab(k)+fac2*0.5*ab(k+1)
+        x(i)=(x(i-1)**3+deltam(i)/(pi43*rho(i)))**0.3333333333 
+        
+        do j=1,19 
+            ycc(i,j)=fac1*0.5*yccin(ind,j) +                        &
+    &           0.5*yccin(k,j)+fac2*0.5*yccin(k+1,j)
+        end do 
+        
+        if (k.eq.1) then
             ycc(i,3)=ycc(i,1) 
             do j=6,15 
-               ycc(i,j)=ycc(i,j+1) 
+            ycc(i,j)=ycc(i,j+1) 
             end do 
             ycc(i,16)=ycc(i,18) 
-            ycc(i,17)=ycc(i,19) 
+            ycc(i,17)=ycc(i,19)
+        endif
                                                                         
-            omei=(1-fac)*0.5*omega(k) +                                 &
-     &           0.5*omega(k)+fac*0.5*omega(k+1)                        
-            dj(i)=omei*x(i)*x(i) 
-            enclmass(i) = enclmass(i-1) + deltam(i) 
-            if (enclmass(i).gt.mcut.and.enclmass(i).lt.40.0) then 
-               write(89,102) ycc(i,1),ycc(i,2),ycc(i,3)+ycc(i,4),       &
-     &              ycc(i,5),ycc(i,6),ycc(i,7),ycc(i,8),ycc(i,9),       &
-     &              ycc(i,10),ycc(i,11),ycc(i,12),ycc(i,13),            &
-     &              ycc(i,14),                                          &
-     &              ycc(i,15),ycc(i,16),ycc(i,17),ycc(i,19),ycc(i,18)   &
-     &              ,ycc(i,19)                                          
-            end if 
+        omei=facomei1*0.5*omega(k) +                                   &
+    &           0.5*omega(k)+facomei2*0.5*omega(k+1)                        
+        dj(i)=omei*x(i)*x(i) 
+        
+        enclmass(i) = enclmass(i-1) + deltam(i) 
+
+        if (enclmass(i).gt.mcut.and.enclmass(i).lt.40.0) then 
+            write(89,102) ycc(i,1),ycc(i,2),ycc(i,3)+ycc(i,4),       &
+    &              ycc(i,5),ycc(i,6),ycc(i,7),ycc(i,8),ycc(i,9),       &
+    &              ycc(i,10),ycc(i,11),ycc(i,12),ycc(i,13),            &
+    &              ycc(i,14),                                          &
+    &              ycc(i,15),ycc(i,16),ycc(i,17),ycc(i,19),ycc(i,18),  &
+    &              ycc(i,19)
+        end if
                                                                         
-!           Adjust the grid, choose region focus (modify the 2nd set too
-            write(45,*) i,enclmass(i),dj(i) 
-            if (enclmass(i).lt..4d0) then 
-               deltam(i+1) = deltam(1)*(x(i)/x(1))**1.0 
-            elseif (enclmass(i).lt..5d0) then 
-               deltam(i+1) = deltam(i) 
-            elseif(enclmass(i).ge.0.5d0.and.enclmass(i).lt.1.0d0) then 
-               deltam(i+1) = deltam(i)*(x(i-1)/x(i))**2. 
-            else 
-               deltam(i+1) = deltam(i)*(x(i)/x(i-1))**(.35d0) 
-            end if 
+!       Adjust the grid, choose region focus
+        write(45,*) i,enclmass(i),dj(i) 
+        !print *,'stuff', deltam(i), enclmass(i),x(i),x(i-1),x(1)   
+        !if(enclmass(i).ge.1.d-4.and.enclmass(i).lt.6.d-2) then          
+        ! if (x(i).ge.2.d-3.and.x(i).le.2.d-2) then
+        !     !if(enclmass(i).ge.1.d-4.and.enclmass(i).lt.6.d-2) then
+        !     deltam(i+1) = deltam(i)!*(x(i)/x(1))          
+        !     !endif
+        if (enclmass(i).lt..6d0) then 
+            deltam(i+1) = deltam(1)*(x(i)/x(1))**1.0 
+        elseif (enclmass(i).lt..7d0) then 
+            deltam(i+1) = deltam(i) 
+        elseif(enclmass(i).ge.0.7d0.and.enclmass(i).lt.1.15d0) then 
+            deltam(i+1) = deltam(i)*(x(i-1)/x(i))**2.45             
+        else 
+            deltam(i+1) = deltam(i)*(x(i)/x(i-1))**(.2d0) 
+        end if 
+        if (k.eq.1) one_counter = one_counter+1
 !                                                                       
 !--call eos                                                             
 !                                                                       
-            rhocgs=dble(rho(i)*udens) 
-            tkelv=dble(temp(i)*utemp) 
-            yej=dble(ye(i)) 
-            abarj=dble(abar(i)) 
-            iflag=0 
+        rhocgs=dble(rho(i)*udens) 
+        tkelv=dble(temp(i)*utemp) 
+        yej=dble(ye(i)) 
+        abarj=dble(abar(i)) 
+        iflag=0 
 
-            if (ieos.eq.4) then
-                call eosgen(i,iflag,rhocgs,tkelv,yej,abarj,                 &
-        &           ucgs,pcgs,xpj,xnj,scgs)                                
-            elseif (ieos.eq.5) then
-                call eos5(i,rho,u,temp,ye,rhocgs,tkelv,yej,            &
-                    abarj,ucgs,pcgs,xpj,xnj,scgs,iflag)       
-            endif
-            u(i)=ucgs/uergg 
-            pr(i)=pcgs/uergg/udens 
-            u2(i)=scgs/uergg*utemp 
-            if (iflag.eq.1.) then 
-               if (abarj.lt.2.5) then 
-                  ufr=-3.3d17/uergg 
-               elseif (abarj.lt.4.5) then 
-                  ufr=-6.1d17/uergg 
-               elseif (abarj.lt.20.) then 
-                  ufr=-7.7d18/uergg 
-               else 
-                  ufr=-8.4d18/uergg 
-               endif 
+        if (ieos.eq.4) then
+            call eosgen(i,iflag,rhocgs,tkelv,yej,abarj,                 &
+                        ucgs,pcgs,xpj,xnj,scgs)                                
+        elseif (ieos.eq.5) then
+            call eos5(i,rho,u,temp,ye,rhocgs,tkelv,yej,            &
+                        abarj,ucgs,pcgs,xpj,xnj,scgs,iflag)       
+        endif
+        u(i)=ucgs/uergg 
+        pr(i)=pcgs/uergg/udens 
+        u2(i)=scgs/uergg*utemp 
+        if (iflag.eq.1.) then 
+            if (abarj.lt.2.5) then 
+                ufr=-3.3d17/uergg 
+            elseif (abarj.lt.4.5) then 
+                ufr=-6.1d17/uergg 
+            elseif (abarj.lt.20.) then 
+                ufr=-7.7d18/uergg 
             else 
-               ufr=0.0 
+                ufr=-8.4d18/uergg 
             endif 
-            ufreez(i)=ufr 
-            ifleos(i)=iflag 
-            xp(i)=xpj 
-            xn(i)=xnj 
-            print*, "FOR NCELL, x, maxrad", x(i), maxrad 
-            if (x(i).gt.maxrad) then 
+        else 
+            ufr=0.0 
+        endif 
+        ufreez(i)=ufr 
+        ifleos(i)=iflag 
+        xp(i)=xpj 
+        xn(i)=xnj 
+        print*, "FOR NCELL, x, maxrad", i, x(i), maxrad, enclmass(i)
+        if (x(i).ge.2.d-3.and.x(i).le.2.d-2) r_counter = r_counter+1
+        if (x(i).gt.maxrad) then 
 !               print *, enclmass(i)                                    
-               ncell=i 
-               goto 50 
-            end if 
-!--for all other k                                                      
-         else 
-            write(47,115) k,fac 
-            fac=-(x(i-1)-rad(k))/(rad(k)-rad(k-1)) 
-            rho(i)=fac*0.5*dens(k-1) +                                  &
-     &           0.5*dens(k)+(1-fac)*0.5*dens(k+1)                      
-            v(i)=fac*0.5*vel(k-1) +                                     &
-     &           0.5*vel(k)+(1-fac)*0.5*vel(k+1)                        
-            temp(i)=fac*0.5*t9(k-1) +                                   &
-     &           0.5*t9(k)+(1-fac)*0.5*t9(k+1)                          
-            ye(i)=fac*0.5*yel(k-1) +                                    &
-     &           0.5*yel(k)+(1-fac)*0.5*yel(k+1)                        
-            abar(i)=fac*0.5*ab(k-1) +                                   &
-     &           0.5*ab(k)+(1-fac)*0.5*ab(k+1)                          
-            x(i)=(x(i-1)**3+deltam(i)/(pi43*rho(i)))**0.3333333333 
-            do j=1,19 
-               ycc(i,j)=fac*0.5*yccin(k-1,j) +                          &
-     &           0.5*yccin(k,j)+(1-fac)*0.5*yccin(k+1,j)                
-            end do 
-            omei=(1-fac)*0.5*omega(k) +                                 &
-     &           0.5*omega(k)+fac*0.5*omega(k+1)                        
-            dj(i)=omei*x(i)*x(i) 
-            enclmass(i) = enclmass(i-1)+deltam(i) 
-            if (enclmass(i).gt.mcut.and.enclmass(i).lt.40.0) then 
-               write(89,102) ycc(i,1),ycc(i,2),ycc(i,3)+ycc(i,4),       &
-     &              ycc(i,5),ycc(i,6),ycc(i,7),ycc(i,8),ycc(i,9),       &
-     &              ycc(i,10),ycc(i,11),ycc(i,12),ycc(i,13),            &
-     &              ycc(i,14),                                          &
-     &              ycc(i,15),ycc(i,16),ycc(i,17),ycc(i,19),ycc(i,18),  &
-     &              ycc(i,19)                                           
-            end if 
-            write(45,*) i,enclmass(i),dj(i) 
-!            print *,'stuff', deltam(i), enclmass(i),x(i),x(i-1),x(1)   
-            if (enclmass(i).lt..6d0) then 
-               deltam(i+1) = deltam(1)*(x(i)/x(1))**1.0 
-            elseif (enclmass(i).lt..7d0) then 
-               deltam(i+1) = deltam(i) 
-            elseif(enclmass(i).ge.0.7d0.and.enclmass(i).lt.1.15d0) then 
-               deltam(i+1) = deltam(i)*(x(i-1)/x(i))**2.45 
-            else 
-               deltam(i+1) = deltam(i)*(x(i)/x(i-1))**(.2d0) 
-            end if 
-!                                                                       
-!--call eos                                                             
-!                                                                       
-            rhocgs=dble(rho(i)*udens) 
-            tkelv=dble(temp(i)*utemp) 
-            yej=dble(ye(i)) 
-            abarj=dble(abar(i)) 
-            iflag=0 
-
-            if (ieos.eq.4) then
-                call eosgen(i,iflag,rhocgs,tkelv,yej,abarj,                 &
-                &           ucgs,pcgs,xpj,xnj,scgs)                                 
-            elseif (ieos.eq.5) then
-                call eos5(i,rho,u,temp,ye,rhocgs,tkelv,yej,            &
-                    abarj,ucgs,pcgs,xpj,xnj,scgs,iflag)        
-            endif                                  
-            u(i)=ucgs/uergg 
-            pr(i)=pcgs/uergg/udens 
-            u2(i)=scgs/uergg*utemp 
-            if (iflag.eq.1.) then 
-               if (abarj.lt.2.5) then 
-                  ufr=-3.3d17/uergg 
-               elseif (abarj.lt.4.5) then 
-                  ufr=-6.1d17/uergg 
-               elseif (abarj.lt.20.) then 
-                  ufr=-7.7d18/uergg 
-               else 
-                  ufr=-8.4d18/uergg 
-               endif 
-            else 
-               ufr=0.0 
-            endif 
-            ufreez(i)=ufr 
-            ifleos(i)=iflag 
-            xp(i)=xpj 
-            xn(i)=xnj 
-            print*, "FOR NCELL, x, maxrad", i, x(i), maxrad 
-            if (x(i).gt.maxrad) then 
-!               print *, enclmass(i)                                    
-               ncell=i 
-               goto 50 
-            end if 
-         endif 
+            ncell=i 
+            goto 50 
+        end if
       enddo 
 !                                                                       
    50 continue 
@@ -376,6 +320,7 @@
       print *,'  Number of cells:  ', ncell 
       print *,'  Output file name:         ', trim(filout) 
       print *,'-----------------------------------' 
+      print *, 'Grid points between 20 and 200 km: ', r_counter, one_counter
       stop 
       END                                           
 !                                                                       
