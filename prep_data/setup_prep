@@ -1,14 +1,17 @@
 <Input File>
-sukhbold2016/s12.0_presn
+sukhbold2016/s19.0_presn
 
 <Output File>
 Data
 
 <Initial Cell Mass>
-4e-5
+1e-4
+
+<Cell Mass Growth Rate past 200km>
+1.25d-3
 
 <Maximum Radius of the Grid (cm)>
-1e10
+5e9
 
 <EOS option>
 5
