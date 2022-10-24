@@ -41,9 +41,9 @@ program read
           double precision mcut 
           double precision, allocatable :: vel(:),rad(:),dens(:),t9(:),     &
          &             yel(:),ab(:),omega(:),press(:)                       
-          double precision maxrad, deltam_growth 
+          double precision maxrad, deltam_growth, enclmass_conv_cutoff 
           integer max,j,i,izone,ieos
-          integer conv_grid,one_counter,pns_counter
+          integer conv_grid,conv_grid_goal,grid_goal
           integer nlines, nkep, header_length, counter 
           logical initial_growth
     !                                                                       
@@ -63,6 +63,15 @@ program read
           read(521,522) filout 
           read(521,*) 
           read(521,*) 
+          read(521,*) grid_goal
+          read(521,*) 
+          read(521,*)                     
+          read(521,*) conv_grid_goal
+          read(521,*) 
+          read(521,*) 
+          read(521,*) enclmass_conv_cutoff
+          read(521,*)
+          read(521,*)
           read(521,*) deltam(1) 
           read(521,*)
           read(521,*) 
@@ -167,14 +176,16 @@ program read
     !      
           if (ieos.eq.5) then 
             call readtable(trim(eos_table))
-          endif     
+          endif   
+                    
     !
     !--find the optimal deltam for the given convective region resolution      
     !
           call search_deltam(nkep,yccin,vel,rad,dens,              &
                              t9,yel,ab,omega,press,                &
                              maxrad,deltam_growth,ieos,            &
-                             conv_grid)
+                             conv_grid,conv_grid_goal,             &
+                             enclmass_conv_cutoff)
     !
     !--interpolate and setup the grid
     !--growth rate past 200km will keep adjusting 
@@ -184,14 +195,15 @@ program read
           call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
                              t9,yel,ab,omega,press,                &
                              maxrad,deltam_growth,ieos,            &
-                             conv_grid)
+                             conv_grid,enclmass_conv_cutoff,grid_goal)
     !
     !--if you want to avoid binary search and do the original grid setup
     !--comment the above 2 subroutine calls, and uncomment setup_grid() below
     !                             
         !   call setup_grid(nkep,yccin,vel,rad,dens,                &
         !                   t9,yel,ab,omega,press,                  &
-        !                   maxrad,deltam_growth,ieos,conv_grid)          
+        !                   maxrad,deltam_growth,ieos,              &
+        !                   conv_grid,enclmass_conv_cutoff)          
                                   
       102 format(20(1pe9.2)) 
       103 format(3(1pe16.8)) 
@@ -201,9 +213,10 @@ program read
           print *,'--------------- Summary ---------------'
           print *,'  Input progenitor:          ', trim(filin)
           print*, '  Final initial cell mass:', deltam(1)          
-          print *,'  Final growth rate:      ', deltam_growth           
-          print *,'  Number of cells:   ', ncell 
-          print *,'  Output file name:          ', trim(filout) 
+          print *,'  Final growth rate:      ', deltam_growth 
+          print *,'  Convective Grid Size:', conv_grid         
+          print *,'  Grid Size:           ', ncell 
+          print *,'  Output file name:            ', trim(filout) 
           print *,'---------------------------------------' 
           stop 
           END                                                                                     
@@ -211,7 +224,8 @@ program read
   
           subroutine setup_grid(nkep,yccin,vel,rad,dens,                   &
                                 t9,yel,ab,omega,press,                     &
-                                maxrad,deltam_growth,ieos,conv_grid)                        
+                                maxrad,deltam_growth,ieos,                 &
+                                conv_grid,enclmass_conv_cutoff)                         
 !****************************************************************              
 !                                                               *              
 ! Woosely's code has nkep cells.  I want to make my code        *       
@@ -323,10 +337,7 @@ program read
           write(45,*) i,enclmass(i),dj(i) 
       
           grid_size = int(idim)
-          lim = 8.d-1
-          if (x(i).lt.3.d-3) then
-              deltam(i+1) = deltam(1)*(x(i)/x(1))
-          elseif (x(i).ge.3.d-3.and.x(i).le.2.d-2) then
+          if (enclmass(i).le.enclmass_conv_cutoff) then
               deltam(i+1) = deltam(1)
           else
               if (beyond_focus.eqv..false.) then
@@ -380,13 +391,17 @@ program read
           xp(i)=xpj 
           xn(i)=xnj 
           
-          if (x(i).le.2.d-2) conv_grid = conv_grid+1
+          !if (x(i).le.2.d-2) conv_grid = conv_grid+1
+          if (enclmass(i).le.enclmass_conv_cutoff) conv_grid = conv_grid+1
 
           if (x(i).gt.maxrad) then 
               ncell=i 
               goto 50 
           end if
         enddo 
+        ! print*, enclmass(i-10:i)
+        ! print*, 'max', maxval(enclmass)
+        ! stop
   !                                                                               
         50 continue 
 
@@ -394,10 +409,11 @@ program read
          end        
 
 
-         subroutine search_deltam(nkep,yccin,vel,rad,dens,         &
+         subroutine search_deltam(nkep,yccin,vel,rad,dens,              &
                                   t9,yel,ab,omega,press,                &
                                   maxrad,deltam_growth,ieos,            &
-                                  conv_grid)                     
+                                  conv_grid,conv_grid_goal,             &
+                                  enclmass_conv_cutoff)                     
 !*********************************************************              
 !                                                        *              
 !  Find the optimal deltam for the given convective      *
@@ -418,7 +434,7 @@ program read
          double precision maxrad, deltam_growth  
 
          integer ieos
-         integer conv_grid
+         integer conv_grid, conv_grid_goal
          integer nkep, counter 
          logical initial_growth
 
@@ -426,14 +442,14 @@ program read
          initial_growth = .true.
          adjust_deltam = 1.d1         
          counter = 1
-         conv_grid_goal = 200
          low = 0.0
          
          do while (.true.)         
  
              call setup_grid(nkep,yccin,vel,rad,dens,                   &
                              t9,yel,ab,omega,press,                     &
-                             maxrad,deltam_growth,ieos,conv_grid)
+                             maxrad,deltam_growth,ieos,                 &
+                             conv_grid, enclmass_conv_cutoff) 
 
              if (conv_grid.eq.0) then
                  print*, "ERROR: Initial Cell Mass is to small for the grid! Increase it."
@@ -464,13 +480,13 @@ program read
 
              counter = counter + 1
 
-             if (counter .eq. 9999) then
+             if (counter .eq. 999) then
                print*, 'ERROR: Could not converge on requested convection grid size'
                call exit
              endif
          enddo
          print *,'---------------------------------------'
-         write(*,'(A,I5,A)'), ' Cell mass in convective region converged in', counter-1, ' iterations'
+         write(*,'(A,I3,A)'), ' Cell mass in convective region converged in', counter-1, ' iterations'
          print*,'Final deltam(1): ', deltam(1)
          print*, ''
       end
@@ -478,7 +494,7 @@ program read
       subroutine search_deltam_growth(nkep,yccin,vel,rad,dens,       &
                                t9,yel,ab,omega,press,                &
                                maxrad,deltam_growth,ieos,            &
-                               conv_grid)                     
+                               conv_grid,enclmass_conv_cutoff,grid_goal)                     
 !*********************************************************              
 !                                                        *              
 !  Growth rate past 200km will keep adjusting            * 
@@ -501,7 +517,7 @@ program read
       double precision maxrad, deltam_growth  
   
       integer ieos
-      integer conv_grid
+      integer conv_grid,grid_goal
       integer nkep, counter 
       logical initial_growth
 
@@ -511,22 +527,23 @@ program read
       counter = 1
       low = 0.0 
       high = -1
-                 
+
       do while (.true.) 
           ncell = 0   
 
           call setup_grid(nkep,yccin,vel,rad,dens,                   &
                           t9,yel,ab,omega,press,                     &
-                          maxrad,deltam_growth,ieos,conv_grid)
+                          maxrad,deltam_growth,ieos,                 &
+                          conv_grid,enclmass_conv_cutoff) 
                         
           ! exit condition once precision of under 1% is reached
-          if (abs(idim-ncell).lt.0.01*ncell) then
+          if (abs(grid_goal-ncell).lt.0.01*ncell) then
             exit
 
-          ! increase growth rate if the grid is above idim
-          elseif (ncell.eq.0) then
+          ! increase growth rate if the grid is above grid_goal
+          elseif (ncell.eq.0.or.ncell.gt.grid_goal) then
               
-              write(*,'(I5,A,I5,A)'), counter,' Grid size: above idim! (', idim,')'
+              write(*,'(I5,A,I5,A)'), counter,' Grid size: above grid_goal! (', grid_goal,')'
 
               if (.not.initial_growth) then
                   low = adjust_growth
@@ -536,7 +553,7 @@ program read
 
               deltam_growth = deltam_growth*adjust_growth
 
-          ! decrease growth rate if the grid is below idim    
+          ! decrease growth rate if the grid is below grid_goal   
           else
               write(*,'(I5,A,I5)'), counter, ' Grid size:', ncell
               
@@ -548,14 +565,15 @@ program read
           endif          
 
           counter = counter + 1
-
-          if (counter .eq. 9999) then
-              print*, 'ERROR: Could not converge on deltam_growth'
+          
+          if (counter .eq. 999) then
+              print*, 'ERROR: Could not converge on deltam_growth.'
+              print*, '       Probably not enough mass enclosed in the maximum radius region.'
               call exit
           endif
       enddo
       print *,'---------------------------------------'
-      write(*,'(A,I5,A)'), ' Growth rate converged in', counter, ' iterations'
+      write(*,'(A,I3,A)'), ' Growth rate converged in', counter, ' iterations'
       print*, 'Final deltam_growth:', deltam_growth   
       print*, ''   
 
@@ -714,15 +732,15 @@ program read
       xye   = ye_table(i)
 
       if (xye  .ge.0.6  ) then
-          print*, "WARNING: ye > yemax, setting ye to maxye"
+          print*, "WARNING: ye > yemax, setting ye to maxye at", i
           xye  = 0.599
       endif
       if (xrho .lt.166.5) then
-          print*, "WARNING: rho < rhomin, setting rho to rhomin"
+          print*, "WARNING: rho < rhomin, setting rho to rhomin at", i
           xrho = 166.5 
       endif
       if (xtemp.lt.0.011) then
-          print*, "WARNING: temp < tempmin, setting temp to tempmin"
+          print*, "WARNING: temp < tempmin, setting temp to tempmin at", i
           xtemp= 0.011                                
       endif
       !                                                                       

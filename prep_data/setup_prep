@@ -1,13 +1,22 @@
 <Input File>
-sukhbold2016/s19.0_presn
+sukhbold2016/s12.0_presn
 
 <Output File>
 Data
 
-<Initial Cell Mass>
-1e-4
+<Target Resolution>
+1000
 
-<Cell Mass Growth Rate past 200km>
+<Goal Size of Convective Grid>
+400
+
+<Enclosed Mass Cutoff for Convective Region (Msol)>
+0.5
+
+<Initial Cell Mass>
+1e-3
+
+<Cell Mass Growth Rate past enclosed mass cutoff>
 1e-4
 
 <Maximum Radius of the Grid (cm)>
