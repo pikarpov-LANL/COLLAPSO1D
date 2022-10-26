@@ -212,11 +212,7 @@
 !  ----------------------------------                                   
 !  (this allows the use of simple eos)                                  
 !  (ieos=3 or 4 calls for the sophisticated eos's)                      
-!                               
-      !do i=30,40
-      !    print*, i, ye(i)
-      !enddo
-      !print *, '[time] ',time,ieos                                     
+!                                                                   
       if(ieos.eq.1)call eospg(ncell,rho,u) 
       if(ieos.eq.2)call eospgr(ncell,rho,u) 
       if(ieos.eq.3.or.ieos.eq.4)call eos3(ncell,rho,u,ye) 
@@ -248,8 +244,7 @@
                                                                         
          if (ynux(k).lt.tiny) print*,'ynux<0, k=',k,ynux(k) 
       enddo 
-!      write(*,200)'hydro: yemn,ynuemx,ynuebmx,ynuxmx',                 
-!     1                   yemn,ynuemx,ynuebmx,ynuxmx                    
+                  
   200 format(A33,4(1x,1pe10.3)) 
 !                                                                       
 !-- initialize                                                          
@@ -312,7 +307,7 @@
 !                                                                       
    90 continue 
 !                                                                       
-!--compute turbulence parameters                                        
+!--compute turbulence parameters (outdated)                                       
 !                                                                       
       !call turbulence(ncell,x,f,q,v,rho,fmix) 
 !                                                                       
@@ -745,7 +740,7 @@
             end if 
 !            du(kp05)=-pdv  - dunu(kp05)                                
 !                                                                       
-            elseif (ieos.eq.4) then 
+            elseif (ieos.eq.4.or.ieos.eq.5) then 
 !--the entropy is the variable of state:                                
                du(kp05)=(0.5*dq(kp05) - dunu(kp05) +                    &
      &                sfac*dye(kp05)*(xmuhat(kp05)-                     &
@@ -1133,12 +1128,12 @@
       vsmax=0. 
       276 format(A,I4,1p,20(E10.3))
       do k=1,ncell 
-        if (k==ncell) then
+        ! if (k==ncell) then
         !    write(*,276),'vars: ', k, abar(k)
         !     write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye(k), &
         !     xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
         !     abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
-         endif
+        !  endif
 
          rhok=rho(k) 
          uk=u(k) 
@@ -1242,7 +1237,7 @@
       END                                           
 !          
       
-      subroutine eos5(ncell,rho,u,ye_spho) 
+      subroutine eos5(ncell,rho,u,ye_table) 
         !*************************************************************          
         !                                                                       
         !     compute pressures and temperatures with the                       
@@ -1260,7 +1255,7 @@
               real*8 xrho,xye,xtemp,xtemp2
               real*8 xenr,xprs,xent,xcs2,xdedt,xmunu
               real*8 xdpderho,xdpdrhoe
-              real*8 xabar,xzbar,xmu_e,xmu_n,xmu_p,xmuhat_spho
+              real*8 xabar,xzbar,xmu_e,xmu_n,xmu_p,xmuhat_table
               real*8 xxa,xxh,xxn,xxp              
               integer keytemp,keyerr
         !                                                                       
@@ -1269,7 +1264,7 @@
              &                 abark, xpk, xnk, xak, xhk, yehk, rholdk,         &
              &                 yeoldk,xpfk, p2k, p3k, p4k, xmuhk, stot          
         !                                                                       
-              dimension rho(idim), u(idim), ye_spho(idim) 
+              dimension rho(idim), u(idim), ye_table(idim) 
         !                                                                       
               common /prev/ xold(0:idim),vold(0:idim),rhold(idim),              &
              &              prold(idim), tempold(idim), yeold(idim),            &
@@ -1301,7 +1296,13 @@
               tempmx  =-1e20 !? 
               tempmn  = 1e20 !?
               vsmax   = 0.   !?
-              keytemp = 1
+
+! keytemp: 0 -> coming in with rho,eps,ye (solve for temp)
+!          1 -> coming in with rho,temperature,ye
+!          2 -> coming in with rho,entropy,ye (solve for temp)
+!          3 -> coming in with pressure,temp,ye (solve for rho)
+!
+              keytemp = 2    
               keyerr  = 0
               
               upr = umass/udist/utime**2
@@ -1313,22 +1314,24 @@
               276 format(A,I4,1p,20(E10.3))
 
               do k=1,ncell             
-                 xrho=rho(k)*udens
-                 xenr=u(k)*uergg
-                 xtemp=temp(k)*utemp*boltzmev
-                 xye=ye_spho(k)
+                 xrho = rho(k)*udens
+                 xenr = u(k)*uergg
+                 xtemp= temp(k)*utemp*boltzmev
+                 xye  = ye_table(k)
+                 xent = u2(k)/sfac
 
-                 if (k==ncell) then
-                    ! write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye_spho(k), &
+                !  if (k==ncell) then
+                    ! write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye_table(k), &
                     ! xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
                     ! abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
                     ! write(*,276),'vars: ', k, abar(k)
-                 endif
+                !  endif
                  
                  ! set upper and lower bounds
                  if (xye  .ge.0.6  ) xye  = 0.599
                  if (xrho .lt.166.5) xrho = 166.5 
-                 if (xtemp.lt.0.011) xtemp= 0.011                  
+                 if (xtemp.lt.0.011) xtemp= 0.011  
+                 if (xenr .lt.0    ) xenr=1.265d16                
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
@@ -1336,19 +1339,19 @@
                  endif 
         !                                                                       
         !--SFHo EOS tables                                               
-        !                     
+        !              
                  call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,             &
                     xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-                    xmuhat_spho,keytemp,keyerr,precision)    
+                    xmuhat_table,keytemp,keyerr,precision)    
                  !                                                                       
                  !--store values - CHECK UNITS!!!                                                        
                  !                 
-                 abar(k)=   xabar !
+                 abar(k)  = xabar !
                  xalpha(k)= xxa   !
                  xheavy(k)= xxh   !
-                 yeh(k)=    xye   !
-                 xmue(k)=   xmu_e/utemp/boltzmev  ! Units: 1e9 K -> MeV               
-                 xmuhat(k)= xmuhat_spho/utemp/boltzmev                 
+                 yeh(k)   = xye   !
+                 xmue(k)  = xmu_e/utemp/boltzmev  ! Units: 1e9 K -> MeV               
+                 xmuhat(k)= xmuhat_table/utemp/boltzmev                 
 
                  if (xxp.le.1d-20) then 
                     xxp=0. 
@@ -1357,30 +1360,37 @@
                     xxn=0. 
                  end if 
 
-                 xp(k)=     xxp !
-                 xn(k)=     xxn !
-                 eta(k)=    xmu_e/xtemp !
-                 temp(k)=   xtemp/utemp/boltzmev
+                 xp(k)    = xxp !
+                 xn(k)    = xxn !
+                 eta(k)   = xmu_e/xtemp !
+                 temp(k)  = xtemp/utemp/boltzmev
                  prold(k) = pr(k) 
-                 pr(k)=     xprs/upr
-                 u2(k)=     xent*sfac ! not used anywhere when ieos=5
-                 vsound(k)= sqrt(xcs2)/uv                 
+                 pr(k)    = xprs/upr
+                 u2(k)    = xent*sfac
+                 vsound(k)= sqrt(xcs2)/uv 
 
                  ! zbar would be nice but not completely *necessary*
                  vsmax=dmax1(vsmax,vsound(k)) 
                  tempmx=dmax1(tempmx,temp(k)) 
                  tempmn=dmin1(tempmn,temp(k))                    
-        !                          
+        !           
+                 
+                               
               enddo
 
             !  k = k-1              
             !  write(*,276),'aftr: ', k, abar(k)
-            !   write(*,276),'aftr: ', k, rho(k), temp(k), u(k), ye_spho(k), &
+            !   write(*,276),'aftr: ', k, rho(k), temp(k), u(k), ye_table(k), &
             !   xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
             !   abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
-            !  print*, abar
-            !  call EXIT        
-
+            !   print*, 'temp', temp(1), temp(k-6:k-1)
+            !   print*, 'rho', rho(1), rho(k-6:k-1)
+            !   print*, 'u', u(1), u(k-6:k-1)
+            !   !print*, 'ye', ye_table(1), ye_table(k-6:k-1)
+            !   print*, 'abar', abar(1), abar(k-6:k-1)
+            !   !print*, abar
+                     
+              !call EXIT 
               return 
               END        
                                                                         
@@ -5142,8 +5152,7 @@
       read(11,*) ufact
       read(11,*)
       read(11,*) yefact 
-      !print *,'cq,cl',cq,cl 
-      !print *,'iextf,ieos',iextf,ieos 
+
       print*,'================ Setup ================'
       print*, 'Input File:            ', trim(filin)
       print*, 'Output File:           ', trim(filout)
@@ -5201,8 +5210,8 @@
             (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
             (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
 !        (vturb2(i),i=1,nc),                                          &
-!
-      print*, 'idump as read = ', idump
+!      
+      print*, 'idump as read =        ', idump
       
       if (shock_ind.ne.0) then
             post_bounce = .true.
@@ -5219,7 +5228,6 @@
       !end do 
       
       do k=1,nc 
-        print*, k
          if (ifleos(k).lt.0.6) stop 
          if (ifleos(k).eq.3) then 
             ifign(k)=.false. 
@@ -5254,7 +5262,7 @@
       print*,'======================================='
 !      gamma=1.666666666666667                                          
       ncell1=ncell+1 
-      if (ieos.eq.4) then 
+      if (ieos.eq.4.or.ieos.eq.5) then 
          do i=1,ncell 
             !write(71,*)i,u2(i),u(i),abar(i) 
             if (ifleos(i).eq.3) then 
@@ -5345,7 +5353,7 @@
       
       from_dump=.true.
 !                                                                       
-      if (ieos.eq.4) then 
+      if (ieos.eq.4.or.ieos.eq.5) then 
          do i=1,ncell 
             if (ifleos(i).eq.3) then 
                s(i)=u(i) 
@@ -5379,8 +5387,7 @@
             (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
             (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
 !          (vturb2(i),i=1,nc),                                          &
-      !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
-!               
+!                                  
       return 
 !                                                                       
 !--an error as occured while writting                                   
