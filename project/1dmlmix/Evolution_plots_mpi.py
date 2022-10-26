@@ -1,9 +1,15 @@
 # This is an analysis script that can:
-#     1. convert binary output to readable .txt
+#     1. convert binary output to readable [.txt]
 #     2. produce time evolution plots for selected variables
-#     3. produce a plot of the convection region grid size post-bounce
+#     3. produce summary plots of 
+#       - the convection region grid size post-bounce
+#       - time evolution of electron neutrinos flux
 #     4. combines all of the plots into movies with ffmpeg
-    
+#
+# and all of this in parllel with MPI. For examples, to run on 4 cores:
+#
+# mpirun -n 4 python Evolution_plots_mpi.py
+#    
 # -pikarpov
 
 import os
@@ -19,40 +25,53 @@ import numpy as np
 from sapsan.utils import line_plot, slice_plot, pdf_plot, cdf_plot
 
 def main():
-    vals = [
-            'rho', 
-            'v',
-            'P',
-            'T',
-            #'mach'
-           ]
-    versus = 'r'
-    #versus = '(v/vsound)^2'
-    base_path = '/home/pkarpov/scratch/1dccsn/'
-    #base_path = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
-    masses = [9.0, 10.0,11.0,12.0,13.0,15.0,
-              16.0,17.0,18.0,19.0,20.0]    
-    datasets = [f's{m}_4k' for m in masses]
-    base_file = f'DataOut_read'
-    rho_threshold = 1e13
-    save_name_amend = ''
-    convert2read = False#True
     
-    only_post_bounce = False
-    save_plot = True,
-    compute = True #False,
+    # --- Datasets and values to plot ---        
+    vals             = [
+                        'rho', 
+                        'v',
+                        'P',
+                        'T',
+                        'enclmass',
+                        'vsound',
+                       ]        
+    versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
+    masses           = [11.0,12.0,13.0,14.0,15.0,
+                        16.0,17.0,18.0,19.0,20.0]        
+    #masses           = [12.0,16.0,19.0,20.0]
 
-    make_movies = True 
-    fps = 10   
+    # --- Paths & Names ---
+    datasets         = [f's{m}_g2k_c1.5k' for m in masses]
+    base_file        = f'DataOut_read'
+    base_path        = '/home/pkarpov/scratch/1dccsn/sfho_s/'
+    #base_path        = '/home/pkarpov/scratch/1dccsn/sleos/funiek/'
+    #base_path        = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
+    save_name_amend  = ''      # add a custom index to the saved plot names
     
-    # -----------------------------------------------------------------------------------
+    # --- Extra ---
+    convert2read     = True    # convert binary to readable (really only needed to be done once) 
+    only_post_bounce = False   # only produce plots after the bounce    
+    
+    # --- Compute Bounce Time, PNS & Shock Positions ---
+    compute          = False
+    rho_threshold    = 1e13    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
 
+    # --- Plots & Movie Parameters ---
+    dpi              = 60      # increase for production plots
+    make_movies      = True 
+    fps              = 10   
+    save_plot        = True    # shouldn't be touched for the mpi routine
+    
+    # === No need to go beyond this point ===========================
+
+    # --- MPI setup ---
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
     rank = comm.Get_rank()
     
     for dataset in datasets:
         
+        # --- Create initial assignment ---
         if rank == 0:                              
             
             numfiles = get_numfiles(base_path, dataset, base_file)
@@ -102,7 +121,7 @@ def main():
         pf = Profiles(rank = rank, numfiles = numfiles, 
                     base_path = base_path, base_file = base_file, dataset = dataset,
                     save_name_amend=save_name_amend, only_post_bounce = only_post_bounce,                    
-                    interval = interval)
+                    interval = interval, dpi = dpi)
         
         pf.bounce_ind = comm.bcast(bounce_shift, root=0)
 
@@ -111,9 +130,8 @@ def main():
         comm.Barrier()
         if rank == 0: print( '\n-------- Progress ---------', flush=True)
 
+        # --- Main Parallel Loop ---
         for i in range(interval[0], interval[1]):  
-            #i = 247 #hrg looks good! from 50 cells to 300+ while res diffs from ~1800 to ~3600
-            #versus can be either 'r' or 'encm'
             pf.plot_profile(i = i, vals = vals, 
                             versus = versus, 
                             show_plot=False, 
@@ -128,6 +146,7 @@ def main():
         gather_shock = comm.gather(pf.shock_ind_ar, root=0)
         gather_lumnue = comm.gather(pf.lumnue, root=0)
         
+        # --- Back to Rank 0 to produce Summary Plots & Movies ---
         if rank == 0: 
             if save_plot:
                 print( '\n--------- Plot Path --------', flush=True)
@@ -145,7 +164,7 @@ def main():
                 print( '\n---------- Movies ----------')
                 for val in vals: pf.movie(val,fps=fps) 
 
-# -----------------------------------------------------------------
+# === Backend ===============================================
                         
 def spread_leftovers(interval, leftover, size):    
     shift = 0
@@ -190,7 +209,9 @@ class readout:
                 if 'Data File Name' in line: 
                     data[i+1] = f'{self.full_output_path}/DataOut\n' 
                 if 'Output Basename' in line:                     
-                    data[i+1] = f'{self.full_output_path}/{self.base_file}\n'                    
+                    data[i+1] = f'{self.full_output_path}/{self.base_file}\n'     
+                if 'Number of dumps' in line:                     
+                    data[i+1] = f'10000\n'                                      
                     
         self.write_data(filepath, data)               
     
@@ -200,6 +221,9 @@ class readout:
         
    
 class routines:
+    #
+    # Routines to calculate PNS radius and shock position
+    #
     def __init__(self, x, rho, v, vsound=None):
         self.x = x
         self.rho = rho
@@ -232,29 +256,33 @@ class routines:
         return self.pns_ind, self.pns_x        
 
 class Profiles:
+    #
+    # All things plotting related (+ bounce check)
+    #
     def __init__(self, rank, numfiles, base_path, base_file, dataset, 
-                 save_name_amend='', only_post_bounce = False, interval=[0,0]):
-        self.numfiles = numfiles
-        self.lumnue = np.zeros((self.numfiles))
-        self.times = np.zeros((self.numfiles))
-        self.base_path = base_path
-        self.dataset = dataset
-        self.base_save_path = f'{self.base_path}{self.dataset}/plots/'
-        self.movie_save_path = f'{self.base_path}{self.dataset}/movies/'
-        self.save_name_amend = save_name_amend
+                 save_name_amend='', only_post_bounce = False, interval=[0,0], dpi=60):
+        self.numfiles         = numfiles
+        self.lumnue           = np.zeros((self.numfiles))
+        self.times            = np.zeros((self.numfiles))
+        self.base_path        = base_path
+        self.dataset          = dataset
+        self.base_save_path   = f'{self.base_path}{self.dataset}/plots/'
+        self.movie_save_path  = f'{self.base_path}{self.dataset}/movies/'
+        self.save_name_amend  = save_name_amend
         self.only_post_bounce = only_post_bounce
-        self.interval = interval
+        self.interval         = interval
+        self.dpi              = dpi
         #self.progress_bar(0)
         
-        self.shock_ind_ar = np.zeros(self.numfiles)
-        self.shock_x_ar = np.zeros(self.numfiles)
-        self.pns_ind_ar = np.zeros(self.numfiles)
-        self.pns_x_ar = np.zeros(self.numfiles)
-        self.time_ar = np.zeros(self.numfiles)
-        self.ind_ar = np.arange(1, self.numfiles+1)
-        self.bounce_ind = 0
-        self.rank = rank
-        self.base_file = base_file 
+        self.shock_ind_ar     = np.zeros(self.numfiles)
+        self.shock_x_ar       = np.zeros(self.numfiles)
+        self.pns_ind_ar       = np.zeros(self.numfiles)
+        self.pns_x_ar         = np.zeros(self.numfiles)
+        self.time_ar          = np.zeros(self.numfiles)
+        self.ind_ar           = np.arange(1, self.numfiles+1)
+        self.bounce_ind       = 0
+        self.rank             = rank
+        self.base_file        = base_file 
         
     def progress_bar(self, current, val='', done = False, bar_length=20):
         current -= self.interval[0]
@@ -263,7 +291,7 @@ class Profiles:
 
         arrow = int(fraction * bar_length - 1) * '-' + '>'
         padding = int(bar_length - len(arrow)) * ' '
-        padding_val = int(7-len(val)) * ' '
+        padding_val = int(8-len(val)) * ' '
 
         ending = '\n' if done == True else '\r'
 
@@ -282,7 +310,7 @@ class Profiles:
 
     def movie(self, val, versus='r', fps=15, start=0, printout=False):      
         self.set_paths(val,versus)
-        padding_val = int(7-len(val)) * ' '
+        padding_val = int(8-len(val)) * ' '
         
         if self.only_post_bounce:
             name_amend = '_bounce'
@@ -303,7 +331,7 @@ class Profiles:
         if printout: print(output, error)       
         
     def plot_convection(self, show_plot=False):
-        ax = line_plot([[self.ind_ar, self.shock_ind_ar-self.pns_ind_ar]], figsize=(10,6))
+        ax = line_plot([[self.ind_ar, self.shock_ind_ar-self.pns_ind_ar]], figsize=(10,6), dpi=self.dpi)
         ax.get_legend().remove()        
         ax.set_xlim(self.bounce_ind+1,self.numfiles)
         ax.set_xlabel('index')
@@ -321,7 +349,7 @@ class Profiles:
         return ax
     
     def plot_lumnue(self, show_plot=False):
-        ax = line_plot([[self.ind_ar, self.lumnue]], figsize=(10,6), plot_type='semilogy')
+        ax = line_plot([[self.ind_ar, self.lumnue]], figsize=(10,6), plot_type='semilogy', dpi=self.dpi)
         ax.get_legend().remove()                
         ax.set_xlabel('index')
         ax.set_ylabel(r'$F_{\nu_{e}} \; [foe/s]$')
@@ -352,7 +380,8 @@ class Profiles:
             pns_ind = int(pns_ind)-1              
             
             if compute: 
-                ps = np.loadtxt(file1d, skiprows=3)
+
+                ps = np.genfromtxt(file1d, skip_header=3)                
                 ps = np.moveaxis(ps,0,1) 
                 rho = ps[3]
                 if np.amax(rho) > 2e14:
@@ -388,7 +417,7 @@ class Profiles:
                         
         #print('Time %.2f ms'%(float(time1d)*1e3))
 
-        ps = np.loadtxt(file1d, skiprows=3)
+        ps = np.genfromtxt(file1d, skip_header=3)
         ps = np.moveaxis(ps,0,1)        
         
         for val in vals:
@@ -417,25 +446,36 @@ class Profiles:
                 y = ps[3]
                 ylabel = r'Density $[g/cm^3]$'
                 ylim = (1e4,1e15)
+                loc = 1
             elif val == 'v':
                 y = ps[4]
                 ylabel = r'Velocity $[cm/s]$'
-                ylim = (-8e9, 2.5e9)
+                ylim = (-1e10, 1e9)
                 if versus == 'r': plot_type = 'semilogx'
                 elif versus == 'encm': plot_type = 'plot'
+                loc = 4
+            elif val == 'vsound':
+                y = ps[8]
+                ylabel = r'$V_{sound}$ $[cm/s]$'
+                ylim = (0, 1.4e10)
+                if versus == 'r': plot_type = 'semilogx'
+                elif versus == 'encm': plot_type = 'plot'
+                loc = 1                
             elif val == 'P':
                 y = ps[6]
                 ylabel = r'$P_{gas} \; [\frac{g}{cm\;s^2}]$'
                 ylim = (1e20,1e36)   
+                loc = 1
             elif val == 'T':
                 y = ps[7]
                 ylabel = r'Temperature $[K]$'
-                ylim = (1e5,4e11)
-            elif val == 'Placeholder':
-                y = ps[7]
-                ylabel = r'$P_{turb}/P_{gas}$'
+                ylim = (1e7,4e11)
+                loc = 1
+            elif val == 'enclmass':
+                y = ps[1]
+                ylabel = r'Enclosed Mass $[M_{\odot}]$'
                 ylim = None
-                sys.exit('Nope')
+                loc = 4
             else: sys.exit(f"ERROR: unknown val {val}, trying to exit")            
 
             #print('diff shock', shock_ind, np.argmin(ps[4]), shock_ind-np.argmin(ps[4]))
@@ -446,7 +486,7 @@ class Profiles:
                            plot_type = plot_type,
                            label = [f'ind     {i+1}'],
                            linestyle=['-','--','-','--'],               
-                           figsize=(10,6))    
+                           figsize=(10,6),dpi=self.dpi)    
             
             # check if after bounce                
             if i >= self.bounce_ind:                
@@ -472,7 +512,7 @@ class Profiles:
             ax.set_ylim(ylim)
             ax.set_title('$t_{1d}=$%.2f ms'%(float(time1d)*1e3))
 
-            plt.legend()
+            plt.legend(loc=loc)
             plt.tight_layout()
             if save_plot:        
                 self.set_paths(val, versus)                
