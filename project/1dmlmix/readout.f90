@@ -41,10 +41,10 @@
 !   
        if (command_argument_count() == 1) then
            print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
-           call EXIT(0)
+           call EXIT
        else if (command_argument_count() == 2) then
            print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
-           call EXIT(0)
+           call EXIT
        else if (command_argument_count() == 3) then
            call get_command_argument(number=1, value=infile)
            call get_command_argument(number=2, value=basename)
@@ -65,23 +65,17 @@
           read(11,*) ndump 
    10 format(A) 
        endif
-   
-   
-      !print*, "What's the data file name?"
-      !read *, infile 
+
       open(42,file=infile,form='unformatted') 
-!                                                                       
+!
       pi43=3.14159265359*4.0/3.0 
    97 continue 
-      !print *,'number of dumps?' 
-      !read *, ndump 
-!                                                                       
+!
 !--read data                                                            
-!                                                                       
-      !print *, 'output basename' 
-      !read(*,fmt='(a)') basename 
+!
       ibasenamelen = index(basename,' ')-1 
-                                                                        
+      nqn=17
+
       do k=1,ndump         
          read(42) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
                pns_ind,pns_x,shock_ind,shock_x,                          &
@@ -96,10 +90,8 @@
                (dj(i),i=1,nc),                                           &
                (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),            &
                (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),            &                  
-               (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)                                       
+               (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)                
 !        
-         !print*, 'rho(1)  ftrape  ftrapb  ftrapx'
-         !print*, rho(1),ftrape,ftrapb,ftrapx 
          if (k.lt.40) then 
             imp=1 
 !         else                                                          
