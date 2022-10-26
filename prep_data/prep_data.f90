@@ -24,7 +24,7 @@ program read
           common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
           common /numb/ ncell 
           common /nustuff/ ynue(idim),ynueb(idim),ynux(idim),               &
-         &               unue(idim),unueb(idim),unux(idim)                  
+                           unue(idim),unueb(idim),unux(idim)                  
           common /eosq / pr(idim), vsound(idim), u2(idim), vsmax 
           common /carac/ deltam(idim), abar(idim) 
           common /state/ xp(idim), xn(idim), eta(idim), ifleos(idim) 
@@ -161,15 +161,12 @@ program read
     
           print *, 'dmtot, rold:      ', dmtot,rold 
           print *, 'initial cell mass:', deltam(1) 
-    !                                                                       
-    !--nucdata is in nse5.f                                                 
-    !                                                                       
-          call nucdata 
-    !                                                                       
-    !--loadmx is in sleos.f                                                 
-    !  
-          if (ieos.eq.4) then                                                                            
-            call loadmx () 
+    !                   
+    !--use Swesty-Lattimer eos
+    !   
+          if (ieos.eq.4) then     
+            call nucdata   ! nucdata is in nse5.f                                       
+            call loadmx () ! loadmx is in sleos.f
           endif        
     !                   
     !--load eos table
@@ -187,24 +184,24 @@ program read
                              conv_grid,conv_grid_goal,             &
                              enclmass_conv_cutoff)
     !
-    !--interpolate and setup the grid
-    !--growth rate past 200km will keep adjusting 
-    !--via a binary-search-like algorithm until 
+    !--Interpolate and setup the grid.
+    !--Growth rate past enclmass_conv_cutoff will keep  
+    !--adjusting via a binary-search-like algorithm until 
     !--total grid size is within 1% of the idim
     !     
           call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
                              t9,yel,ab,omega,press,                &
                              maxrad,deltam_growth,ieos,            &
                              conv_grid,enclmass_conv_cutoff,grid_goal)
-    !
+    
     !--if you want to avoid binary search and do the original grid setup
     !--comment the above 2 subroutine calls, and uncomment setup_grid() below
     !                             
         !   call setup_grid(nkep,yccin,vel,rad,dens,                &
         !                   t9,yel,ab,omega,press,                  &
         !                   maxrad,deltam_growth,ieos,              &
-        !                   conv_grid,enclmass_conv_cutoff)          
-                                  
+        !                   conv_grid,enclmass_conv_cutoff)       
+
       102 format(20(1pe9.2)) 
       103 format(3(1pe16.8)) 
       115 format(I5,1pe13.4) 
@@ -221,6 +218,119 @@ program read
           stop 
           END                                                                                     
 !      
+          subroutine wdump 
+!************************************************************           
+!                                                           *           
+!  this routine writes a dump on disk                       *           
+!                                                           *           
+!************************************************************           
+  !                                                                       
+          implicit double precision (a-h, o-z) 
+  !                                                                       
+          logical from_dump 
+          integer idump 
+          parameter (idim=4000) 
+          common /celle/ x(0:idim),v(0:idim) 
+          common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
+          common /numb/ ncell 
+          common /nustuff/ ynue(idim),ynueb(idim),ynux(idim),               &
+                           unue(idim),unueb(idim),unux(idim)                  
+          common /state/ xp(idim), xn(idim), eta(idim), ifleos(idim) 
+          common /eosq / pr(idim), vsound(idim), u2(idim), vsmax 
+          common /freez/ ufreez(idim) 
+          common /carac/ deltam(idim), abar(idim) 
+          common /tempe/ temp(idim) 
+          common /cgas / gamma 
+          common /times / t, dt 
+          common /ener2/ tkin, tterm 
+          logical te(idim), teb(idim), tx(idim) 
+          common /cent/ dj(idim) 
+          real ycc(idim,20) 
+          common /abun/ ycc 
+          common /timei/ steps(idim) 
+          common /rshock/ shock_ind, shock_x 
+          common /pns/ pns_ind, pns_x 
+          common /dump/ from_dump 
+          double precision rlumnue,rlumnueb,rlumnux,bounce_time 
+          double precision pr_turb(idim) 
+  !            
+          steps = 0 
+          shock_ind = 0 
+          shock_x = 0 
+          pns_ind = 0 
+          pns_x = 0 
+          idump=0 
+          bounce_time=0 
+          from_dump = .false. 
+  !--initialize neutrino fluxes                                           
+          rlumnue = 0 
+          rlumnueb = 0 
+          rlumnux = 0 
+          pr_turb(:) = 0 
+  !                      
+          nc = ncell 
+          do i=1,nc 
+              if (u(i).eq.0) then
+                print*, "ERROR: u(i) is 0 at i=",i
+                stop 
+              endif
+              ynue(i)=0. 
+              ynueb(i)=0. 
+              ynux(i)=0. 
+              unue(i)=0. 
+              unueb(i)=0. 
+              unux(i)=0. 
+              te(i)=.false. 
+              teb(i)=.false. 
+              tx(i)=.false. 
+              q(i)=0. 
+              dq(i)=0. 
+          enddo 
+          rb=9e-3 
+          gc=0.0001 
+          ftrap=1. 
+          fe=ftrap 
+          fb=ftrap 
+          fx=ftrap 
+  !                                                                       
+  !--write                                                                
+  !                  
+          nqn=17 
+          write(29,iostat=io,err=10) idump,nc,t,gc,rb,fe,fb,fx,             &
+          &     pns_ind,pns_x,shock_ind,shock_x,                             &
+          &     bounce_time,from_dump,rlumnue,rlumnueb,rlumnux,              &
+          &     (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),    &
+          &     (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),           &
+          &     (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),             &
+          &     (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),            &
+          &     (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),         &
+          &     (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),         &
+          &     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),            &
+          &     (dj(i),i=1,nc),                                              &
+          &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),               &
+          &     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),               &
+          &     (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)                       
+  !                                                     
+          !print*, 'abar max & min: ', maxval(abar), minval(abar)
+        ! print*, 'temp:', temp(1), temp(nc-5:nc)
+        ! print*, 'rho', rho(1), rho(nc-5:nc)
+        ! print*, 'u', u(1), u(nc-5:nc)
+        ! print*, 'ye', ye(1), ye(nc-5:nc)
+        ! print*, 'abar:', abar(1), abar(nc-5:nc)
+          do i=1,ncell 
+              write (43,103) (ycc(i,j),j=1,19) 
+          end do 
+      102 format(I4,4(1pe14.4),I3) 
+      103 format(19(1pe12.4)) 
+          return 
+  !                                                                       
+  !--an error as occured while writting                                   
+  !                                                                       
+       10 print *,'an error has occured while writing' 
+  !                                                                       
+          return 
+          END                                           
+
   
           subroutine setup_grid(nkep,yccin,vel,rad,dens,                   &
                                 t9,yel,ab,omega,press,                     &
@@ -249,7 +359,7 @@ program read
           common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
           common /numb/ ncell 
           common /nustuff/ ynue(idim),ynueb(idim),ynux(idim),        &
-          &               unue(idim),unueb(idim),unux(idim)                  
+                           unue(idim),unueb(idim),unux(idim)                  
           common /eosq / pr(idim), vsound(idim), u2(idim), vsmax 
           common /carac/ deltam(idim), abar(idim) 
           common /state/ xp(idim), xn(idim), eta(idim), ifleos(idim) 
@@ -268,7 +378,7 @@ program read
           double precision maxrad, deltam_growth         
   
           logical beyond_focus
-          integer nkep,ieos,conv_grid,one_counter,pns_counter
+          integer nkep,ieos,conv_grid,focus_i
                
           conv_grid = 0
           one_counter = 0
@@ -314,7 +424,7 @@ program read
           
           do j=1,19 
               ycc(i,j)=fac1*0.5*yccin(ind,j) +                        &
-      &           0.5*yccin(k,j)+fac2*0.5*yccin(k+1,j)
+                  0.5*yccin(k,j)+fac2*0.5*yccin(k+1,j)
           end do 
           
           if (k.eq.1) then
@@ -341,15 +451,14 @@ program read
               deltam(i+1) = deltam(1)
           else
               if (beyond_focus.eqv..false.) then
-                  leftover = grid_size-i             
                   beyond_focus = .true.
                   focus_i = i
               endif
 
+              ! exponential growth of deltam with a set growth rate
               deltam(i+1) = deltam(focus_i)*(1+deltam_growth)**(i-focus_i)
 
           end if 
-          if (k.eq.1) one_counter = one_counter+1
   !                                                                       
   !--call eos                                                             
   !                                                                       
@@ -391,7 +500,6 @@ program read
           xp(i)=xpj 
           xn(i)=xnj 
           
-          !if (x(i).le.2.d-2) conv_grid = conv_grid+1
           if (enclmass(i).le.enclmass_conv_cutoff) conv_grid = conv_grid+1
 
           if (x(i).gt.maxrad) then 
@@ -399,12 +507,8 @@ program read
               goto 50 
           end if
         enddo 
-        ! print*, enclmass(i-10:i)
-        ! print*, 'max', maxval(enclmass)
-        ! stop
   !                                                                               
         50 continue 
-
          return
          end        
 
@@ -440,7 +544,7 @@ program read
 
          print *,'-------- Search for deltam(1) ---------'
          initial_growth = .true.
-         adjust_deltam = 1.d1         
+         adjust_deltam = 1.d1
          counter = 1
          low = 0.0
          
@@ -455,7 +559,7 @@ program read
                  print*, "ERROR: Initial Cell Mass is to small for the grid! Increase it."
                  call exit
              else
-                 write(*,'(I5,A,I5)'), counter, ' Convective size:', conv_grid
+                 write(*,'(I4,A,I6)'), counter, ' Convective size:', conv_grid
              endif
  
              ! exit condition once convection grid is of the right size
@@ -486,7 +590,7 @@ program read
              endif
          enddo
          print *,'---------------------------------------'
-         write(*,'(A,I3,A)'), ' Cell mass in convective region converged in', counter-1, ' iterations'
+         write(*,'(A,I4,A)'), ' Cell mass in convective region converged in', counter, ' iterations'
          print*,'Final deltam(1): ', deltam(1)
          print*, ''
       end
@@ -497,8 +601,9 @@ program read
                                conv_grid,enclmass_conv_cutoff,grid_goal)                     
 !*********************************************************              
 !                                                        *              
-!  Growth rate past 200km will keep adjusting            * 
-!  via a binary-search-like algorithm until              *
+!  Interpolate and setup the grid.                       *
+!  Growth rate past enclmass_conv_cutoff will keep       *
+!  adjusting via a binary-search-like algorithm until    *
 !  total grid size is within 1% of the idim              *          
 !                                                        *              
 !*********************************************************  
@@ -538,12 +643,13 @@ program read
                         
           ! exit condition once precision of under 1% is reached
           if (abs(grid_goal-ncell).lt.0.01*ncell) then
+            write(*,'(I4,A,I6)'), counter, ' Grid size:', ncell
             exit
 
           ! increase growth rate if the grid is above grid_goal
           elseif (ncell.eq.0.or.ncell.gt.grid_goal) then
               
-              write(*,'(I5,A,I5,A)'), counter,' Grid size: above grid_goal! (', grid_goal,')'
+              write(*,'(I4,A,I6)'), counter,' Grid size: above grid_goal of', grid_goal
 
               if (.not.initial_growth) then
                   low = adjust_growth
@@ -555,7 +661,7 @@ program read
 
           ! decrease growth rate if the grid is below grid_goal   
           else
-              write(*,'(I5,A,I5)'), counter, ' Grid size:', ncell
+              write(*,'(I4,A,I6)'), counter, ' Grid size:', ncell
               
               if (initial_growth) initial_growth = .false.
               high = adjust_growth
@@ -573,127 +679,24 @@ program read
           endif
       enddo
       print *,'---------------------------------------'
-      write(*,'(A,I3,A)'), ' Growth rate converged in', counter, ' iterations'
+      write(*,'(A,I4,A)'), ' Growth rate converged in', counter, ' iterations'
       print*, 'Final deltam_growth:', deltam_growth   
       print*, ''   
 
       end
         
-      subroutine wdump 
-!************************************************************           
-!                                                           *           
-!  this routine writes a dump on disk                       *           
-!                                                           *           
-!************************************************************           
-!                                                                       
-      implicit double precision (a-h, o-z) 
-!                                                                       
-      logical from_dump 
-      integer idump 
-      parameter (idim=4000) 
-      common /celle/ x(0:idim),v(0:idim) 
-      common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
-      common /numb/ ncell 
-      common /nustuff/ ynue(idim),ynueb(idim),ynux(idim),               &
-     &               unue(idim),unueb(idim),unux(idim)                  
-      common /state/ xp(idim), xn(idim), eta(idim), ifleos(idim) 
-      common /eosq / pr(idim), vsound(idim), u2(idim), vsmax 
-      common /freez/ ufreez(idim) 
-      common /carac/ deltam(idim), abar(idim) 
-      common /tempe/ temp(idim) 
-      common /cgas / gamma 
-      common /times / t, dt 
-      common /ener2/ tkin, tterm 
-      logical te(idim), teb(idim), tx(idim) 
-      common /cent/ dj(idim) 
-      real ycc(idim,20) 
-      common /abun/ ycc 
-      common /timei/ steps(idim) 
-      common /rshock/ shock_ind, shock_x 
-      common /pns/ pns_ind, pns_x 
-      common /dump/ from_dump 
-      double precision rlumnue,rlumnueb,rlumnux,bounce_time 
-      double precision pr_turb(idim) 
-!            
-      steps = 0 
-      shock_ind = 0 
-      shock_x = 0 
-      pns_ind = 0 
-      pns_x = 0 
-      idump=0 
-      bounce_time=0 
-      from_dump = .false. 
-!--initialize neutrino fluxes                                           
-      rlumnue = 0 
-      rlumnueb = 0 
-      rlumnux = 0 
-      pr_turb(:) = 0 
-!                      
-      nc = ncell 
-      do i=1,nc 
-         if (u(i).eq.0) then
-            print*, "ERROR: u(i) is 0 at i=",i
-            stop 
-         endif
-         ynue(i)=0. 
-         ynueb(i)=0. 
-         ynux(i)=0. 
-         unue(i)=0. 
-         unueb(i)=0. 
-         unux(i)=0. 
-         te(i)=.false. 
-         teb(i)=.false. 
-         tx(i)=.false. 
-         q(i)=0. 
-         dq(i)=0. 
-      enddo 
-      rb=9e-3 
-      gc=0.0001 
-      ftrap=1. 
-      fe=ftrap 
-      fb=ftrap 
-      fx=ftrap 
-!                                                                       
-!--write                                                                
-!                     
-      nqn=17 
-      write(29,iostat=io,err=10) idump,nc,t,gc,rb,fe,fb,fx,             &
-     &     pns_ind,pns_x,shock_ind,shock_x,                             &
-     &     bounce_time,from_dump,rlumnue,rlumnueb,rlumnux,              &
-     &     (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc),    &
-     &     (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc),           &
-     &     (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc),             &
-     &     (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc),            &
-     &     (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc),         &
-     &     (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc),         &
-     &     (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),            &
-     &     (dj(i),i=1,nc),                                              &
-     &     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),               &
-     &     (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),               &
-     &     (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)                       
-!                                                     
-     !print*, 'abar max & min: ', maxval(abar), minval(abar)
-    !  print*, temp
-    !  print*, 'temp:', temp(nc-10:nc)
-    !  print*, 'abar:', abar(nc-10:nc)
-      do i=1,ncell 
-         write (43,103) (ycc(i,j),j=1,19) 
-      end do 
-!      print *, x(0),x(1)                                               
-  102 format(I4,4(1pe14.4),I3) 
-  103 format(19(1pe12.4)) 
-      return 
-!                                                                       
-!--an error as occured while writting                                   
-!                                                                       
-   10 print *,'an error has occured while writing' 
-!                                                                       
-      return 
-      END                                           
       
       subroutine eos5(i,rho,u,temp,ye_table,rhocgs,tkelv,yej,            &
-                    abarj,ucgs,pcgs,xpj,xnj,scgs,iflag)
+                      abarj,ucgs,pcgs,xpj,xnj,scgs,iflag)
 
+!*********************************************************              
+!                                                        *              
+!  EOSDriver integration from Evan O'Connor              * 
+!  (https://github.com/evanoconnor/EOSdriver)            *
+!  This is primarily to read and interpolate             *
+!  SFHo EOS tables, but others should work fine too      *          
+!                                                        *              
+!*********************************************************
       use eosmodule
       
       implicit double precision (a-h,o-z)
@@ -706,6 +709,7 @@ program read
       parameter(utime=1e1) 
       parameter(uergg=1e16) 
       parameter(pi43=3.14159*4.0/3.0)  
+      parameter(avokb=6.02e23*1.381e-16)
 !     
       dimension u(idim),rho(idim),ye_table(idim),temp(idim)
 
@@ -724,7 +728,7 @@ program read
       integer keytemp,keyerr 
       
       keytemp = 1
-      keyerr  = 0
+      keyerr  = 0      
 
       xrho  = rho(i)*udens
       xenr  = u(i)*uergg
@@ -745,20 +749,33 @@ program read
       endif
       !                                                                       
       !--SFHo EOS tables                                               
-      !                     
+      !   
+    !   print*, '----', i
+    !   print*, xrho, xenr, xtemp, xye                  
       call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,               &
             xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-            xmuhat_table,keytemp,keyerr,precision)  
+            xmuhat_table,keytemp,keyerr,precision)
+    !   print*, xabar      
+    !   if (i.eq.1000) then
+    !     print*, xabar
+    !     stop
+    !   endif
 
+      ! if energy is negative, set it to min value in the SFHo tables
+      ! if (xenr.lt.0) xenr=1.265d16
+
+      ! these will be in the output from the eos to final Data file
+      ucgs   = xenr
+      pcgs   = xprs
+      scgs   = xent*avokb
+      xpj    = xxp
+      xnj    = xxn
+
+      ! these effectively do nothing
       rhocgs = xrho
       tkelv  = xtemp/boltzmev
       yej    = xye
-      abarj  = xabar
-      ucgs   = xenr
-      pcgs   = xprs
-      xpj    = xxp
-      xnj    = xxn
-      scgs   = xent  
+      abarj  = xabar            
       iflag  = 5 
       end
 

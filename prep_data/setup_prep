@@ -5,19 +5,19 @@ sukhbold2016/s12.0_presn
 Data
 
 <Target Resolution>
-1000
+2000
 
 <Goal Size of Convective Grid>
-400
+1500
 
 <Enclosed Mass Cutoff for Convective Region (Msol)>
-0.5
+1.4
 
 <Initial Cell Mass>
 1e-3
 
 <Cell Mass Growth Rate past enclosed mass cutoff>
-1e-4
+1e-3
 
 <Maximum Radius of the Grid (cm)>
 5e9
