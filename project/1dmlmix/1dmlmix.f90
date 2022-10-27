@@ -1373,9 +1373,7 @@
                  vsmax=dmax1(vsmax,vsound(k)) 
                  tempmx=dmax1(tempmx,temp(k)) 
                  tempmn=dmin1(tempmn,temp(k))                    
-        !           
-                 
-                               
+        !                          
               enddo
 
             !  k = k-1              
@@ -5162,7 +5160,7 @@
       print*, 'Dump time interval (s):', dtime
       print*, 'Max time (s):          ', tmax
       print*, 'EOS:                   ', ieos
-      print*, 'EOS Table Path:        ', trim(eos_table)
+      if (ieos.eq.5) print*, 'EOS Table Path:        ', trim(eos_table)
       !print*, cq,cl
       !print*, iextf,ieos,dcore
       !print*, ncell,delp,nups,damp,dcell
