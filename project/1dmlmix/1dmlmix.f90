@@ -101,7 +101,7 @@
 !                                                                       
       !90 call printout(lu)                                             
       !call printout(lu) 
-      stop 
+      stop "DONE: reached the maximum time"
       END                                           
 !
 ! ============================ Subroutines ============================
@@ -216,7 +216,7 @@
       if(ieos.eq.1)call eospg(ncell,rho,u) 
       if(ieos.eq.2)call eospgr(ncell,rho,u) 
       if(ieos.eq.3.or.ieos.eq.4)call eos3(ncell,rho,u,ye) 
-      if(ieos.eq.5)call eos5(ncell,rho,u,ye) 
+      if(ieos.eq.5.or.ieos.eq.6)call eos5(ncell,rho,u,ye) 
 !                                                                       
 !--do gravity                                                           
 !  --------------------------------------------------------             
@@ -391,42 +391,43 @@
       common /interp/ mlin_grid_size
       common /mlout/ pr_turb(idim1)
                                     
-      ! The tensor shape is exactly backwards from python: (Length,Channels,N batches)
-      real(real32) :: input(mlin_grid_size, 4, 1)
-      real(real32), allocatable :: output_h(:,:,:)    
-      double precision pr_relative(idim1)
-      double precision interp_x(mlin_grid_size)         
+    !   ! The tensor shape is exactly backwards from python: (Length,Channels,N batches)
+    !   real(real32) :: input(mlin_grid_size, 4, 1)
+    !   real(real32), allocatable :: output_h(:,:,:)    
+    !   double precision pr_relative(idim1)
+    !   double precision interp_x(mlin_grid_size)         
       
-      ! Scale Pressure to fit into single precission (taken from ML training)
-      scale_pr = 1.d-8
-      scale_pr_relative = 1.d-8
+    !   ! Scale Pressure to fit into single precission (taken from ML training)
+    !   scale_pr = 1.d-8
+    !   scale_pr_relative = 1.d-8
 
-      input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
-      input(:,2,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
-      input(:,3,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size)*scale_pr
-      input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
+    !   input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
+    !   input(:,2,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
+    !   input(:,3,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size)*scale_pr
+    !   input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
 
-      ! ML model (reverse the order for fortran data)
-      ! Input: ['u1','rho','Pgas', 'T'] (1, 4, 200)
-      ! Output: [pr_relative = P_turb/P_gas] (1, 1, 200)
+    !   ! ML model (reverse the order for fortran data)
+    !   ! Input: ['u1','rho','Pgas', 'T'] (1, 4, 200)
+    !   ! Output: [pr_relative = P_turb/P_gas] (1, 1, 200)
 
-      output_h = mlmodel(input, trim(mlmodel_name))      
+    !   output_h = mlmodel(input, trim(mlmodel_name))      
       
-      ! Re-shape output into code-shape mlout:
-      pr_turb(:) = 0   
-      pr_relative(:) = 0
-      interp_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
-      pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
-                                                   mlin_grid_size,1,mlin_grid_size,           &
-                                                   int(shock_ind-pns_ind))*scale_pr_relative
+    !   ! Re-shape output into code-shape mlout:
+    !   pr_turb(:) = 0   
+    !   pr_relative(:) = 0
+    !   interp_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
+    !   pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
+    !                                                mlin_grid_size,1,mlin_grid_size,           &
+    !                                                int(shock_ind-pns_ind))*scale_pr_relative
+      pr_relative = 0.3
       pr_turb = pr_relative*pr
-      print*, 'ML prediction'      
-      print*, size(output_h), shape(output_h), shock_ind-pns_ind
-      print*, '-- pr_relative --'
-      print*, pr_relative(shock_ind-5:shock_ind)
-      print*, '-- pr_turb --'
-      print*, pr_turb(shock_ind-5:shock_ind)
-      call exit(0)
+    !   print*, 'ML prediction'      
+    !   print*, size(output_h), shape(output_h), shock_ind-pns_ind
+    !   print*, '-- pr_relative --'
+    !   print*, pr_relative(shock_ind-5:shock_ind)
+    !   print*, '-- pr_turb --'
+    !   print*, pr_turb(shock_ind-5:shock_ind)
+    !   call exit(0)
       return 
       END       
 !
@@ -1141,7 +1142,7 @@
          yek=ye(k) 
          if (yek.lt.0.) then 
             print *,'k,yek',k,yek 
-            stop 
+            stop "ERROR: yek < 0"
          endif 
 !                                                                       
 !--assume chemical freeze-out                                           
@@ -1280,6 +1281,7 @@
               common /cpots/ xmue(idim), xmuhat(idim) 
               common /hnucl/ xalpha(idim),xheavy(idim), yeh(idim) 
               common /cgas / gamma 
+              common /typef/ iextf, ieos
               common /const/ gg, clight, arad, bigr, xsecnn, xsecne 
               common /units/ umass, udist, udens, utime, uergg, uergcc 
               common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
@@ -1302,7 +1304,12 @@
 !          2 -> coming in with rho,entropy,ye (solve for temp)
 !          3 -> coming in with pressure,temp,ye (solve for rho)
 !
-              keytemp = 2    
+              if (ieos.eq.5) then
+                keytemp = 2
+              elseif (ieos.eq.6) then
+                keytemp = 0
+              endif
+
               keyerr  = 0
               
               upr = umass/udist/utime**2
@@ -1327,22 +1334,45 @@
                     ! write(*,276),'vars: ', k, abar(k)
                 !  endif
                  
-                 ! set upper and lower bounds
-                 if (xye  .ge.0.6  ) xye  = 0.599
-                 if (xrho .lt.166.5) xrho = 166.5 
-                 if (xtemp.lt.0.011) xtemp= 0.011  
-                 if (xenr .lt.0    ) xenr=1.265d16                
+                 ! set upper and lower bounds based on SFHo table limits
+                 if (xye  .gt.0.59999)  xye   = 0.59999
+                 if (xrho .lt.166.054)  then
+                    print*, 'xrho hit min', i
+                    xrho  = 166.054
+                 endif
+                 if (xtemp.lt.0.01) then
+                    print*, 'xtemp hit min', i
+                    xtemp = 0.01
+                 endif   
+                 if (xent .lt.0.000131) then
+                    print*, 'xent hit min', i
+                    xent  = 0.000131  
+                 endif
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
-                    stop 
+                    stop "ERROR: xye < 0"
                  endif 
+
+                !  print*, '--- In ---'
+                !  print*, 'xtemp', xtemp
+                !  print*, 'xrho ', xrho
+                !  print*, 'xent ', xent
+                !  print*, 'xye   ', xye
         !                                                                       
         !--SFHo EOS tables                                               
         !              
                  call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,             &
                     xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-                    xmuhat_table,keytemp,keyerr,precision)    
+                    xmuhat_table,keytemp,keyerr,precision)   
+                !  call nuc_low_eos(xrho,xenr,xprs,xcs2,xdpderho,xdpdrhoe,keytemp)                    
+
+                !  print*, ''
+                !  print*, '--- Out ---'
+                !  print*, 'xtemp', xtemp
+                !  print*, 'xrho ', xrho
+                !  print*, 'xent ', xent
+                !  print*, 'xye   ', xye
                  !                                                                       
                  !--store values - CHECK UNITS!!!                                                        
                  !                 
@@ -1373,6 +1403,8 @@
                  vsmax=dmax1(vsmax,vsound(k)) 
                  tempmx=dmax1(tempmx,temp(k)) 
                  tempmn=dmin1(tempmn,temp(k))                    
+                 
+                 !if (k.eq.100) stop
         !                          
               enddo
 
@@ -1386,9 +1418,8 @@
             !   print*, 'u', u(1), u(k-6:k-1)
             !   !print*, 'ye', ye_table(1), ye_table(k-6:k-1)
             !   print*, 'abar', abar(1), abar(k-6:k-1)
-            !   !print*, abar
-                     
-              !call EXIT 
+              !print*, abar(1:ncell)
+              !stop                     
               return 
               END        
                                                                         
@@ -1650,7 +1681,7 @@
           write(*,*) 'NSE mis-stored entering nserho' 
           write(*,*) 'T9, rho, ye,k',t9,rhoold,yeold,k 
           write(*,*) 'inconsistent with yp, yn',yp,yn 
-          stop 
+          stop "ERROR: kit >= kmax"
       Endif 
       ypold=yp 
       ynold=yn 
@@ -1690,7 +1721,7 @@
       write(*,*)kit,zbar,abar 
       write(*,*)kmax,ubind,dubind 
       write(*,*)testk,testzy,testay,testyp,testyn 
-      stop 
+      stop "ERROR: Ye loop failure"
    50 Continue 
 !                                                                       
 !--Begin rho iteration                                                  
@@ -1732,7 +1763,7 @@
       write(*,*)kit,zbar,abar 
       write(*,*)kmax,ubind,dubind 
       write(*,*)testk,testzy,testay,testyp,testyn 
-      stop 
+      stop "ERROR: rho loop failure"
    70 Continue 
    90 format(A25,3(1pe12.4),I3) 
 !                                                                       
@@ -1798,7 +1829,7 @@
           write(*,*) 'NSE mis-stored entering nsetemp' 
           write(*,*) 'T9, rho, ye',t9old,rho,ye 
           write(*,*) 'inconsistent with yp, yn',yp,yn 
-          if (yp.eq.0.) stop 
+          if (yp.eq.0.) stop "ERROR: kit >= kmax and yp == 0"
       Endif 
       ypold=yp 
       ynold=yn 
@@ -1863,7 +1894,7 @@
       If(kit.ge.kmax) Then 
           write(*,*) 'NSEtemp failed for final T9, particle',k 
           write(*,*) kit,t9,t9tmp 
-          STOP 
+          STOP "ERROR: kit >= kmax"
       Endif 
 !                                                                       
 !--Overstep in T9 to calculate dUb/dT9                                  
@@ -4679,7 +4710,7 @@
 !                                                                       
 !      print *,'rootemp2: no convergence for part. i,rho(cgs)',         
 !     1         i,rhoi                                                  
-      stop 
+      stop "ERROR: rootemp2 did not converge"
 !                                                                       
 !--iteration sucessful, transform back in code units                    
 !                                                                       
@@ -4779,7 +4810,7 @@
             print *,'rhocgs,rhoold',rhocgs,rhoold 
             print *,'yek,yeold',yek,yeold 
             print*,'ediss,etot,ucoul',ediss,etot,ucoul 
-            stop 
+            stop "ERROR: t9 < 2"
          endif 
 !                                                                       
 !--solve nse                                                            
@@ -4814,7 +4845,7 @@
 !                                                                       
       print *,'rootemp3: no convergence for part. k,rho(cgs)',          &
      &         k,rhok                                                   
-      stop 
+      stop "ERROR: rootemp3: did not converge"
 !                                                                       
 !--iteration sucessful, transform back in code units                    
 !                                                                       
@@ -4962,7 +4993,7 @@
 !                                                                       
       print *,'eta convergence failed: rho, ynu, unu, k',               &
      &        rho, ynu, unu, k                                          
-      stop 
+      stop "ERROR: eta convergence failed"
 !                                                                       
       END                                           
 !                                                                       
@@ -5160,7 +5191,7 @@
       print*, 'Dump time interval (s):', dtime
       print*, 'Max time (s):          ', tmax
       print*, 'EOS:                   ', ieos
-      if (ieos.eq.5) print*, 'EOS Table Path:        ', trim(eos_table)
+      if (ieos.eq.5.or.ieos.eq.6) print*, 'EOS Table Path:        ', trim(eos_table)
       !print*, cq,cl
       !print*, iextf,ieos,dcore
       !print*, ncell,delp,nups,damp,dcell
@@ -5226,7 +5257,7 @@
       !end do 
       
       do k=1,nc 
-         if (ifleos(k).lt.0.6) stop 
+         if (ifleos(k).lt.0.6) stop "ERROR: ifleos(k) < 0.6"
          if (ifleos(k).eq.3) then 
             ifign(k)=.false. 
          elseif (ifleos(k).eq.2) then 
@@ -5284,7 +5315,7 @@
       enddo 
 
       
-      if (ieos.eq.5) then 
+      if (ieos.eq.5.or.ieos.eq.6) then 
         call readtable(trim(eos_table))
       endif
 !                                                                       
@@ -6026,7 +6057,7 @@
 !                                                                       
 !--flag particles according to physical state                           
 !
-         if (ieos.ne.5) then                                                                       
+         if (ieos.ne.5.and.ieos.ne.6) then                                                                       
             call eosflg(ncell,rho,ye,u,f1ye,f1u) 
          endif
 !                                                                       
@@ -6824,8 +6855,7 @@
       if(ers.lt.eps) goto 110 
       call derivn(y,rob,ff,rrat,rlam) 
       if(knew.gt.maxit)then 
-         write(*,*)' error: knew gt maxit' 
-         stop 
+         stop "ERROR: knew > maxit"
       end if 
       goto 35 
   110 return 
