@@ -444,25 +444,31 @@
       common /rshock/ shock_ind, shock_x    
       common /units/ umass, udist, udens, utime, uergg, uergcc
 
-      dimension x(0:ncell),v(0:ncell),vsound(0:ncell),mach(0:ncell)
+      dimension x(0:ncell),v(0:ncell),vsound(0:ncell),mach(0:ncell-1)
 
       double precision :: mach
       double precision :: mach_threshold
       real :: initial_v, old_max_v
       real, dimension(ncell) :: v_old
-      integer :: i,j, ind
+      integer :: i,j, ind, minv
       logical print_nuloss
+!
+      ! need to subtract 1 since the array has a ghost cell at (0)
+      minv = minloc(v, dim=1)-1
 
-      mach_threshold = 1.0
-!                                    
-      mach = ABS(v/vsound)
-      do i=minloc(v, dim=1),1,-1
-        if (mach(i).lt.mach_threshold) then
-            shock_x = x(i)
-            shock_ind = i
-            EXIT
-        endif
-      enddo
+      shock_ind = minv
+      shock_x   = x(shock_ind)    
+
+    !   mach = ABS(v(:ncell-1)/vsound(:ncell-1))
+    !   mach_threshold = maxval(mach)/2.
+
+    !   do i=minv,1,-1
+    !     if (mach(i).lt.mach_threshold) then
+    !         shock_ind = i
+    !         shock_x = x(i)            
+    !         EXIT
+    !     endif
+    !   enddo
 
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
@@ -831,7 +837,8 @@
 !                                                                       
 !--entropy conversion factor                                            
       sfac=avokb*utemp/uergg 
-!                                                                       
+!           
+      print*, 'I am eosglf!'                                                            
       do k=1,ncell 
          tempk=temp(k) 
          rhok=rho(k)*udens 
@@ -938,7 +945,7 @@
             call nados(tempk,dens,zbark,abar2,pel,eel,sel,              &
      &                  ptot,etot,stot,dpt,det,dpd,ded,gamsl,etak)      
             dens=rho(k) 
-            call coulomb(dens,zbark,yek,ucoul,pcoul) 
+            call coulomb(dens,zbark,yek,ucoul,pcoul)             
             u(k)=ucoul+ubind/uergg+etot/uou1 
             xp(k)=xpk 
             xn(k)=xnk 
@@ -956,7 +963,7 @@
             endif 
             !print *,'change occured at cell',k,ifleos(k)
          endif 
-!                                                                       
+!                                                                    
       enddo 
 !      write(*,100) rhomax,kount12,kount21,kount23,kount32              
 !  100 format('eosflg: rhomax, 1->2, 2->1, 2->3, 3->2',1pe10.2,4(1x,I4))
@@ -1221,7 +1228,7 @@
          vsmax=dmax1(vsmax,vsound(k)) 
          tempmx=dmax1(tempmx,temp(k)) 
          tempmn=dmin1(tempmn,temp(k)) 
-!                                                                       
+!         
       enddo 
 
     !  k = k-1              
@@ -1257,7 +1264,7 @@
               real*8 xenr,xprs,xent,xcs2,xdedt,xmunu
               real*8 xdpderho,xdpdrhoe
               real*8 xabar,xzbar,xmu_e,xmu_n,xmu_p,xmuhat_table
-              real*8 xxa,xxh,xxn,xxp              
+              real*8 xxa,xxh,xxn,xxp 
               integer keytemp,keyerr
         !                                                                       
               double precision umass 
@@ -1319,13 +1326,16 @@
               ifign(:) = .false.  
               
               276 format(A,I4,1p,20(E10.3))
-
-              do k=1,ncell             
+              
+              !print*,"minval u", minval(u)*uergg
+              
+              do k=1,ncell                 
                  xrho = rho(k)*udens
                  xenr = u(k)*uergg
                  xtemp= temp(k)*utemp*boltzmev
                  xye  = ye_table(k)
                  xent = u2(k)/sfac
+                 !print*, '---',k, xenr
 
                 !  if (k==ncell) then
                     ! write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye_table(k), &
@@ -1337,28 +1347,33 @@
                  ! set upper and lower bounds based on SFHo table limits
                  if (xye  .gt.0.59999)  xye   = 0.59999
                  if (xrho .lt.166.054)  then
-                    print*, 'xrho hit min', i
+                    print*, 'xrho hit min', k
                     xrho  = 166.054
                  endif
                  if (xtemp.lt.0.01) then
-                    print*, 'xtemp hit min', i
+                    print*, 'xtemp hit min', k
                     xtemp = 0.01
                  endif   
                  if (xent .lt.0.000131) then
-                    print*, 'xent hit min', i
+                    print*, 'xent hit min', k
                     xent  = 0.000131  
                  endif
+                 !if (xenr .lt.-1.d17) then
+                    !print*, 'xenr hit min', k
+                 !   xenr  = -1.d17
+                 !endif
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
                     stop "ERROR: xye < 0"
                  endif 
 
-                !  print*, '--- In ---'
+                !  print*, '--- In ---', k
                 !  print*, 'xtemp', xtemp
                 !  print*, 'xrho ', xrho
                 !  print*, 'xent ', xent
-                !  print*, 'xye   ', xye
+                !  print*, 'xenr ', xenr
+                !  print*, 'xye  ', xye
         !                                                                       
         !--SFHo EOS tables                                               
         !              
@@ -1372,7 +1387,8 @@
                 !  print*, 'xtemp', xtemp
                 !  print*, 'xrho ', xrho
                 !  print*, 'xent ', xent
-                !  print*, 'xye   ', xye
+                !  print*, 'xenr ', xenr
+                !  print*, 'xye  ', xye
                  !                                                                       
                  !--store values - CHECK UNITS!!!                                                        
                  !                 
@@ -1396,6 +1412,7 @@
                  temp(k)  = xtemp/utemp/boltzmev
                  prold(k) = pr(k) 
                  pr(k)    = xprs/upr
+                 u(k)     = xenr/uergg
                  u2(k)    = xent*sfac
                  vsound(k)= sqrt(xcs2)/uv 
 
@@ -1405,7 +1422,7 @@
                  tempmn=dmin1(tempmn,temp(k))                    
                  
                  !if (k.eq.100) stop
-        !                          
+        !              
               enddo
 
             !  k = k-1              
