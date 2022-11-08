@@ -14,6 +14,7 @@
 
 import os
 import sys
+import time
 from subprocess import Popen, PIPE
 from mpi4py import MPI
 
@@ -28,24 +29,28 @@ def main():
     
     # --- Datasets and values to plot ---        
     vals             = [
-                        'rho', 
+                        #'rho', 
                         # 'v',
-                        # 'P',
-                        # 'T',
-                        # 'enclmass',
-                        # 'vsound',
+                        #'P',
+                        #'T',
+                        #'encm',
+                        #'vsound',
+                        #'ye',
+                        'mach',
+                        #'entropy',
                        ]        
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
-    masses           = [11.0,12.0,13.0,14.0,15.0,
-                        16.0,17.0,18.0,19.0,20.0]        
-    #masses           = [12.0,16.0,19.0,20.0]
+    masses           = [11.0]#[11.0,12.0,13.0,14.0,15.0,
+                        #16.0,17.0,18.0,19.0,20.0]        
+    #masses           = [9.0,10.0,11.0,12.0,13.0,19.0,20.0]
 
     # --- Paths & Names ---
-    datasets         = [f's{m}_g2k_c1k_p0.4k' for m in masses]
-    base_file        = f'DataOut_read'
-    base_path        = '/home/pkarpov/scratch/1dccsn/sfho_s/'
+    datasets         = [f's{m}_g2k_c1k_p0.3k' for m in masses]
+    #datasets         = [f's{m}_4k' for m in masses]
+    base_path        = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/'#test_extrema/'
     #base_path        = '/home/pkarpov/scratch/1dccsn/sleos/funiek/'
     #base_path        = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
+    base_file        = f'DataOut_read'
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
@@ -53,14 +58,14 @@ def main():
     only_post_bounce = True   # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
-    compute          = False
+    compute          = False#True
     rho_threshold    = 1e13    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
 
     # --- Plots & Movie Parameters ---
     dpi              = 60      # increase for production plots
-    make_movies      = False#True 
+    make_movies      = True 
     fps              = 10   
-    save_plot        = True    # shouldn't be touched for the mpi routine
+    save_plot        = True
     
     # === No need to go beyond this point ===========================
 
@@ -78,6 +83,9 @@ def main():
             numfiles = get_numfiles(base_path, dataset, base_file)
             
             if convert2read: numfiles = Readout(base_path, dataset, base_file).run_readable()
+            elif numfiles==0: print('ERROR: no readable files found; try setting convert2read = True'); comm.Abort()
+
+            #numfiles = 8941            
 
             print( '\n--------- Summary ---------')
             print(f'Total number of files:  {numfiles}') 
@@ -87,7 +95,12 @@ def main():
             pf = Profiles(rank = rank, numfiles = numfiles, 
                           base_path = base_path, base_file = base_file, dataset = dataset,
                           save_name_amend=save_name_amend, only_post_bounce = only_post_bounce)
-            
+
+            #bounce_shift = 0
+            #shift = 8361-1000
+            #shift = 8000
+            #numfiles = numfiles-shift
+                                    
             bounce_files = pf.check_bounce(compute=compute)
             bounce_shift = pf.bounce_ind
             if only_post_bounce: numfiles = bounce_files
@@ -106,7 +119,9 @@ def main():
             
             if leftover != 0: interval = spread_leftovers(interval, leftover, size)
             
+            
             if only_post_bounce: interval+=bounce_shift
+            #interval+=shift
             
             # creates (if needed) directories to store all plots
             if save_plot: [pf.set_paths(val, versus, check_path=True) for val in vals]
@@ -115,7 +130,7 @@ def main():
             last_file    = 0
             interval     = 0   
             bounce_shift = 0   
-
+        #continue
         numfiles = comm.bcast(last_file, root=0)
         interval = comm.scatter(interval, root=0)                
 
@@ -129,6 +144,7 @@ def main():
         print(f'rank {rank}, interval {interval}')
 
         comm.Barrier()
+        time.sleep(0.1)
         if rank == 0: print( '\n-------- Progress ---------', flush=True)
 
         # --- Main Parallel Loop ---
@@ -173,7 +189,7 @@ def main():
                     
             if make_movies:
                 print( '\n---------- Movies ----------')
-                for val in vals: pf.movie(val,fps=fps)
+                for val in vals: pf.movie(val,versus=versus,fps=fps)
                  
             print(f'<<<<<<<<<<< Done >>>>>>>>>>>\n')                
 
@@ -189,8 +205,8 @@ def spread_leftovers(interval, leftover, size):
         interval[i,1] += shift
     return interval
 
-def get_numfiles(base_path, dataset, basefile):
-    numfiles = len([filename for filename in os.listdir(f'{base_path}{dataset}') if basefile in filename])
+def get_numfiles(base_path, dataset, base_file):
+    numfiles = len([filename for filename in os.listdir(f'{base_path}{dataset}') if base_file in filename])
     return numfiles
 
 class Readout:
@@ -247,15 +263,19 @@ class ComputeRoutines:
         self.pns_ind    = 0
         self.pns_x      = 0        
         
-    def shock_radius(self):        
-                        
-        mach = abs(self.v/self.vsound)
+    def shock_radius(self):                        
+
+        self.shock_ind = np.argmin(self.v)
+        self.shock_x   = self.x[self.shock_ind]
         
-        for i in range(np.argmin(self.v),-1,-1):            
-            if mach[i] < 1:
-                self.shock_ind = i
-                self.shock_x   = self.x[self.shock_ind]
-                break
+        # mach = abs(self.v/self.vsound)
+        # mach_threshold = np.amax(mach)/2
+        
+        # for i in range(np.argmin(self.v),-1,-1):       
+        #     if mach[i] < mach_threshold:
+        #         self.shock_ind = i
+        #         self.shock_x   = self.x[self.shock_ind]
+        #         break
     
         #print('shock position: %.2e'%self.shock_x, self.shock_ind)
         return self.shock_ind, self.shock_x
@@ -336,7 +356,8 @@ class Profiles:
                 line        = file.readline()        
                 header_vals = file.readline()
                 vals_strip  = header_vals[:-1].split(' ')        
-                time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
+                try: time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
+                except: time1d, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']
                 
             pns_ind = int(pns_ind)-1              
             
@@ -366,7 +387,7 @@ class Profiles:
         mpl.style.use(style)
         mpl.rcParams.update(plot_params())  
         
-        if not label: label = ["Data {}".format(i) for i in range(len(series))]
+        if not label: label = [f'None' for i in range(len(series))]
                     
         fig = plt.figure(figsize=(10,6), dpi=self.dpi)
         ax  = fig.add_subplot(111)        
@@ -387,6 +408,7 @@ class Profiles:
             if self.only_post_bounce: ax.set_xlim(self.bounce_ind,self.numfiles)
             
         plt.tight_layout()
+        if 'None' not in label: ax.legend(loc=0)
         
         plt.savefig(save_path)        
         if not show_plot: plt.close()        
@@ -440,13 +462,11 @@ class Profiles:
         
         ax = self.plot_format(series    = plot_data,
                               xlabel    = r'$Radius \; [km]$', 
-                              ylabel    = r'$M_{enc} \; [M_{sol}]$', 
+                              ylabel    = r'$M_{enc} \; [M_{\odot}]$', 
                               title     = f'Bounce index = {self.bounce_ind+1}',
                               save_path = save_path, 
                               show_plot = show_plot,
-                              label     = labels) 
-        ax.legend(loc=0) 
-                   
+                              label     = labels)                             
         return ax        
                     
     def plot_profile(self, i, vals, versus,
@@ -459,7 +479,8 @@ class Profiles:
             line = file.readline()        
             header_vals = file.readline()
             vals_strip  = header_vals[:-1].split(' ')        
-            time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
+            try: time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
+            except: time1d, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
             self.lumnue[i] = rlumnue
             self.times[i]  = time1d    
             #print(file.readline())
@@ -482,7 +503,9 @@ class Profiles:
         ye      = ps[5]
         P       = ps[6]
         T       = ps[7]
-        vsound  = ps[8]
+        try: vsound  = ps[8]
+        except: vsound = np.ones(v.shape)
+        s       = ps[9] #entropy
         
         # Print out enclosed mass at 200km without plotting anything
         # if i == self.numfiles-1:         
@@ -495,7 +518,7 @@ class Profiles:
         for val in vals:
             if versus=='encm':
                 x         = encm
-                xlabel    = r'$M_{enc} \; [M_{sol}]$'
+                xlabel    = r'$M_{enc} \; [M_{\odot}]$'
                 xlim      = (0,3) #or (0,4)
                 plot_type = 'semilogy'
                 unit      = 1        
@@ -521,7 +544,7 @@ class Profiles:
             elif val == 'v':
                 y      = v
                 ylabel = r'Velocity $[cm/s]$'
-                ylim   = (-1e10, 1e9)
+                ylim   = (-1.2e10, 1e9)
                 loc    = 4
                 if versus == 'r': plot_type = 'semilogx'
                 elif versus == 'encm': plot_type = 'plot'                
@@ -531,7 +554,14 @@ class Profiles:
                 ylim   = (0, 1.4e10)
                 loc    = 1
                 if versus == 'r': plot_type = 'semilogx'
-                elif versus == 'encm': plot_type = 'plot'                                
+                elif versus == 'encm': plot_type = 'plot'   
+            elif val == 'mach':
+                y      = abs(v/vsound)
+                ylabel = 'Mach'
+                ylim   = (0,11)
+                loc    = 1
+                if versus == 'r': plot_type = 'semilogx'
+                elif versus == 'encm': plot_type = 'plot'                                               
             elif val == 'P':
                 y      = P
                 ylabel = r'$P_{gas} \; [\frac{g}{cm\;s^2}]$'
@@ -542,11 +572,25 @@ class Profiles:
                 ylabel = r'Temperature $[K]$'
                 ylim   = (1e7,4e11)
                 loc    = 1
-            elif val == 'enclmass':
+            elif val == 'encm':
                 y      = encm
                 ylabel = r'Enclosed Mass $[M_{\odot}]$'
-                ylim   = None
+                ylim   = (1,2)
                 loc    = 4
+                if versus == 'r': plot_type = 'semilogx'
+                elif versus == 'encm': plot_type = 'plot'                
+            elif val == 'ye':
+                y      = ye
+                ylabel = r'$Y_e$'
+                ylim   = (0,1)
+                loc    = 4   
+                if versus == 'r': plot_type = 'semilogx'
+                elif versus == 'encm': plot_type = 'plot' 
+            elif val == 'entropy':
+                y      = s
+                ylabel = r'Entropy $[k_b/baryon]$'
+                ylim   = None
+                loc    = 4                            
             else: sys.exit(f"ERROR: unknown val {val}, trying to exit")            
 
             #print('diff shock', shock_ind, np.argmin(ps[4]), shock_ind-np.argmin(ps[4]))
@@ -571,10 +615,10 @@ class Profiles:
                     
                 #print(f'shock {ps[2,int(shock_ind)]:.3e}, {shock_x:.3e}')
                 
-                pns_edge    = pns_x*unit
+                pns_edge    = x[int(pns_ind)]*unit
                 shock_front = x[int(shock_ind)]*unit
                 if versus == 'r'   : line_label = '%.2e km'          
-                if versus == 'encm': line_label = '%.3f $M_{sol}$'      
+                if versus == 'encm': line_label = '%.3f $M_{\odot}$'      
                          
                 ax.axvline(x=pns_edge,linestyle='-',color='r',linewidth=1,
                            label=f'PNS    {line_label%pns_edge}')
