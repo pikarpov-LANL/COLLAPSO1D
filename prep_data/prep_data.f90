@@ -17,6 +17,7 @@ program read
           parameter(utime=1e1) 
           parameter(uergg=1e16) 
           parameter(pi43=3.14159*4.0/3.0) 
+          parameter(iqn=17)
     !                                                                       
           parameter(idim=4000) 
     !                                                                       
@@ -33,15 +34,15 @@ program read
           common /cent/ dj(idim) 
           common /abun/ ycc 
     
-          double precision yccin(idim,20),rnorm 
-          real ycc(idim,20) 
+          double precision yccin(idim,iqn),rnorm 
+          real ycc(idim,iqn) 
     
           double precision rhocgs, tkelv, yej, abarj, ucgs, pcgs, xpj, xnj 
           double precision f3, enclmass(0:idim) 
           double precision mcut 
           double precision, allocatable :: vel(:),rad(:),dens(:),t9(:),     &
          &             yel(:),ab(:),omega(:),press(:)                       
-          double precision maxrad, deltam_growth, enclmass_conv_cutoff 
+          double precision maxrad, maxmass, deltam_growth, enclmass_conv_cutoff 
           integer max,j,i,izone,ieos
           integer conv_grid,pns_grid,pns_grid_goal,conv_grid_goal,grid_goal
           integer nlines, nkep, header_length, counter 
@@ -50,8 +51,9 @@ program read
           character*1024 filin,filout,eos_table
           character*1 ajunk       
     !                                                                                                                           
-          mcut=40. 
-          max=0                                                    
+          mcut    = 40. 
+          max     = 0 
+          maxmass = 0                                                   
     !                                                                       
     !--read options                                                         
     !                                                                       
@@ -150,36 +152,39 @@ program read
           do 10 i=1,nkep 
               if (verify('woosley',filin).eq.0) then
                 read(11,*) izone, djunk, djunk, drad, dvel, ddens, dtemp,      &
-                    djunk,djunk,djunk,domega,dabar,dyel,(yccin(i,j),j=1,19)
+                    djunk,djunk,djunk,domega,dabar,dyel,(yccin(i,j),j=1,iqn)
               elseif (verify('sukhbold',filin).eq.0) then
                 read(11,*) izone, djunk, drad, dvel, ddens, dtemp,             &
-                    djunk,djunk,djunk,domega,dabar,dyel,(yccin(i,j),j=1,19)
+                    djunk,djunk,djunk,domega,dabar,dyel,(yccin(i,j),j=1,iqn)
               endif                                               
              rnorm=0. 
-             do j=1,19 
+             do j=1,iqn
                 rnorm=rnorm+yccin(i,j) 
              end do 
-             do j=1,19 
+             do j=1,iqn
                 yccin(i,j)=yccin(i,j)/rnorm 
              end do 
     !--rescale to correct units                                             
-             rad(i)=drad/udist 
-             dens(i)=ddens/udens 
-             t9(i)=dtemp/utemp 
-             yel(i)=dyel 
-             ab(i)=dabar 
-             vel(i)=dvel/uvel 
-             omega(i)=0. 
+             rad(i)   = drad/udist 
+             dens(i)  = ddens/udens 
+             t9(i)    = dtemp/utemp 
+             yel(i)   = dyel 
+             ab(i)    = dabar 
+             vel(i)   = dvel/uvel 
+             omega(i) = 0. 
        10 continue 
           close (11) 
-          dmtot=0. 
-          rold=0. 
+          dmtot = 0. 
+          rold  = 0. 
     
           do i=1,nkep 
-             dmtot=dmtot+4.d0*3.14159258/3.d0*dens(i)*                      &
-                  (rad(i)**3-rold**3)                                                                                          
-             rold=rad(i)                 
-          end do     
+             dmtot = dmtot+4.d0*3.14159258/3.d0*dens(i)*                      &
+                     (rad(i)**3-rold**3)                                                                                          
+             rold  = rad(i)
+                               
+             if (rad(i).ge.maxrad.and.maxmass.eq.0.) maxmass=dmtot
+          end do        
+                 
     !                   
     !--use Swesty-Lattimer eos
     !   
@@ -197,24 +202,24 @@ program read
     !
     !--find the optimal deltam for the given convective region resolution      
     !
-          call search_deltam(nkep,yccin,vel,rad,dens,              &
-                             t9,yel,ab,omega,press,                &
-                             maxrad,deltam_growth,ieos,            &
-                             conv_grid,conv_grid_goal,             &
-                             enclmass_conv_cutoff,deltam_conv,     &
-                             pns_grid_goal,pns_cutoff,pns_grid)
-    !
-    !--Interpolate and setup the grid.
-    !--Growth rate past enclmass_conv_cutoff will keep  
-    !--adjusting via a binary-search-like algorithm until 
-    !--total grid size is within 1% of the idim
-    !     
-          call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
-                             t9,yel,ab,omega,press,                &
-                             maxrad,deltam_growth,ieos,            &
-                             conv_grid,enclmass_conv_cutoff,       &
-                             grid_goal,deltam_conv,                &
-                             pns_grid_goal,pns_cutoff,pns_grid)
+    !       call search_deltam(nkep,yccin,vel,rad,dens,              &
+    !                          t9,yel,ab,omega,press,                &
+    !                          maxrad,deltam_growth,ieos,            &
+    !                          conv_grid,conv_grid_goal,             &
+    !                          enclmass_conv_cutoff,deltam_conv,     &
+    !                          pns_grid_goal,pns_cutoff,pns_grid)
+    ! !
+    ! !--Interpolate and setup the grid.
+    ! !--Growth rate past enclmass_conv_cutoff will keep  
+    ! !--adjusting via a binary-search-like algorithm until 
+    ! !--total grid size is within 1% of the idim
+    ! !     
+    !       call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
+    !                          t9,yel,ab,omega,press,                &
+    !                          maxrad,deltam_growth,ieos,            &
+    !                          conv_grid,enclmass_conv_cutoff,       &
+    !                          grid_goal,deltam_conv,                &
+    !                          pns_grid_goal,pns_cutoff,pns_grid)
     
     !--if you want to avoid binary search and do the original grid setup
     !--comment the above 2 subroutine calls, and uncomment setup_grid() below
@@ -223,7 +228,15 @@ program read
         !                   t9,yel,ab,omega,press,                  &
         !                   maxrad,deltam_growth,ieos,              &
         !                   conv_grid,enclmass_conv_cutoff,         &
-        !                   deltam_conv,pns_grid_goal,pns_cutoff,pns_grid)       
+        !                   deltam_conv,pns_grid_goal,pns_cutoff,pns_grid) 
+          
+          ! resizable grid
+          call resizable_grid(nkep,yccin,vel,rad,dens,                &
+                          t9,yel,ab,omega,press,                  &
+                          maxrad,deltam_growth,ieos,              &
+                          conv_grid,enclmass_conv_cutoff,         &
+                          deltam_conv,pns_grid_goal,pns_cutoff,   &
+                          pns_grid,maxmass,conv_grid_goal,grid_goal)           
 
       102 format(20(1pe9.2)) 
       103 format(3(1pe16.8)) 
@@ -255,6 +268,7 @@ program read
           logical from_dump 
           integer idump 
           parameter (idim=4000) 
+          parameter(iqn=17)
           common /celle/ x(0:idim),v(0:idim) 
           common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
           common /numb/ ncell 
@@ -270,7 +284,7 @@ program read
           common /ener2/ tkin, tterm 
           logical te(idim), teb(idim), tx(idim) 
           common /cent/ dj(idim) 
-          real ycc(idim,20) 
+          real ycc(idim,iqn) 
           common /abun/ ycc 
           common /timei/ steps(idim) 
           common /rshock/ shock_ind, shock_x 
@@ -279,19 +293,19 @@ program read
           double precision rlumnue,rlumnueb,rlumnux,bounce_time 
           double precision pr_turb(idim) 
   !            
-          steps = 0 
-          shock_ind = 0 
-          shock_x = 0 
-          pns_ind = 0 
-          pns_x = 0 
-          idump=0 
-          bounce_time=0 
-          from_dump = .false. 
+          steps       = 0 
+          shock_ind   = 0 
+          shock_x     = 0 
+          pns_ind     = 0 
+          pns_x       = 0 
+          idump       = 0 
+          bounce_time = 0 
+          from_dump   = .false. 
   !--initialize neutrino fluxes                                           
-          rlumnue = 0 
-          rlumnueb = 0 
-          rlumnux = 0 
-          pr_turb(:) = 0 
+          rlumnue     = 0 
+          rlumnueb    = 0 
+          rlumnux     = 0 
+          pr_turb(:)  = 0 
   !                      
           nc = ncell 
           do i=1,nc 
@@ -299,28 +313,27 @@ program read
                 print*, "ERROR: u(i) is 0 at i=",i
                 stop 
               endif
-              ynue(i)=0. 
-              ynueb(i)=0. 
-              ynux(i)=0. 
-              unue(i)=0. 
-              unueb(i)=0. 
-              unux(i)=0. 
-              te(i)=.false. 
-              teb(i)=.false. 
-              tx(i)=.false. 
-              q(i)=0. 
-              dq(i)=0. 
+              ynue(i)  = 0. 
+              ynueb(i) = 0. 
+              ynux(i)  = 0. 
+              unue(i)  = 0. 
+              unueb(i) = 0. 
+              unux(i)  = 0. 
+              te(i)    = .false. 
+              teb(i)   = .false. 
+              tx(i)    = .false. 
+              q(i)     = 0. 
+              dq(i)    = 0. 
           enddo 
-          rb=9e-3 
-          gc=0.0001 
-          ftrap=1. 
-          fe=ftrap 
-          fb=ftrap 
-          fx=ftrap 
+          rb    = 9e-3 
+          gc    = 0.0001 
+          ftrap = 1. 
+          fe    = ftrap 
+          fb    = ftrap 
+          fx    = ftrap 
   !                                                                       
   !--write                                                                
   !                  
-          nqn=17 
           write(29,iostat=io,err=10) idump,nc,t,gc,rb,fe,fb,fx,              &
                 pns_ind,pns_x,shock_ind,shock_x,                             &
                 bounce_time,from_dump,rlumnue,rlumnueb,rlumnux,              &
@@ -333,7 +346,7 @@ program read
                 (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),            &
                 (dj(i),i=1,nc),                                              &
                 (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),               &
-                (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),               &
+                (steps(i),i=1,nc),((ycc(i,j),j=1,iqn),i=1,nc),               &
                 (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)                       
   !                                                     
         ! print*, 'abar max & min: ', maxval(abar), minval(abar)
@@ -343,7 +356,7 @@ program read
         ! print*, 'ye', ye(1), ye(nc-5:nc)
         ! print*, 'abar:', abar(1), abar(nc-5:nc)
           do i=1,ncell 
-              write (43,103) (ycc(i,j),j=1,19) 
+              write (43,103) (ycc(i,j),j=1,iqn) 
           end do 
       102 format(I4,4(1pe14.4),I3) 
       103 format(19(1pe12.4)) 
@@ -354,7 +367,214 @@ program read
        10 print *,'an error has occured while writing' 
   !                                                                       
           return 
-          END                                           
+          END         
+
+          subroutine resizable_grid(nkep,yccin,vel,rad,dens,                   &
+                                    t9,yel,ab,omega,press,                     &
+                                    maxrad,deltam_growth,ieos,                 &
+                                    conv_grid,enclmass_conv_cutoff,            &
+                                    deltam_conv,pns_grid_goal,pns_cutoff,      &
+                                    pns_grid,maxmass,conv_grid_goal,grid_goal)                         
+!****************************************************************              
+!                                                               *              
+! Woosely's code has nkep cells.  I want to make my code        *       
+! whatever number of cells I like.  I use an average of         *      
+! adjacent cells to calculate the important values of my code.  *       
+!                                                               *              
+!****************************************************************                                  
+            implicit double precision (a-h, o-z) 
+            !                                                                       
+            parameter(utemp = 1e9) 
+            parameter(udens = 2e6) 
+            parameter(uvel  = 1e8) 
+            parameter(udist = 1e9) 
+            parameter(utime = 1e1) 
+            parameter(uergg = 1e16) 
+            parameter(pi43  = 3.14159*4.0/3.0) 
+            !                                                                       
+            parameter(idim  = 4000) 
+            parameter(iqn=17)
+            !                                                                       
+            common /celle/ x(0:idim),v(0:idim) 
+            common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
+            common /numb/ ncell 
+            common /nustuff/ ynue(idim),ynueb(idim),ynux(idim),        &
+                             unue(idim),unueb(idim),unux(idim)                  
+            common /eosq / pr(idim), vsound(idim), u2(idim), vsmax 
+            common /carac/ deltam(idim), abar(idim) 
+            common /state/ xp(idim), xn(idim), eta(idim), ifleos(idim) 
+            common /freez/ ufreez(idim) 
+            common /tempe/ temp(idim) 
+            common /cent/ dj(idim) 
+            common /abun/ ycc 
+    
+            dimension vel(nkep),rad(nkep),dens(nkep),t9(nkep),        &
+                      yel(nkep),ab(nkep),omega(nkep),press(nkep) 
+            dimension yccin(idim,iqn)
+    
+            real ycc(idim,iqn) 
+            double precision rhocgs, tkelv, yej, abarj, ucgs, pcgs, xpj, xnj 
+            double precision enclmass(0:idim)                       
+            double precision maxrad, maxmass
+            double precision deltam_growth, deltam_conv, pns_growth
+            double precision exact_pns_cutoff      
+    
+            logical beyond_focus
+            integer nkep,ieos,conv_grid,pns_grid,focus_i
+            integer pns_grid_goal, conv_grid_goal, grid_goal
+                 
+            pns_grid     = 0
+            conv_grid    = 0
+            beyond_focus = .false.         
+            pns_counter  = 0                                                        
+            x(0)         = 0.d0 
+            v(0)         = 0.d0 
+            enclmass(0)  = 0.d0 
+
+            ! calculate by how much to raise deltam(1) for the PNS based on
+            ! the given PNS mass cutoff and pns_grid_goal from setup
+            print*, 'pns cutoff, grid goal, deltam_conv', pns_cutoff,pns_grid_goal,deltam_conv
+            
+            deltam_init_fac = 2*pns_cutoff/(pns_grid_goal*deltam_conv)-1
+            deltam(1)       = deltam_init_fac*deltam_conv
+            pns_growth      = (deltam(1)-deltam_conv)/pns_grid_goal
+            print*, 'deltam(1)', deltam(1), pns_growth
+            
+  
+            ! the actual pns mass cutoff will deviate slightly due to 
+            ! a numerical error - calculate the exact pns cutoff
+            exact_pns_cutoff = deltam(1)
+            do i=1,pns_grid_goal
+              exact_pns_cutoff = exact_pns_cutoff+(deltam(1)-pns_growth*i)
+            enddo
+            print*, 'exact pns cutoff', exact_pns_cutoff
+            !stop
+    
+            do i=1,idim 
+              do k=1,nkep 
+                if (rad(k).gt.x(i-1)) goto 20 
+              end do 
+       20    continue 
+    
+             if (k.eq.1) then !-- for k=1, we can not use cell k-1                         
+                ind      = k
+                fac      = x(i-1)/rad(1) 
+                fac1     = 1-fac
+                fac2     = fac
+                facomei1 = fac1
+                facomei2 = fac2
+             else !--for all other k      
+                ind      = k-1
+                fac      = (rad(k)-x(i-1))/(rad(k)-rad(k-1)) 
+                fac1     = fac
+                fac2     = 1-fac
+                facomei1 = fac2
+                facomei2 = fac1
+             endif
+    
+            rho(i)  = 0.5*(fac1*dens(ind) + dens(k) + fac2*dens(k+1))
+            v(i)    = 0.5*(fac1*vel(ind)  + vel(k)  + fac2*vel(k+1))
+            temp(i) = 0.5*(fac1*t9(ind)   + t9(k)   + fac2*t9(k+1))
+            ye(i)   = 0.5*(fac1*yel(ind)  + yel(k)  + fac2*yel(k+1))
+            abar(i) = 0.5*(fac1*ab(ind)   + ab(k)   + fac2*ab(k+1))
+            x(i)    = (x(i-1)**3+deltam(i)/(pi43*rho(i)))**0.3333333333 
+            
+            do j=1,iqn 
+                ycc(i,j) = 0.5*(fac1*yccin(ind,j)+yccin(k,j)+fac2*yccin(k+1,j))
+            end do 
+            
+            if (k.eq.1) then
+                ycc(i,3)  = ycc(i,1) 
+                do j=6,15 
+                  ycc(i,j) = ycc(i,j+1) 
+                end do 
+            endif
+                                                                            
+            omei  = 0.5*(facomei1*omega(k) + omega(k) + facomei2*omega(k+1))
+            dj(i) = omei*x(i)*x(i) 
+            
+            enclmass(i) = enclmass(i-1) + deltam(i) 
+    !                                                                        
+    !--Adjust the grid here, choose a focus region
+    !                                    
+            ! PNS linearly increasing mass resolution
+            !if (enclmass(i).lt.exact_pns_cutoff) then
+            if (enclmass(i).lt.exact_pns_cutoff) then
+                pns_grid    = pns_grid+1              
+                deltam(i+1) = deltam(1)-pns_growth*i
+  
+            ! Static high resolution in the Convective region
+            elseif (enclmass(i).ge.exact_pns_cutoff.and.            &
+                    conv_grid.lt.conv_grid_goal) then
+                conv_grid   = conv_grid+1
+                deltam(i+1) = deltam_conv
+                      
+            ! Exponential growth beyond convection region
+            else
+                if (beyond_focus.eqv..false.) then
+                    beyond_focus  = .true.
+                    conv_grid_end = i
+
+                    ! calculate exponential deltam growth in the outer region
+                    deltam_growth = (maxmass/enclmass(conv_grid_end))**(1./real(grid_goal-conv_grid_end-1))-1
+                endif  
+                ! exponential growth of deltam with a set growth rate
+                deltam(i+1) = enclmass(conv_grid_end)*(1+deltam_growth)**(i-conv_grid_end)-enclmass(i-1)
+  
+            end if 
+    !                                                                       
+    !--call eos                                                             
+    !                                                                       
+            rhocgs = dble(rho(i)*udens) 
+            tkelv  = dble(temp(i)*utemp) 
+            yej    = dble(ye(i)) 
+            abarj  = dble(abar(i)) 
+            iflag  = 0 
+    
+            ! choose either Swesty-Lattimer or SFHo Tables EOS
+            if (ieos.eq.4) then
+                call eosgen(i,iflag,rhocgs,tkelv,yej,abarj,                 &
+                            ucgs,pcgs,xpj,xnj,scgs)                                
+            elseif (ieos.eq.5) then
+                call eos5(i,rho,u,temp,ye,rhocgs,tkelv,yej,            &
+                            abarj,ucgs,pcgs,xpj,xnj,scgs,iflag)       
+            endif
+  
+            u(i)  = ucgs/uergg 
+            pr(i) = pcgs/uergg/udens 
+            u2(i) = scgs/uergg*utemp 
+  
+            if (iflag.eq.1.) then 
+                if (abarj.lt.2.5) then 
+                    ufr =-3.3d17/uergg 
+                elseif (abarj.lt.4.5) then 
+                    ufr =-6.1d17/uergg 
+                elseif (abarj.lt.20.) then 
+                    ufr =-7.7d18/uergg 
+                else 
+                    ufr =-8.4d18/uergg 
+                endif 
+            else 
+                ufr=0.0 
+            endif 
+  
+            ufreez(i) = ufr 
+            ifleos(i) = iflag 
+            xp(i)     = xpj 
+            xn(i)     = xnj 
+            
+            if (enclmass(i).ge.maxmass) then  
+                print*, x(i), enclmass(i)               
+                ncell = i 
+                goto 50 
+            end if
+            
+          enddo 
+    !                  
+          50 continue         
+           return
+           end        
+          
 
   
           subroutine setup_grid(nkep,yccin,vel,rad,dens,                   &
@@ -371,15 +591,16 @@ program read
 !****************************************************************                                  
           implicit double precision (a-h, o-z) 
           !                                                                       
-          parameter(utemp=1e9) 
-          parameter(udens=2e6) 
-          parameter(uvel=1e8) 
-          parameter(udist=1e9) 
-          parameter(utime=1e1) 
-          parameter(uergg=1e16) 
-          parameter(pi43=3.14159*4.0/3.0) 
+          parameter(utemp = 1e9) 
+          parameter(udens = 2e6) 
+          parameter(uvel  = 1e8) 
+          parameter(udist = 1e9) 
+          parameter(utime = 1e1) 
+          parameter(uergg = 1e16) 
+          parameter(pi43  = 3.14159*4.0/3.0) 
           !                                                                       
-          parameter(idim=4000) 
+          parameter(idim  = 4000) 
+          parameter(iqn=17)
           !                                                                       
           common /celle/ x(0:idim),v(0:idim) 
           common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
@@ -395,10 +616,10 @@ program read
           common /abun/ ycc 
   
           dimension vel(nkep),rad(nkep),dens(nkep),t9(nkep),        &
-          yel(nkep),ab(nkep),omega(nkep),press(nkep) 
-          dimension yccin(idim,20)
+                    yel(nkep),ab(nkep),omega(nkep),press(nkep) 
+          dimension yccin(idim,iqn)
   
-          real ycc(idim,20) 
+          real ycc(idim,iqn) 
           double precision rhocgs, tkelv, yej, abarj, ucgs, pcgs, xpj, xnj 
           double precision enclmass(0:idim)                       
           double precision maxrad, deltam_growth, deltam_conv, pns_growth
@@ -408,13 +629,13 @@ program read
           integer nkep,ieos,conv_grid,pns_grid,focus_i
           integer pns_grid_goal
                
-          pns_grid      = 0
-          conv_grid     = 0
-          beyond_focus  = .false.         
-          pns_counter   = 0                                                        
-          x(0)          = 0.d0 
-          v(0)          = 0.d0 
-          enclmass(0)   = 0.d0 
+          pns_grid     = 0
+          conv_grid    = 0
+          beyond_focus = .false.         
+          pns_counter  = 0                                                        
+          x(0)         = 0.d0 
+          v(0)         = 0.d0 
+          enclmass(0)  = 0.d0 
 
           ! calculate by how much to raise deltam(1) for the PNS based on
           ! the given PNS mass cutoff and pns_grid_goal from setup
@@ -422,7 +643,7 @@ program read
           deltam(1)       = deltam_init_fac*deltam_conv
           pns_growth      = (deltam(1)-deltam_conv)/pns_grid_goal
 
-          ! the actual pns mass cutoff will vary deviate slightly due to 
+          ! the actual pns mass cutoff will deviate slightly due to 
           ! a numerical error - calculate the exact pns cutoff
           exact_pns_cutoff = deltam(1)
           do i=1,pns_grid_goal
@@ -444,42 +665,33 @@ program read
               facomei2 = fac2
            else !--for all other k      
               ind      = k-1
-              fac      =-(x(i-1)-rad(k))/(rad(k)-rad(k-1)) 
+              fac      = (rad(k)-x(i-1))/(rad(k)-rad(k-1)) 
               fac1     = fac
               fac2     = 1-fac
               facomei1 = fac2
               facomei2 = fac1
            endif
   
-          rho(i)  = fac1*0.5*dens(ind) +                              &
-                        0.5*dens(k)+fac2*0.5*dens(k+1)
-          v(i)    = fac1*0.5*vel(ind) +                               &
-                        0.5*vel(k)+fac2*0.5*vel(k+1)
-          temp(i) = fac1*0.5*t9(ind) +                                &
-                        0.5*t9(k)+fac2*0.5*t9(k+1)
-          ye(i)   = fac1*0.5*yel(ind) +                               &
-                        0.5*yel(k)+fac2*0.5*yel(k+1)
-          abar(i) = fac1*0.5*ab(ind) +                                &
-                        0.5*ab(k)+fac2*0.5*ab(k+1)
+          rho(i)  = 0.5*(fac1*dens(ind) + dens(k) + fac2*dens(k+1))
+          v(i)    = 0.5*(fac1*vel(ind)  + vel(k)  + fac2*vel(k+1))
+          temp(i) = 0.5*(fac1*t9(ind)   + t9(k)   + fac2*t9(k+1))
+          ye(i)   = 0.5*(fac1*yel(ind)  + yel(k)  + fac2*yel(k+1))
+          abar(i) = 0.5*(fac1*ab(ind)   + ab(k)   + fac2*ab(k+1))
           x(i)    = (x(i-1)**3+deltam(i)/(pi43*rho(i)))**0.3333333333 
           
-          do j=1,19 
-              ycc(i,j)=fac1*0.5*yccin(ind,j) +                        &
-                  0.5*yccin(k,j)+fac2*0.5*yccin(k+1,j)
+          do j=1,iqn 
+              ycc(i,j) = real(0.5*(fac1*yccin(ind,j)+yccin(k,j)+fac2*yccin(k+1,j)))
           end do 
           
           if (k.eq.1) then
-              ycc(i,3)=ycc(i,1) 
+              ycc(i,3)  = ycc(i,1) 
               do j=6,15 
-                ycc(i,j)=ycc(i,j+1) 
+                ycc(i,j) = ycc(i,j+1) 
               end do 
-              ycc(i,16)=ycc(i,18) 
-              ycc(i,17)=ycc(i,19)
           endif
                                                                           
-          omei=facomei1*0.5*omega(k) +                                &
-                 0.5*omega(k)+facomei2*0.5*omega(k+1)                        
-          dj(i)=omei*x(i)*x(i) 
+          omei  = 0.5*(facomei1*omega(k) + omega(k) + facomei2*omega(k+1))
+          dj(i) = omei*x(i)*x(i) 
           
           enclmass(i) = enclmass(i-1) + deltam(i) 
   !                                                                        
@@ -501,7 +713,7 @@ program read
           else
               if (beyond_focus.eqv..false.) then
                   beyond_focus = .true.
-                  focus_i = i
+                  focus_i      = i
               endif
 
               ! exponential growth of deltam with a set growth rate
@@ -532,13 +744,13 @@ program read
 
           if (iflag.eq.1.) then 
               if (abarj.lt.2.5) then 
-                  ufr=-3.3d17/uergg 
+                  ufr =-3.3d17/uergg 
               elseif (abarj.lt.4.5) then 
-                  ufr=-6.1d17/uergg 
+                  ufr =-6.1d17/uergg 
               elseif (abarj.lt.20.) then 
-                  ufr=-7.7d18/uergg 
+                  ufr =-7.7d18/uergg 
               else 
-                  ufr=-8.4d18/uergg 
+                  ufr =-8.4d18/uergg 
               endif 
           else 
               ufr=0.0 
@@ -550,7 +762,7 @@ program read
           xn(i)     = xnj 
           
           if (x(i).gt.maxrad) then 
-              ncell=i 
+              ncell = i 
               goto 50 
           end if
           
@@ -577,9 +789,10 @@ program read
          implicit double precision (a-h, o-z) 
 
          parameter(idim=4000)
+         parameter(iqn=17)
          dimension vel(nkep),rad(nkep),dens(nkep),t9(nkep),            &
                    yel(nkep),ab(nkep),omega(nkep),press(nkep) 
-         dimension yccin(idim,20)
+         dimension yccin(idim,iqn)
          
          common /carac/ deltam(idim), abar(idim)
  
@@ -593,9 +806,9 @@ program read
 
          print *,'------- Search for conv deltam --------'
          initial_growth = .true.
-         adjust_deltam = 1.d1
-         counter = 1
-         low = 0.0
+         adjust_deltam  = 1.d1
+         counter        = 1
+         low            = 0.0
          
          do while (.true.)         
  
@@ -618,18 +831,18 @@ program read
              
              elseif (conv_grid.lt.conv_grid_goal) then            
                  if (.not.initial_growth) then
-                     low = adjust_deltam
-                     deltam_conv = deltam_conv*adjust_deltam           
+                     low           = adjust_deltam
+                     deltam_conv   = deltam_conv*adjust_deltam           
                      adjust_deltam = adjust_deltam + (high-adjust_deltam)*0.5                
                  endif
                  deltam_conv = deltam_conv/adjust_deltam
  
              elseif (conv_grid.gt.conv_grid_goal.or.conv_grid.eq.0) then
                  if (initial_growth) initial_growth = .false.
-                 high = adjust_deltam
-                 deltam_conv = deltam_conv*adjust_deltam
+                 high          = adjust_deltam
+                 deltam_conv   = deltam_conv*adjust_deltam
                  adjust_deltam = adjust_deltam - (adjust_deltam-low)*0.5
-                 deltam_conv = deltam_conv/adjust_deltam
+                 deltam_conv   = deltam_conv/adjust_deltam
              endif
 
              counter = counter + 1
@@ -664,9 +877,10 @@ program read
       implicit double precision (a-h, o-z) 
   
       parameter(idim=4000)
+      parameter(iqn=17)
       dimension vel(nkep),rad(nkep),dens(nkep),t9(nkep),            &
       yel(nkep),ab(nkep),omega(nkep),press(nkep) 
-      dimension yccin(idim,20)
+      dimension yccin(idim,iqn)
   
       common /numb/ ncell
       common /carac/ deltam(idim), abar(idim)
@@ -681,10 +895,10 @@ program read
 
       print *,'---- Search for deltam growth rate ----'
       initial_growth = .true.
-      adjust_growth = 1.d1
-      counter = 1
-      low = 0.0 
-      high = -1
+      adjust_growth  = 1.d1
+      counter        = 1
+      low            = 0.0 
+      high           =-1
 
       do while (.true.) 
           ncell = 0   
@@ -706,7 +920,7 @@ program read
               write(*,'(I4,A,I6)'), counter,' Grid size: above grid_goal of', grid_goal
 
               if (.not.initial_growth) then
-                  low = adjust_growth
+                  low           = adjust_growth
                   deltam_growth = deltam_growth/adjust_growth
                   adjust_growth = adjust_growth + (high-adjust_growth)*0.5
               endif
@@ -718,7 +932,7 @@ program read
               write(*,'(I4,A,I6)'), counter, ' Grid size:', ncell
               
               if (initial_growth) initial_growth = .false.
-              high = adjust_growth
+              high          = adjust_growth
               deltam_growth = deltam_growth/adjust_growth            
               adjust_growth = adjust_growth - (adjust_growth-low)*0.5
               deltam_growth = deltam_growth*adjust_growth
@@ -819,11 +1033,11 @@ program read
       ! if (xenr.lt.0) xenr=1.265d16
 
       ! these will be in the output from the eos to final Data file
-      ucgs   = xenr
-      pcgs   = xprs
-      scgs   = xent*avokb
-      xpj    = xxp
-      xnj    = xxn
+      ucgs = xenr
+      pcgs = xprs
+      scgs = xent*avokb
+      xpj  = xxp
+      xnj  = xxn
 
       ! these effectively do nothing
       rhocgs = xrho

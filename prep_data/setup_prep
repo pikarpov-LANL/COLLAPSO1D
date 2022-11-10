@@ -1,32 +1,32 @@
 <Input File>
-sukhbold2016/s12.0_presn
+sukhbold2016/s19.0_presn
 
 <Output File>
 Data
 
 <Goal Size of the PNS>
-400
+300
 
 <Goal Size of Convective Grid>
-1000
+300
 
 <Goal Total Resolution>
-2000
+1300
 
 <Enclosed Mass Cutoff for the PNS (Msol)>
-1.1
+1.
 
 <Enclosed Mass Cutoff for Convective Region (Msol)>
-1.31
+1.48
 
 <Initial Cell Mass>
-3e-4
+5e-5
 
 <Cell Mass Growth Rate past enclosed mass cutoff>
 1e-3
 
 <Maximum Radius of the Grid (cm)>
-5e9
+2e9
 
 <EOS option>
 5
