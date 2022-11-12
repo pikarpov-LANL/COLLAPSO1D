@@ -182,7 +182,10 @@ program read
                      (rad(i)**3-rold**3)                                                                                          
              rold  = rad(i)
                                
-             if (rad(i).ge.maxrad.and.maxmass.eq.0.) maxmass=dmtot
+             if (rad(i).ge.maxrad.and.maxmass.eq.0.) then
+                maxmass=dmtot
+                print*, rad(i), maxmass
+             endif
           end do        
                  
     !                   
@@ -414,7 +417,7 @@ program read
     
             real ycc(idim,iqn) 
             double precision rhocgs, tkelv, yej, abarj, ucgs, pcgs, xpj, xnj 
-            double precision enclmass(0:idim)                       
+            double precision enclmass(0:idim), enclmass_bisection(0:idim)                      
             double precision maxrad, maxmass
             double precision deltam_growth, deltam_conv, pns_growth
             double precision exact_pns_cutoff      
@@ -422,39 +425,41 @@ program read
             logical beyond_focus
             integer nkep,ieos,conv_grid,pns_grid,focus_i
             integer pns_grid_goal, conv_grid_goal, grid_goal
+            double precision :: deltam_check(idim)
+            integer          :: tmp(1), counter
+            double precision :: low, high
                  
-            pns_grid     = 0
-            conv_grid    = 0
+            pns_grid     = 1
+            conv_grid    = 1
             beyond_focus = .false.         
             pns_counter  = 0                                                        
             x(0)         = 0.d0 
             v(0)         = 0.d0 
             enclmass(0)  = 0.d0 
+            low          = 0
+            high         = 0
 
             ! calculate by how much to raise deltam(1) for the PNS based on
             ! the given PNS mass cutoff and pns_grid_goal from setup
-            print*, 'pns cutoff, grid goal, deltam_conv', pns_cutoff,pns_grid_goal,deltam_conv
             
             deltam_init_fac = 2*pns_cutoff/(pns_grid_goal*deltam_conv)-1
             deltam(1)       = deltam_init_fac*deltam_conv
-            pns_growth      = (deltam(1)-deltam_conv)/pns_grid_goal
-            print*, 'deltam(1)', deltam(1), pns_growth
-            
+            pns_growth      = (deltam(1)-deltam_conv)/pns_grid_goal            
   
             ! the actual pns mass cutoff will deviate slightly due to 
             ! a numerical error - calculate the exact pns cutoff
-            exact_pns_cutoff = deltam(1)
-            do i=1,pns_grid_goal
-              exact_pns_cutoff = exact_pns_cutoff+(deltam(1)-pns_growth*i)
-            enddo
-            print*, 'exact pns cutoff', exact_pns_cutoff
+            ! exact_pns_cutoff = deltam(1)
+            ! do i=1,pns_grid_goal
+            !   exact_pns_cutoff = exact_pns_cutoff+(deltam(1)-pns_growth*i)
+            ! enddo
+            ! print*, 'exact pns cutoff', exact_pns_cutoff
             !stop
     
             do i=1,idim 
               do k=1,nkep 
                 if (rad(k).gt.x(i-1)) goto 20 
               end do 
-       20    continue 
+       20    continue              
     
              if (k.eq.1) then !-- for k=1, we can not use cell k-1                         
                 ind      = k
@@ -499,13 +504,14 @@ program read
     !                                    
             ! PNS linearly increasing mass resolution
             !if (enclmass(i).lt.exact_pns_cutoff) then
-            if (enclmass(i).lt.exact_pns_cutoff) then
+            counter = 0
+            if (i.lt.pns_grid_goal) then
                 pns_grid    = pns_grid+1              
                 deltam(i+1) = deltam(1)-pns_growth*i
   
             ! Static high resolution in the Convective region
-            elseif (enclmass(i).ge.exact_pns_cutoff.and.            &
-                    conv_grid.lt.conv_grid_goal) then
+            !elseif (enclmass(i).ge.exact_pns_cutoff.and.            &
+            elseif (conv_grid.lt.conv_grid_goal) then
                 conv_grid   = conv_grid+1
                 deltam(i+1) = deltam_conv
                       
@@ -514,14 +520,38 @@ program read
                 if (beyond_focus.eqv..false.) then
                     beyond_focus  = .true.
                     conv_grid_end = i
+                    
+                    ! find exponential deltam growth in the outer region via bisection
+                    n             = real(grid_goal-(conv_grid_end+1))
+                    deltam_growth = (2.*(maxmass-enclmass(conv_grid_end))/(deltam_conv*n)-1)**(1./n)-1
 
-                    ! calculate exponential deltam growth in the outer region
-                    deltam_growth = (maxmass/enclmass(conv_grid_end))**(1./real(grid_goal-conv_grid_end-1))-1
+                    enclmass_bisection(:) = enclmass(conv_grid_end)
+
+                    low  = deltam_growth
+                    high = deltam_growth*2
+                    do while (abs(maxval(enclmass_bisection)-maxmass).ge.1e-8)
+                        do j=(conv_grid_end+1),grid_goal-1
+                            deltam(j) = deltam_conv*(1+deltam_growth)**(j-conv_grid_end)
+                            enclmass_bisection(j) = enclmass_bisection(j-1)+deltam(j)
+                        enddo                        
+
+                        if (maxval(enclmass_bisection).gt.maxmass) then
+                            high = deltam_growth
+                        else
+                            low  = deltam_growth
+                        endif
+
+                        deltam_growth = (high+low)/2.
+                        counter = counter +1                        
+                    enddo
+                    print*, 'Converged on growth-rate after shock in', counter
                 endif  
                 ! exponential growth of deltam with a set growth rate
-                deltam(i+1) = enclmass(conv_grid_end)*(1+deltam_growth)**(i-conv_grid_end)-enclmass(i-1)
+                deltam(i+1)   = deltam_conv*(1+deltam_growth)**(i-conv_grid_end)
+                !deltam(i+1) = enclmass(conv_grid_end)*(1+deltam_growth)**(i-conv_grid_end)-enclmass(i-1)
   
             end if 
+            !stop
     !                                                                       
     !--call eos                                                             
     !                                                                       
@@ -564,14 +594,31 @@ program read
             xn(i)     = xnj 
             
             if (enclmass(i).ge.maxmass) then  
-                print*, x(i), enclmass(i)               
+                print*, 'i, x, enclmass', i ,x(i), enclmass(i)               
                 ncell = i 
                 goto 50 
             end if
             
-          enddo 
+          enddo           
     !                  
           50 continue         
+
+        !   deltam_check      = nint(deltam(:)*1e8)
+        !   tmp = minloc(deltam_check(:ncell))
+        !   print*, 'New start', tmp(1),deltam(tmp(1)-1),deltam(tmp(1))
+        !   do i=tmp(1),tmp(1)+302            
+        !     if ((deltam_check(i+1).eq.deltam_check(i)).eqv..false.) then            
+        !        print*, 'New False', i, deltam(i),deltam(i+1)
+        !        print*, deltam(i+1:i+10)
+        !        print*, deltam(ncell)
+        !        print*, 'deltam growth', deltam_growth
+        !        print*, 'ecnlmass conv end', enclmass(conv_grid_end), conv_grid_end
+        !        !print*, deltam(i:ncell)
+        !        exit
+        !     endif
+        !   enddo         
+          !stop    
+
            return
            end        
           

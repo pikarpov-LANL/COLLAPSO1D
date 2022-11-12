@@ -153,7 +153,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx, mlin_grid_size
       character*1024 mlmodel_name
-      logical post_bounce
+      logical post_bounce, first_bounce
 
       parameter (idim = 4000) 
       parameter (idim1 = idim+1) 
@@ -197,16 +197,20 @@
       common /mlmod/ mlmodel_name
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /interp/ mlin_grid_size
       common /mlout/ pr_turb(idim1)
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !
 !--resize grid based on the shock position
-!      
-      call resize_grid(ncell,x,v,u,rho,ye)
-      
+!     
+      if (first_bounce.eqv..true.) then
+        call shock_radius(ncell,x,v,vsound,print_nuloss)
+        !print*, 'shock_ind', shock_ind
+        call resize_grid(ncell,x,v,u,rho,ye)   
+        stop
+      endif
 !                                        
 !--compute density                                                      
 ! ---------------------------------------------------------             
@@ -394,7 +398,7 @@
       common /rshock/ shock_ind, shock_x
       common /units/ umass, udist, udens, utime, uergg, uergcc
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg
-      double precision :: enclmass(0:ncell)
+      double precision :: enclmass(0:ncell), enclmass_bisection(0:ncell)
       double precision :: new_deltam(idim)
       double precision :: new_x(0:idim), new_v(0:idim)
       double precision :: new_u(idim), new_rho(idim), new_ye(idim)
@@ -403,16 +407,38 @@
       real             :: new_ycc(idim,iqn)
       logical          :: beyond_focus
       integer          :: pns_grid_end, conv_grid_end
+
+      ! grid point that should try to allign with the shock position;
+      ! by default, it is at 2/3 of the high resolution region
+      integer          :: anchor, anchor_ar(1)
+      integer          :: tmp(1), conv_grid, pns_grid, counter
+      double precision :: deltam_check(idim)
+      double precision :: total_mass, deltam_growth, low, high
+
+      deltam_check      = nint(deltam(:)*1e8)
+      
+      tmp = minloc(deltam_check(:ncell))
+      print*, 'Old start', tmp(1)
+      do i=tmp(1),tmp(1)+302            
+        if ((deltam_check(i).eq.deltam_check(i+1)).eqv..false.) then            
+           print*,'Old False', i
+           exit
+        endif
+      enddo 
+
       !-----------                  
       beyond_focus = .false.
       pns_counter  = 0                                                        
       new_x(0)     = 0.d0 
       new_v(0)     = 0.d0 
       enclmass(0)  = 0.d0    
+      pns_grid     = 1
+      conv_grid    = 1
+      counter      = 0
       
       deltam_conv       = 5e-5 ! in Msol, which should be in code units
       shock_grid_goal   = 300  ! grab from setup
-      shock_ind         = 500  ! def delete this
+      !shock_ind         = 501  ! def delete this
 
       ! --- New Algorithm ---
       ! --- Calculate a new mass grid first ---
@@ -425,9 +451,32 @@
       enddo
 
       ! 2/3 before and 1/3 after the shock (goal specified in setup)
-      before_shock_grid = int(2./3.*shock_grid_goal)
-      after_shock_grid  = int(1./3.*shock_grid_goal)      
-      pns_grid_end      = int(shock_ind-before_shock_grid)
+      before_shock_grid = int(2./3.*shock_grid_goal)+1
+      after_shock_grid  = int(1./3.*shock_grid_goal)  
+
+      !deltam            = real(deltam)
+      anchor_ar         = minloc(deltam_check(:ncell))+before_shock_grid-2
+      anchor            = anchor_ar(1) ! Fortran is trully the worst
+      
+    !   print*, 'min deltam', minloc(deltam(:ncell)), size(minloc(deltam(:ncell)))
+    !   print*, deltam(minloc(deltam(:ncell)))
+    !   print*, deltam(minloc(deltam(:ncell))-1),deltam(minloc(deltam(:ncell))+1)
+    !   print*, 'eq', deltam(minloc(deltam(:ncell))).eq.deltam(minloc(deltam(:ncell))+1)
+    !   print*, 'lt', deltam(minloc(deltam(:ncell))).lt.deltam(minloc(deltam(:ncell))+1)
+    !   print*, 'anchor, shock', anchor, int(shock_ind)
+
+      print*, 'anchor old', anchor
+      if (anchor.lt.shock_ind) then
+        anchor = anchor+1
+      elseif (anchor.gt.shock_ind) then
+        anchor = anchor-1
+      else
+        return
+      endif
+      print*, 'anchor new', anchor, int(shock_ind)
+      !stop
+
+      pns_grid_end      = int(anchor-before_shock_grid)
       conv_grid_end     = pns_grid_end+shock_grid_goal
       pns_cutoff        = enclmass(before_shock_grid)      
 
@@ -498,27 +547,46 @@
           ! PNS linearly increasing mass resolution
           !if (enclmass(i).lt.exact_pns_cutoff) then
           if (i.le.pns_grid_end) then
-              !pns_grid    = pns_grid+1              
+              pns_grid    = pns_grid+1              
               deltam(i+1) = deltam(1)-pns_growth*i  
   
           ! Static high resolution in the Convective region
           !elseif (enclmass(i).le.enclmass_conv_cutoff) then
-          elseif (i.le.conv_grid_end) then
-              !conv_grid   = conv_grid+1
+          elseif (i.lt.conv_grid_end) then
+              conv_grid   = conv_grid+1
               deltam(i+1) = deltam_conv  
-              print*,'conv', enclmass(i), deltam(i)
           ! Exponential growth beyond convection region
           else
               if (beyond_focus.eqv..false.) then
                   beyond_focus = .true.
-                  !focus_i      = i
 
-                  ! calculate exponential deltam growth in the outer region
-                  mass_growth = (total_mass/enclmass(conv_grid_end))**(1./real(ncell-conv_grid_end))-1
-                  print*, 'enclmass tot, last conv', total_mass, enclmass(conv_grid_end)
-              endif  
+                  ! find exponential deltam growth in the outer region via bisection
+                  n             = real(ncell-(conv_grid_end+1))
+                  deltam_growth = (2.*(total_mass-enclmass(conv_grid_end))/(deltam_conv*n)-1)**(1./n)-1                  
+                  enclmass_bisection(:) = enclmass(conv_grid_end)
+
+                  low  = deltam_growth
+                  high = deltam_growth*2
+                  do while (abs(maxval(enclmass_bisection)-total_mass).ge.1e-8)
+                      do j=(conv_grid_end+1),ncell-1
+                          deltam(j) = deltam_conv*(1+deltam_growth)**(j-conv_grid_end)
+                          enclmass_bisection(j) = enclmass_bisection(j-1)+deltam(j)
+                      enddo                        
+
+                      if (maxval(enclmass_bisection).gt.total_mass) then
+                          high = deltam_growth
+                      else
+                          low  = deltam_growth
+                      endif
+
+                      deltam_growth = (high+low)/2.
+                      counter = counter +1   
+                  enddo
+                  print*, 'Converged on growth-rate after shock in', counter
+              endif 
               ! exponential growth of deltam with a set growth rate
-              deltam(i+1) = enclmass(conv_grid_end)*(1+mass_growth)**(i-conv_grid_end)-enclmass(i-1)
+              deltam(i+1)   = deltam_conv*(1+deltam_growth)**(i-conv_grid_end)
+              !deltam(i+1) = enclmass(conv_grid_end)*(1+mass_growth)**(i-conv_grid_end)-enclmass(i-1)
               !deltam(i+1) = deltam(conv_grid_end)*(1+deltam_growth)**(i-conv_grid_end)  
           end if          
 
@@ -535,6 +603,15 @@
         ycc  = new_ycc  
         !print*, ye(1:ncell)
         !call exit   
+        deltam_check      = nint(deltam(:)*1e8)
+        tmp = minloc(deltam_check(:ncell))
+        print*, 'New start', tmp(1)
+        do i=tmp(1),tmp(1)+302            
+          if ((deltam_check(i).eq.deltam_check(i+1)).eqv..false.) then            
+             print*,'New False', i
+             exit
+          endif
+        enddo        
       !                  
       return
       end                   
@@ -651,7 +728,7 @@
       logical          :: print_nuloss
 !
       ! need to subtract 1 since the array has a ghost cell at (0)
-      minv = minloc(v, dim=1)-1
+      minv = minloc(v, dim=1)-1      
 
       shock_ind = minv
       shock_x   = x(shock_ind)    
@@ -725,18 +802,20 @@
           
       parameter (idim = 4000)   
       dimension rho(idim)
+
+      logical :: post_bounce, first_bounce
+      real    :: bounce_delay      
   
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /timej / time, dt! 
-      common /units/ umass, udist, udens, utime, uergg, uergcc   
-      
-      logical post_bounce
-      real bounce_delay
-      
+      common /units/ umass, udist, udens, utime, uergg, uergcc               
+
+      first_bounce = .false.
       post_bounce  = .false.
       bounce_delay = 2.d-3/utime !delay of 2 ms
       
       if (maxval(rho)*udens.gt.2.d14) then
+          first_bounce = .true.
           if (bounce_time.eq.0) bounce_time=time
           if (time-bounce_time.ge.bounce_delay) then
             post_bounce   = .true.
@@ -1681,7 +1760,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !             
-      logical post_bounce
+      logical post_bounce, first_bounce
       double precision pr_turb
       parameter (idim = 4000) 
       parameter (idim1 = idim+1) 
@@ -1693,7 +1772,7 @@
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /carac/ deltam(idim), abar(idim) 
       common /damping/ damp, dcell 
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
@@ -5264,7 +5343,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx,mlin_grid_size,idump,skip_dump
-      logical from_dump, post_bounce      
+      logical from_dump, post_bounce, first_bounce      
 !                                                                       
       parameter (idim = 4000) 
       parameter (idim1 = idim+1) 
@@ -5319,7 +5398,7 @@
       common /dump/ from_dump
       common /idump/ idump
       common /interp/ mlin_grid_size
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
 !                                                                       
       character*1024 filin,filout,eos_table      
@@ -5524,7 +5603,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
-      logical from_dump
+      logical from_dump, post_bounce, first_bounce
 !                                                                       
       parameter (idim = 4000) 
       parameter (idim1 = idim+1) 
@@ -5563,7 +5642,7 @@
       common /cent/ dj(idim)
       common /dump/ from_dump
       common /idump/ idump
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
@@ -5799,7 +5878,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx, ntstep, ind, mlin_grid_size
-      logical from_dump, post_bounce
+      logical from_dump, post_bounce, first_bounce
       character*1024 mlmodel_name, rho_file, x_file      
       character*10 frmtx
       character*11 frmtrho
@@ -5869,7 +5948,7 @@
       common /outp/ rout, p1out, p2out
       common /mlmod/ mlmodel_name
       common /dump/ from_dump
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /interp/ mlin_grid_size
 
       save ifirst
