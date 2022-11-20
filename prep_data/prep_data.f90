@@ -395,7 +395,7 @@ program read
             parameter(uergg = 1e16) 
             parameter(pi43  = 3.14159*4.0/3.0) 
             !                                                                       
-            parameter(idim  = 4000) 
+            parameter(idim=10000) 
             parameter(iqn=17)
             !                                                                       
             common /celle/ x(0:idim),v(0:idim) 
@@ -641,7 +641,7 @@ program read
           parameter(uergg = 1e16) 
           parameter(pi43  = 3.14159*4.0/3.0) 
           !                                                                       
-          parameter(idim  = 4000) 
+          parameter(idim=10000) 
           parameter(iqn=17)
           !                                                                       
           common /celle/ x(0:idim),v(0:idim) 
