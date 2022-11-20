@@ -19,7 +19,7 @@ program read
           parameter(pi43=3.14159*4.0/3.0) 
           parameter(iqn=17)
     !                                                                       
-          parameter(idim=4000) 
+          parameter(idim=10000) 
     !                                                                       
           common /celle/ x(0:idim),v(0:idim) 
           common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
@@ -270,7 +270,7 @@ program read
   !                                                                       
           logical from_dump 
           integer idump 
-          parameter (idim=4000) 
+          parameter (idim=10000) 
           parameter(iqn=17)
           common /celle/ x(0:idim),v(0:idim) 
           common /cellc/ u(idim),rho(idim),ye(idim),q(idim),dq(idim) 
@@ -457,9 +457,8 @@ program read
     
             do i=1,idim 
               do k=1,nkep 
-                if (rad(k).gt.x(i-1)) goto 20 
-              end do 
-       20    continue              
+                if (rad(k).gt.x(i-1)) exit
+              end do        
     
              if (k.eq.1) then !-- for k=1, we can not use cell k-1                         
                 ind      = k
@@ -551,7 +550,6 @@ program read
                 !deltam(i+1) = enclmass(conv_grid_end)*(1+deltam_growth)**(i-conv_grid_end)-enclmass(i-1)
   
             end if 
-            !stop
     !                                                                       
     !--call eos                                                             
     !                                                                       
@@ -596,13 +594,10 @@ program read
             if (enclmass(i).ge.maxmass) then  
                 print*, 'i, x, enclmass', i ,x(i), enclmass(i)               
                 ncell = i 
-                goto 50 
-            end if
-            
+                return
+            end if            
           enddo           
     !                  
-          50 continue         
-
         !   deltam_check      = nint(deltam(:)*1e8)
         !   tmp = minloc(deltam_check(:ncell))
         !   print*, 'New start', tmp(1),deltam(tmp(1)-1),deltam(tmp(1))
@@ -835,7 +830,7 @@ program read
 
          implicit double precision (a-h, o-z) 
 
-         parameter(idim=4000)
+         parameter(idim=10000)
          parameter(iqn=17)
          dimension vel(nkep),rad(nkep),dens(nkep),t9(nkep),            &
                    yel(nkep),ab(nkep),omega(nkep),press(nkep) 
@@ -923,7 +918,7 @@ program read
 
       implicit double precision (a-h, o-z) 
   
-      parameter(idim=4000)
+      parameter(idim=10000)
       parameter(iqn=17)
       dimension vel(nkep),rad(nkep),dens(nkep),t9(nkep),            &
       yel(nkep),ab(nkep),omega(nkep),press(nkep) 
@@ -1016,7 +1011,7 @@ program read
       
       implicit double precision (a-h,o-z)
 
-      parameter(idim=4000)
+      parameter(idim=10000)
       parameter(utemp=1e9) 
       parameter(udens=2e6) 
       parameter(uvel=1e8) 
