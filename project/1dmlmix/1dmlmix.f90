@@ -11,10 +11,10 @@
 !                                                                       
 !--ntstep counts the number of timesteps                                
       integer jtrape,jtrapb,jtrapx,ntstep
-      character*128 mlmodel_name
+      character*1024 mlmodel_name
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       common /bstuf/ rb, dumrb, f1rb, f2rb 
       common /carac/ deltam(idim), abar(idim) 
@@ -101,17 +101,17 @@
 !                                                                       
       !90 call printout(lu)                                             
       !call printout(lu) 
-      stop 
+      stop "DONE: reached the maximum time"
       END                                           
 !
 ! ============================ Subroutines ============================
 !      
       subroutine hydro(time,ncell,x,v,                                  &
-     &           u,rho,ye,f,du,dye,q,                                   &
-     !fmix,                              &
-     &           ynue,ynueb,ynux,dynue,dynueb,dynux,                    &
-     &           unue,unueb,unux,dunue,dunueb,dunux,                    &
-     &           print_nuloss,ntstep)                                          
+                       u,rho,ye,f,du,dye,q,                             &
+                       ! fmix,                              &
+                       ynue,ynueb,ynux,dynue,dynueb,dynux,              &
+                       unue,unueb,unux,dunue,dunueb,dunux,              &
+                       print_nuloss,ntstep)                                          
 !                                                                       
 !****************************************************************       
 !                                                               *       
@@ -152,12 +152,13 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx, mlin_grid_size
-      character*128 mlmodel_name
-      logical post_bounce
+      character*1024 mlmodel_name
+      logical post_bounce, first_bounce
 
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
       parameter (tiny=-1e-5) 
+      parameter (iqn = 17)
 !                                                                       
       dimension x(0:idim), v(0:idim), f(0:idim) 
       dimension fmix(idim) 
@@ -196,31 +197,40 @@
       common /mlmod/ mlmodel_name
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /interp/ mlin_grid_size
       common /mlout/ pr_turb(idim1)
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
+!
+!--resize grid based on the shock position (not done)
+!     
+    !   if (post_bounce.eqv..true.) then
+    !     if (print_nuloss.eqv..true.) then
+    !             call shock_radius(ncell,x,v,vsound,print_nuloss)
+    !             call resize_grid(ncell,x,v,u,rho,ye,f,du,dye,q,                 &
+    !                              ynue,ynueb,ynux,dynue,dynueb,dynux,            &
+    !                              unue,unueb,unux,dunue,dunueb,dunux) 
+    !     endif
+    !   endif
 !                                        
 !--compute density                                                      
 ! ---------------------------------------------------------             
 !    
-      call density(ncell,x,rho) 
+      call density(ncell,x,rho)       
 !                                                                      
 !                                                                       
 !--compute thermodynamical properties                                   
 !  ----------------------------------                                   
-!  (this allows the use of simple eos)                                  
-!  (ieos=3 or 4 calls for the sophisticated eos's)                      
-!                               
-      !do i=30,40
-      !    print*, i, ye(i)
-      !enddo
-      !print *, '[time] ',time,ieos                                     
+!  this allows the use of simple eos                                  
+!  ieos=3 or 4 calls for the Swesty-Lattimer EOS above rhoswe
+!  ieos=5 or 6 calls SFHo Tables EOS 
+!                                                                   
       if(ieos.eq.1)call eospg(ncell,rho,u) 
       if(ieos.eq.2)call eospgr(ncell,rho,u) 
       if(ieos.eq.3.or.ieos.eq.4)call eos3(ncell,rho,u,ye) 
-      if(ieos.eq.5)call eos5(ncell,rho,u,ye) 
+      if(ieos.eq.5.or.ieos.eq.6)call eos5(ncell,rho,u,ye) 
+      !call exit
 !                                                                       
 !--do gravity                                                           
 !  --------------------------------------------------------             
@@ -230,26 +240,26 @@
 !                                                                       
 !--neutrino physics                                                     
 !  ----------------                                                     
-      yemn=1e20 
-      yemx=-1e20 
-      ynuemx=-1e20 
-      ynuebmx=-1e20 
-      ynuxmx=-1e20 
+      yemn    = 1e20 
+      yemx    =-1e20 
+      ynuemx  =-1e20 
+      ynuebmx =-1e20 
+      ynuxmx  =-1e20 
+
       do k=1,ncell 
-         yemn=dmin1(ye(k),yemn) 
-         yemx=dmax1(ye(k),yemx) 
-         ynuemx=dmax1(ynue(k),ynuemx) 
-         ynuebmx=dmax1(ynueb(k),ynuebmx) 
-         ynuxmx=dmax1(ynux(k),ynuxmx) 
+         yemn    = dmin1(ye(k),yemn) 
+         yemx    = dmax1(ye(k),yemx) 
+         ynuemx  = dmax1(ynue(k),ynuemx) 
+         ynuebmx = dmax1(ynueb(k),ynuebmx) 
+         ynuxmx  = dmax1(ynux(k),ynuxmx) 
          if (ye(k).lt.0.0) print *,'ye<0, k=',k,ye(k) 
 !         if (ye(k).gt.0.51) print *,'ye>0.51, k=',k,ye(k)              
          if (ynue(k).lt.tiny) print *,'ynue<0, k=',k,ynue(k),            &
-     &                               trapnue(k),ebetaeq(k)              
+                                       trapnue(k),ebetaeq(k)              
                                                                         
          if (ynux(k).lt.tiny) print*,'ynux<0, k=',k,ynux(k) 
       enddo 
-!      write(*,200)'hydro: yemn,ynuemx,ynuebmx,ynuxmx',                 
-!     1                   yemn,ynuemx,ynuebmx,ynuxmx                    
+                  
   200 format(A33,4(1x,1pe10.3)) 
 !                                                                       
 !-- initialize                                                          
@@ -257,8 +267,8 @@
 !      goto 90                                                          
 !                                                                       
       call nuinit(ncell,rho,x,ye,dye,                                   &
-     &            ynue,ynueb,ynux,dynue,dynueb,dynux,                   &
-     &            unue,unueb,unux,dunue,dunueb,dunux)                   
+                  ynue,ynueb,ynux,dynue,dynueb,dynux,                   &
+                  unue,unueb,unux,dunue,dunueb,dunux)                   
 !                                                                                                           
 !-- nu contribution to pressure                                         
 !                                                                       
@@ -271,12 +281,12 @@
 !--plasma/pair neutrino emission processes                              
 !                                                                       
       call nupp(ncell,rho,ye,dynue,dynueb,dynux,                        &
-     &          dunue,dunueb,dunux)                                     
+                dunue,dunueb,dunux)                                     
 !                                                                       
 !--neutrino/anti neutrino conversion                                    
 !                                                                       
       call nuconv(ncell,x,rho,ynue,ynueb,ynux,                          &
-     &     dynue,dynueb,dynux,dunue,dunueb,dunux)                       
+                  dynue,dynueb,dynux,dunue,dunueb,dunux)                       
 !                                                                       
 !--neutrino/anti-neutrino annihilation                                  
 !                                                                       
@@ -286,8 +296,8 @@
 !--neutrino depletion from thin regions                                 
 !                                                                       
       call nusphere(ncell,x,                                            &
-     &            ynue,ynueb,ynux,dynue,dynueb,dynux,                   &
-     &            unue,unueb,unux,dunue,dunueb,dunux)                   
+                    ynue,ynueb,ynux,dynue,dynueb,dynux,                 &
+                    unue,unueb,unux,dunue,dunueb,dunux)                   
 !                                                                       
 !                                                                       
 !--fold-in neutrino background luminosity from the core                 
@@ -298,27 +308,29 @@
 !--neutrino absorption                                                  
 !                                                                       
       call nuabs(ncell,rho,x,dye,ynue,ynueb,                            &
-     &          dynue,dynueb,dunue,dunueb)                              
+                 dynue,dynueb,dunue,dunueb)                              
 !                                                                       
 !--neutrino/electron scattering                                         
 !                                                                       
       call nuscat(ncell,rho,x,ynue,ynueb,ynux,                          &
-     &            dunue,dunueb,dunux)                                   
+                  dunue,dunueb,dunux)                                   
 !                                                                       
 !--do the beta equilibrium cases                                        
 !                                                                       
       call nubeta(ncell,x,rho,ye,dye,ynue,ynueb,unue,unueb,             &
-     &            dynue,dynueb,dunue,dunueb)                            
+                  dynue,dynueb,dunue,dunueb)                            
 !                                                                       
    90 continue 
 !                                                                       
-!--compute turbulence parameters                                        
+!--compute turbulence parameters (outdated)                                       
 !                                                                       
       !call turbulence(ncell,x,f,q,v,rho,fmix) 
 !                                                                       
 !--compute q values                                                     
-!                                                                       
+!              
+      !print*, 'Artvis old q', maxval(q), maxloc(q), minval(q), minloc(q)                                                         
       call artvis(ncell,x,rho,v,q)                                                                     
+      !print*, 'Artvis new q', maxval(q), maxloc(q), minval(q), minloc(q)
 !     
       !post_bounce = .true.
       if (post_bounce.eqv..true.) then
@@ -343,8 +355,8 @@
 !--flux limited diffusion                                               
 !--skip neutrino                                                        
       call nudiff(ncell,x,rho,time,ye,                                  &
-     &    ynue,ynueb,ynux,dynue,dynueb,dynux,                           &
-     &    dunue,dunueb,dunux)                                           
+                  ynue,ynueb,ynux,dynue,dynueb,dynux,                   &
+                  dunue,dunueb,dunux)                                           
 !                                                                       
 !--compute energy derivative                                            
 !                                                          
@@ -354,12 +366,408 @@
 !                                                                       
 !--skip neutrino                                                        
       call nuwork(ncell,x,v,rho,                                        &
-     &            unue,unueb,unux,dunue,dunueb,dunux)                   
-!                                                                       
-   99 return 
+                  unue,unueb,unux,dunue,dunueb,dunux)                   
+!                                                                            
+   99 return    
       END                                           
 !
-!     
+!
+      subroutine resize_grid(ncell,x,v,u,rho,ye,f,du,dye,q,                 &
+                             ynue,ynueb,ynux,dynue,dynueb,dynux,            &
+                             unue,unueb,unux,dunue,dunueb,dunux)
+!****************************************************************              
+!                                                               *              
+! The grid is re-sized to keep the shock in the region          *
+! of the higherst resolution. I use an average of               *      
+! adjacent cells to calculate the important values.             *       
+!                                                               *              
+!****************************************************************                                  
+      implicit double precision (a-h, o-z) 
+      !                   
+      !                                                                       
+      !--- new ---
+
+      !parameter(uvel  = 1e8)  
+      parameter (pi43  = 3.14159*4.0/3.0)                                                                    
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1)
+      parameter (iqn = 17)
+
+      dimension x(0:idim), v(0:idim), f(0:idim) 
+      dimension u(idim), rho(idim), ye(idim)
+      dimension dye(idim), du(idim), q(idim) 
+      dimension ynue(idim),ynueb(idim),ynux(idim) 
+      dimension unue(idim),unueb(idim),unux(idim) 
+      dimension dynue(idim),dynueb(idim),dynux(idim) 
+      dimension dunue(idim),dunueb(idim),dunux(idim) 
+
+      real             :: ycc, uccave
+    
+      common /tempe/ temp(idim)
+      common /carac/ deltam(idim), abar(idim)
+      common /cc   / ycc(idim,iqn), yccave(iqn)
+      common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax
+      common /state/ xp(idim), xn(idim), eta(idim), ifleos(idim)
+      common /etnus/ etanue(idim),etanueb(idim),etanux(idim)
+      common /rshock/ shock_ind, shock_x
+      common /units/ umass, udist, udens, utime, uergg, uergcc
+      common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg
+      double precision :: enclmass(0:ncell), new_enclmass(0:ncell), enclmass_bisection(0:ncell)
+      double precision :: new_deltam(idim)
+      double precision :: new_x(0:idim), new_v(0:idim), new_f(0:idim)
+      double precision :: new_u(idim), new_rho(idim), new_ye(idim) 
+      double precision :: new_du(idim),new_dye(idim),new_q(idim)
+      double precision :: new_ynue(idim), new_ynueb(idim),new_ynux(idim),        &
+                          new_unue(idim), new_unueb(idim),new_unux(idim)
+      double precision :: new_temp(idim), new_abar(idim), new_u2(idim)
+      double precision :: new_xn(idim), new_xp(idim)
+      double precision :: mass_growth
+      real             :: new_ycc(idim,iqn)
+      logical          :: beyond_focus
+      integer          :: pns_grid_end, conv_grid_end
+
+      ! grid point that should try to allign with the shock position;
+      ! by default, it is at 2/3 of the high resolution region
+      integer          :: anchor, anchor_ar(1)
+      integer          :: tmp(1), conv_grid, pns_grid, counter
+      double precision :: deltam_check(idim)
+      double precision :: total_mass, deltam_growth, low, high
+      character*30     :: savefile
+
+      deltam_check      = nint(deltam(:)*1e8)      
+      !tmp = minloc(deltam_check(:ncell))   
+
+      beyond_focus = .false.
+      pns_counter  = 0                                                        
+      new_x(:)     = 0
+      new_v(:)     = 0 
+      enclmass(:)  = 0.d0 
+      
+      new_ye(:)    = 0   
+      new_abar(:)  = 0 
+      new_u(:)     = 0    
+      new_u2(:)    = 0   
+      new_xn(:)    = 0   
+      new_xp(:)    = 0   
+      new_du(:)    = 0   
+      new_ynue(:)  = 0 
+      new_ynueb(:) = 0
+      new_ynux(:)  = 0 
+      new_unue(:)  = 0 
+      new_unueb(:) = 0
+      new_unux(:)  = 0 
+
+      pns_grid     = 1
+      conv_grid    = 1      
+      
+      deltam_conv       = minval(deltam_check) ! in Msol
+      shock_grid_goal   = 300  ! grab from input grid
+
+      ! Calculate a new mass grid first
+      do i=1, ncell
+        enclmass(i) = enclmass(i-1)+deltam(i)
+      enddo
+
+      ! 2/3 before and 1/3 after the shock (goal specified in setup)
+      before_shock_grid = int(2./3.*shock_grid_goal)+1
+      after_shock_grid  = int(1./3.*shock_grid_goal)  
+
+      anchor_ar         = minloc(deltam_check(:ncell))-1
+      anchor            = anchor_ar(1) ! Fortran is trully the worst
+
+      if (anchor.lt.(shock_ind-before_shock_grid)) then
+        anchor = anchor+1
+      elseif (anchor.gt.(shock_ind-before_shock_grid)) then
+        anchor = anchor-1
+      else
+        return
+      endif
+      !print*, 'anchor new', anchor, int(shock_ind)
+
+    ! For debugging
+    !   savefile = 'old.txt'
+    !   call write_value(ncell,x, deltam, enclmass, rho, savefile)      
+
+      pns_grid_end  = 300 ! needs to grab from input file
+      conv_grid_end = pns_grid_end+shock_grid_goal
+      pns_cutoff    = enclmass(anchor)
+      pns_cutoff_x  = x(anchor)
+
+      ! calculate by how much to raise deltam(1) for the PNS based on
+      ! the given PNS mass cutoff and pns_grid_goal from setup
+      deltam_init_fac = 2*pns_cutoff/(pns_grid_end*deltam_conv)-1
+      new_deltam(1)   = deltam_init_fac*deltam_conv
+      pns_growth      = (new_deltam(1)-deltam_conv)/pns_grid_end 
+      
+      !---------------------------------------------------------      
+      ! Find pns_growth factor via bisection
+
+      counter = 0
+      low     = pns_growth*0.9
+      high    = pns_growth*1.1
+      do while (.true.)
+        new_enclmass(:) = 0        
+
+        do i=1,pns_grid_end            
+            new_enclmass(i) = new_enclmass(i-1) + new_deltam(i)
+            new_deltam(i+1) = new_deltam(1)-pns_growth*i  
+        enddo
+
+        if (abs(maxval(new_enclmass)-pns_cutoff).le.1e-8) then
+            exit
+        else if (maxval(new_enclmass).gt.pns_cutoff) then
+            high  = pns_growth
+        else
+            low = pns_growth
+        endif        
+
+        pns_growth    = (high+low)/2.
+        new_deltam(1) = pns_growth*pns_grid_end+deltam_conv
+
+        counter = counter +1   
+        if (counter.eq.60) then
+            stop 'ERROR: Failed to converge on pns-growth-rate in resize_grid'                        
+        endif
+      enddo
+
+    !   print*, 'Converged on pns-growth-rate in', counter      
+      
+      ! zero enclosed mass to populate with the new grid
+      total_mass      = enclmass(ncell)
+      new_enclmass(:) = 0.d0 
+      counter         = 0
+
+      do i=1,ncell     
+          new_enclmass(i) = new_enclmass(i-1) + new_deltam(i)           
+          do k=1,ncell 
+              !if (enclmass(k).gt.new_enclmass(i-1)) exit
+            if (enclmass(k).gt.new_enclmass(i)) exit
+          end do 
+
+          if (k.eq.1) then !-- for k=1, we can not use cell k-1                                      
+             fac      = new_enclmass(i-1)/enclmass(1) 
+             fac1     = 1-fac
+             fac2     = fac
+             facomei1 = fac1
+             facomei2 = fac2
+             ind      = k
+          else !--for all other k                   
+             fac      = (enclmass(k)-new_enclmass(i-1))/(enclmass(k)-enclmass(k-1)) 
+             fac1     = fac
+             fac2     = 1-fac
+             facomei1 = fac2
+             facomei2 = fac1
+             ind      = k-1
+          endif    
+          
+          
+          ! Piecewise Linear works, but oscilates near the shock (of course)
+          ! Need to implement WENO5 interpolation for non-uniform grids (a big pain)
+          call piecewise_linear(enclmass(k-1), enclmass(k), rho(k-1), rho(k),   &
+                                new_enclmass(i), new_rho(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), v(k-1), v(k),   &
+                                new_enclmass(i), new_v(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), ye(k-1), ye(k),   &
+                                new_enclmass(i), new_ye(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), abar(k-1), abar(k),   &
+                                new_enclmass(i), new_abar(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), u(k-1), u(k),   &
+                                new_enclmass(i), new_u(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), u2(k-1), u2(k),   &
+                                new_enclmass(i), new_u2(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), xn(k-1), xn(k),   &
+                                new_enclmass(i), new_xn(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), xp(k-1), xp(k),   &
+                                new_enclmass(i), new_xp(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), du(k-1), du(k),   &
+                                new_enclmass(i), new_du(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), ynue(k-1), ynue(k),   &
+                                new_enclmass(i), new_ynue(i))                                
+          call piecewise_linear(enclmass(k-1), enclmass(k), ynueb(k-1), ynueb(k),   &
+                                new_enclmass(i), new_ynueb(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), ynux(k-1), ynux(k),   &
+                                new_enclmass(i), new_ynux(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), unue(k-1), unue(k),   &
+                                new_enclmass(i), new_unue(i))                                
+          call piecewise_linear(enclmass(k-1), enclmass(k), unueb(k-1), unueb(k),   &
+                                new_enclmass(i), new_unueb(i))
+          call piecewise_linear(enclmass(k-1), enclmass(k), unux(k-1), unux(k),   &
+                                new_enclmass(i), new_unux(i))  
+          
+        !   call weno5(rho(k-2:k+2),new_rho(i))
+        !   call weno5(v(k-2:k+2),new_v(i))
+        !   call weno5(ye(k-2:k+2), new_ye(i))
+        !   call weno5(abar(k-2:k+2), new_abar(i))
+        !   call weno5(u(k-2:k+2),new_u(i))
+        !   call weno5(u2(k-2:k+2), new_u2(i))
+        !   call weno5(xn(k-2:k+2), new_xn(i))
+        !   call weno5(xp(k-2:k+2), new_xp(i))
+        !   call weno5(du(k-2:k+2), new_du(i))
+        !   call weno5(ynue(k-2:k+2), new_ynue(i))                                
+        !   call weno5(ynueb(k-2:k+2), new_ynueb(i))
+        !   call weno5(ynux(k-2:k+2), new_ynux(i))
+        !   call weno5(unue(k-2:k+2), new_unue(i))                                
+        !   call weno5(unueb(k-2:k+2), new_unueb(i))
+        !   call weno5(unux(k-2:k+2), new_unux(i))                                 
+  
+          new_x(i)     = (new_x(i-1)**3+new_deltam(i)/(pi43*new_rho(i)))**(1./3.)
+  
+          do j=1,iqn
+              new_ycc(i,j) = 0.5*(fac1*ycc(ind,j)+ycc(k,j)+fac2*ycc(k+1,j))
+          end do                        
+      !                                                                        
+      !--Adjust the grid here, choose a focus region
+      !
+          ! PNS linearly increasing mass resolution
+          if (i.lt.pns_grid_end) then
+
+              pns_grid        = pns_grid+1              
+              new_deltam(i+1) = new_deltam(1)-pns_growth*i  
+  
+          ! Static high resolution in the Convective region
+          elseif (i.lt.conv_grid_end) then
+              conv_grid       = conv_grid+1
+              new_deltam(i+1) = deltam_conv  
+
+          ! Exponential growth beyond convection region
+          else
+              if (beyond_focus.eqv..false.) then                  
+                  beyond_focus = .true.
+
+                  ! find exponential deltam growth in the outer region via bisection
+                  n             = real(ncell-(conv_grid_end+1))
+                  deltam_growth = (2.*(total_mass-new_enclmass(conv_grid_end))/(deltam_conv*n)-1)**(1./n)-1                  
+                  enclmass_bisection(:) = new_enclmass(conv_grid_end-1)
+
+                  low  = deltam_growth
+                  high = deltam_growth*10
+                  do while (.true.)
+                      do j=(conv_grid_end),ncell
+                          new_deltam(j+1) = deltam_conv*(1+deltam_growth)**(j-conv_grid_end)                          
+                          enclmass_bisection(j) = enclmass_bisection(j-1)+new_deltam(j)
+                      enddo                        
+
+                      if (abs(maxval(enclmass_bisection)-total_mass).le.1e-12) then
+                        exit
+                      elseif (maxval(enclmass_bisection).gt.total_mass) then
+                          high = deltam_growth
+                      else
+                          low  = deltam_growth
+                      endif
+
+                      deltam_growth = (high+low)/2.
+                      counter = counter +1   
+                      if (counter.eq.1000) then
+                        stop 'ERROR: Failed to converge on growth rate in resize_grid'                        
+                      endif
+                  enddo
+              endif 
+              ! exponential growth of deltam with a set growth rate
+              new_deltam(i+1) = deltam_conv*(1+deltam_growth)**(i-conv_grid_end)
+
+          end if
+
+      enddo 
+    
+        rho  = new_rho
+        v    = new_v  
+        ye   = new_ye
+        abar = new_abar  
+        u    = new_u 
+        u2   = new_u2  
+        x    = new_x  
+        xn   = new_xn
+        xp   = new_xp 
+        ycc  = new_ycc
+        
+        du     = new_du 
+        ynue   = new_ynue
+        ynueb  = new_ynueb
+        ynux   = new_ynux
+        unue   = new_unue
+        unueb  = new_unueb
+        unux   = new_unux
+
+        deltam = new_deltam
+
+        ! For debugging
+        ! savefile = 'new.txt'
+        ! call write_value(ncell,x, deltam,enclmass,rho, savefile)
+          
+      return
+      end  
+
+      subroutine piecewise_linear(x1,x2,y1,y2,new_x,new_y)     
+        implicit double precision (a-h,o-z)     
+
+        double precision, intent(in)  :: x1, x2, y1, y2, new_x
+        double precision, intent(out) :: new_y
+        double precision              :: m, b
+
+        m     = (y2-y1)/(x2-x1)
+        b     = y1
+        new_y = m*(new_x-x1)+b
+
+        return
+        
+      end
+
+      subroutine weno5(f,new_f)   
+
+!*********************************************************************************        
+! WENO5 interpolation scheme for uniform grid is based on :                      *
+! G.-S. Jiang, C.-W. Shu, Efficient implementation of weighted ENO schemes, 1996 *
+!                                                                                *
+! exact notation was taken from:                                                 *
+! Henrick et al, Mapped weighted essentially non-oscillatory schemes:            *                                   
+! Achieving optimal order near critical points, 2005                             * 
+!                                                                                *
+! Non-uniform grid (NOT IMPLEMENTED!) requires you to find                       *
+! all coefficients manually. Use the following paper as reference:               *
+!        "The WENO Method for Non-Equidistant Meshes" by Philip Rupp 2012        *
+!        https://www.wias-berlin.de/people/john/BETREUUNG/bachelor_rupp.pdf      *
+!                                                                                *
+! -pikarpov                                                                      *
+!*********************************************************************************
+
+        implicit double precision (a-h,o-z)     
+
+        double precision, intent(in)  :: f(5)
+        double precision, intent(out) :: new_f
+        double precision              :: alpha(3), beta(3)
+        double precision              :: w(3), w_ideal(3), stencil(3)        
+        double precision              :: eps, alpha_sum
+
+        w_ideal = (/1./10.,6./10.,3./10./)
+
+        beta(1) = (1./3. * (4. *f(1)**2   - 19.*f(1)*f(2) +      &
+                            25.*f(2)**2   + 11.*f(1)*f(3) -      &
+                            31.*f(2)*f(3) + 10.*f(3)**2))
+        beta(2) = (1./3. * (4. *f(2)**2   - 13.*f(2)*f(3) +      &
+                            13.*f(3)**2   + 5. *f(2)*f(4) -      &
+                            13.*f(3)*f(4) + 4. *f(4)**2))
+        beta(3) = (1./3. * (10.*f(3)**2   - 31.*f(3)*f(4) +      &
+                            25.*f(4)**2   + 11.*f(3)*f(5) -      &
+                            19.*f(4)*f(5) + 4. *f(5)**2))        
+        
+        eps        = 1.e-100
+    
+        alpha(:)   = w_ideal(:)/(eps+beta(:))**2    
+ 
+        alpha_sum  = SUM(alpha)
+     
+        w(:)       = alpha(:)/alpha_sum
+
+        stencil(1) = 2./6. * f(1) - 7./6. * f(2) + 11./6. * f(3)
+        stencil(2) =-1./6. * f(2) + 5./6. * f(3) +  2./6. * f(4)
+        stencil(3) = 1./3. * f(3) + 5./6. * f(4) -  1./6. * f(5)
+
+        new_f      = SUM(w(:)*stencil(:))
+
+        return
+      end
+!
+!
       subroutine turbpress(ncell,rho,x,v,temp) 
 !*********************************************************               
 !                                                        *               
@@ -372,13 +780,13 @@
       use data_functions
       implicit double precision (a-h,o-z) 
 !          
-      character*128 :: mlmodel_name
+      character*1024 :: mlmodel_name
       integer mlin_grid_size
       real scale_pr, scale_pr_relative
       double precision pr_turb
 !
-      parameter(idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter(idim=10000) 
+      parameter(idim1 = idim+1) 
 !                                                                       
       dimension rho(idim), temp(idim) 
       dimension x(0:idim), v(0:idim)
@@ -389,6 +797,7 @@
       common /trap/ trapnue(idim),trapnueb(idim),trapnux(idim) 
       common /etnus/ etanue(idim),etanueb(idim),etanux(idim) 
       common /eosnu/ prnu(idim1) 
+      common /units/ umass, udist, udens, utime, uergg, uergcc
       common /mlmod/ mlmodel_name               
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /rshock/ shock_ind, shock_x
@@ -403,34 +812,46 @@
       double precision interp_x(mlin_grid_size)         
       
       ! Scale Pressure to fit into single precission (taken from ML training)
-      scale_pr = 1.d-8
-      scale_pr_relative = 1.d-8
+      scale_u    = udist/utime*1e-8
+      scale_rho  = 2.d6*2e-13
+      scale_pr   = 2.d22*2e-32
+      scale_temp = 1
+      scale_pr_relative = 1.d-1
 
-      input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
-      input(:,2,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
-      input(:,3,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size)*scale_pr
-      input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),int(shock_ind),mlin_grid_size)
+      input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *  scale_u
+      input(:,2,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *    scale_rho
+      input(:,3,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) * scale_pr
+      input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *   scale_temp
+
+      print*, 'max u', maxval(abs(input(:,1,1)))
+      print*, 'max rho', maxval(input(:,2,1))
+      print*, 'max T', maxval(input(:,3,1))
+      print*, 'max P', maxval(input(:,4,1))
+
 
       ! ML model (reverse the order for fortran data)
       ! Input: ['u1','rho','Pgas', 'T'] (1, 4, 200)
       ! Output: [pr_relative = P_turb/P_gas] (1, 1, 200)
 
       output_h = mlmodel(input, trim(mlmodel_name))      
-      
+      print*, output_h
       ! Re-shape output into code-shape mlout:
-      pr_turb(:) = 0   
+      pr_turb(:)     = 0   
       pr_relative(:) = 0
       interp_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
       pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
                                                    mlin_grid_size,1,mlin_grid_size,           &
                                                    int(shock_ind-pns_ind))*scale_pr_relative
+      !pr_relative = 0.3
+      !print*, pr_relative(int(pns_ind):int(shock_ind))
+      print*, 'pr_relative', maxval(pr_relative), size(pr_relative)
       pr_turb = pr_relative*pr
-      print*, 'ML prediction'      
-      print*, size(output_h), shape(output_h), shock_ind-pns_ind
-      print*, '-- pr_relative --'
-      print*, pr_relative(shock_ind-5:shock_ind)
-      print*, '-- pr_turb --'
-      print*, pr_turb(shock_ind-5:shock_ind)
+    !   print*, 'ML prediction'      
+    !   print*, size(output_h), shape(output_h), shock_ind-pns_ind
+    !   print*, '-- pr_relative --'
+    !   print*, pr_relative(shock_ind-5:shock_ind)
+    !   print*, '-- pr_turb --'
+    !   print*, pr_turb(shock_ind-5:shock_ind)
       call exit(0)
       return 
       END       
@@ -448,25 +869,31 @@
       common /rshock/ shock_ind, shock_x    
       common /units/ umass, udist, udens, utime, uergg, uergcc
 
-      dimension x(0:ncell),v(0:ncell),vsound(0:ncell),mach(0:ncell)
+      dimension x(0:ncell),v(0:ncell),vsound(0:ncell),mach(0:ncell-1)
 
       double precision :: mach
       double precision :: mach_threshold
-      real :: initial_v, old_max_v
-      real, dimension(ncell) :: v_old
-      integer :: i,j, ind
-      logical print_nuloss
+      real             :: initial_v, old_max_v
+      real             :: v_old(ncell)
+      integer          :: i,j, ind, minv
+      logical          :: print_nuloss
+!
+      ! need to subtract 1 since the array has a ghost cell at (0)
+      minv = minloc(v, dim=1)-1      
 
-      mach_threshold = 1.0
-!                                    
-      mach = ABS(v/vsound)
-      do i=minloc(v, dim=1),1,-1
-        if (mach(i).lt.mach_threshold) then
-            shock_x = x(i)
-            shock_ind = i
-            EXIT
-        endif
-      enddo
+      shock_ind = minv
+      shock_x   = x(shock_ind)    
+
+    !   mach = ABS(v(:ncell-1)/vsound(:ncell-1))
+    !   mach_threshold = maxval(mach)/2.
+
+    !   do i=minv,1,-1
+    !     if (mach(i).lt.mach_threshold) then
+    !         shock_ind = i
+    !         shock_x = x(i)            
+    !         EXIT
+    !     endif
+    !   enddo
 
 511   format(A,1p,I5,A,E10.3) 
       if (print_nuloss .eqv. .true.) then      
@@ -490,16 +917,16 @@
       common /units/ umass, udist, udens, utime, uergg, uergcc   
       dimension x(0:ncell)
       dimension rho(ncell) 
-      real :: rho_threshold      
+      real    :: rho_threshold      
       integer :: i
-      logical print_nuloss
+      logical :: print_nuloss
 !      
 !--g/cm^3 / unit conversion
       rho_threshold = 1.d13/udens
 !
       do i=size(rho), 1, -1        
           if (rho(i) .ge. rho_threshold) then                        
-              pns_x = x(i)
+              pns_x   = x(i)
               pns_ind = i
               EXIT
           end if 
@@ -524,25 +951,27 @@
 !            
       implicit double precision (a-h,o-z) 
           
-      parameter (idim=4000)   
+      parameter (idim=10000)   
       dimension rho(idim)
+
+      logical :: post_bounce, first_bounce
+      real    :: bounce_delay      
   
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /timej / time, dt! 
-      common /units/ umass, udist, udens, utime, uergg, uergcc   
-      
-      logical post_bounce
-      real bounce_delay
-      
-      post_bounce = .false.
+      common /units/ umass, udist, udens, utime, uergg, uergcc               
+
+      first_bounce = .false.
+      post_bounce  = .false.
       bounce_delay = 2.d-3/utime !delay of 2 ms
       
       if (maxval(rho)*udens.gt.2.d14) then
+          first_bounce = .true.
           if (bounce_time.eq.0) bounce_time=time
           if (time-bounce_time.ge.bounce_delay) then
-            post_bounce = .true.
+            post_bounce   = .true.
             bounce_ntstep = ntstep
-            bounce_time = time
+            bounce_time   = time
           endif
       endif                
       
@@ -558,8 +987,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       dimension x(0:idim),v(0:idim) 
       dimension rho(idim),q(idim) 
@@ -574,28 +1003,33 @@
 !--update q value                                                       
 !                                                                       
       do kp05=1,ncell 
-         k=kp05 - 1 
-         k1=kp05 
-         q(kp05)=0.d0 
-         akp1=pi4*x(k1)*x(k1) 
-         ak=pi4*x(k)*x(k) 
-         akp05=0.5d0*(ak+akp1) 
-         gradv=v(k1)*(3.d0*akp05-akp1) - v(k)*(3.d0*akp05-ak) 
+         k       = kp05 - 1 
+         k1      = kp05 
+         q(kp05) = 0.d0 
+         akp1    = pi4*x(k1)*x(k1) 
+         ak      = pi4*x(k)*x(k) 
+         akp05   = 0.5d0*(ak+akp1) 
+         gradv   = v(k1)*(3.d0*akp05-akp1) - v(k)*(3.d0*akp05-ak) 
+
          if(gradv.lt.0.d0)then 
 !                                                                       
 !--quadratic term                                                       
 !                                                                       
-            dv=v(k1) - v(k) 
-            alpha=0.5d0*cq*cq*rho(kp05)*dabs(dv)/akp05 
-            q(kp05)=-alpha*gradv 
+            dv      = v(k1) - v(k) 
+            alpha   = 0.5d0*cq*cq*rho(kp05)*dabs(dv)/akp05 
+            q(kp05) =-alpha*gradv 
 !                                                                       
 !--linear term                                                          
 !                                                                       
-            cs=vsound(kp05) 
-            alphal=0.5d0*cl*rho(kp05)*cs/akp05 
-            q(kp05)=q(kp05) - alphal*gradv 
+            cs      = vsound(kp05) 
+            alphal  = 0.5d0*cl*rho(kp05)*cs/akp05 
+            q(kp05) = q(kp05) - alphal*gradv 
          end if 
-         dq(kp05)=-q(kp05)*gradv/deltam(kp05) 
+         dq(kp05) =-q(kp05)*gradv/deltam(kp05) 
+
+        !  if (kp05.lt.8) then
+        !     print*, 'artvis', q(kp05), alpha, gradv, v(kp05) 
+        !  endif
       enddo 
 !                                                                       
       return 
@@ -622,12 +1056,12 @@
       parameter(ufac=-0.214d0) 
       parameter(pfac=-0.0714d0) 
 !                                                                       
-      rho13=rhok**0.333333333333d0 
-      rho43=rho13*rhok 
-      ye2=ye*ye 
-      y43z23=(ye2*zbar)**0.66666666666d0 
-      ucoul=ufac*rho13*y43z23 
-      pcoul=pfac*rho43*y43z23 
+      rho13  = rhok**0.333333333333d0 
+      rho43  = rho13*rhok 
+      ye2    = ye*ye 
+      y43z23 = (ye2*zbar)**0.66666666666d0 
+      ucoul  = ufac*rho13*y43z23 
+      pcoul  = pfac*rho43*y43z23 
 !                                                                       
       return 
       END                                           
@@ -642,7 +1076,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
       dimension x(0:idim),rho(idim) 
       common /carac/ deltam(idim), abar(idim) 
@@ -653,10 +1087,10 @@
 !--update density                                                       
 !                                                                       
       do kp05=1,ncell 
-         k1=kp05 
-         k=kp05 - 1 
-         rho(kp05)=3.d0*deltam(kp05)/                                   &
-     &              (pi4*(x(k1)*x(k1)*x(k1)-x(k)*x(k)*x(k)))            
+         k1 = kp05 
+         k  = kp05 - 1 
+         rho(kp05) = 3.d0*deltam(kp05)/                                   &
+                     (pi4*(x(k1)*x(k1)*x(k1)-x(k)*x(k)*x(k)))            
       enddo
       
       return 
@@ -671,8 +1105,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
       parameter (avokb=6.02e23*1.381e-16) 
 !                                                                       
       dimension x(0:idim),v(0:idim) 
@@ -700,14 +1134,14 @@
       sfac=avokb*utemp/uergg 
 !                                                                       
       do kp05=1,ncell 
-         k=kp05-1 
-         k1=kp05 
+         k    = kp05-1 
+         k1   = kp05 
          !vturbk=dsqrt(vturb2(kp05)) 
-         akp1=pi4*x(k1)*x(k1) 
-         akp=pi4*x(k)*x(k) 
+         akp1 = pi4*x(k1)*x(k1) 
+         akp  = pi4*x(k)*x(k) 
          !pdv=(pr(kp05)+rho(kp05)*vturb2(kp05))*                         &
      !&        (akp1*v(k1)-akp*v(k))/deltam(kp05)                        
-         pdv=pr(kp05)*(akp1*v(k1)-akp*v(k))/deltam(kp05)
+         pdv  = pr(kp05)*(akp1*v(k1)-akp*v(k))/deltam(kp05)
          
 !                                                                       
          dupp=0.0 
@@ -721,11 +1155,11 @@
      !&           rho(kp05)*vturbk**3/dmix(kp05)                         
             du(kp05)=-pdv+0.5*dq(kp05)-dunu(kp05)-dupp     
             if (rho(kp05+1).gt.0.1.and.kp05.lt.1) then 
-               xp05=.5d0*(x(k)+x(k1)) 
-               xp15=.5d0*(x(k1)+x(k1+1)) 
+               xp05 = .5d0*(x(k)+x(k1)) 
+               xp15 = .5d0*(x(k1)+x(k1+1)) 
                if (temp(kp05)*xp05.gt.1.2d0*temp(kp05+1)*xp15) then 
-                  dubef=du(kp05) 
-                  du(kp05)=min(1.2d0*du(kp05),-1.d-2*du(kp05)) 
+                  dubef    = du(kp05) 
+                  du(kp05) = min(1.2d0*du(kp05),-1.d-2*du(kp05)) 
                   print *, 'Artificial Cooling', dubef, du(kp05) 
                end if 
             end if 
@@ -733,29 +1167,29 @@
          else 
             if (ieos.eq.3) then 
 !--the energy is the variable of state:                                 
-            du(kp05)=-pdv + 0.5*dq(kp05) - dunu(kp05) 
+            du(kp05) =-pdv + 0.5*dq(kp05) - dunu(kp05) 
             if (rho(kp05+1).gt.0.1.and.kp05.lt.1) then 
-               xp05=.5d0*(x(k)+x(k1)) 
-               xp15=.5d0*(x(k1)+x(k1+1)) 
+               xp05 = .5d0*(x(k)+x(k1)) 
+               xp15 = .5d0*(x(k1)+x(k1+1)) 
                if (temp(kp05)*xp05.gt.1.2d0*temp(kp05+1)*xp15) then 
-                  dubef=du(kp05) 
-                  du(kp05)=min(1.2d0*du(kp05),-1.d-2*du(kp05)) 
+                  dubef    = du(kp05) 
+                  du(kp05) = min(1.2d0*du(kp05),-1.d-2*du(kp05)) 
                   print *, 'Artificial Cooling', dubef, du(kp05) 
                end if 
             end if 
 !            du(kp05)=-pdv  - dunu(kp05)                                
 !                                                                       
-            elseif (ieos.eq.4) then 
+            elseif (ieos.eq.4.or.ieos.eq.5) then 
 !--the entropy is the variable of state:                                
                du(kp05)=(0.5*dq(kp05) - dunu(kp05) +                    &
      &                sfac*dye(kp05)*(xmuhat(kp05)-                     &
      &                xmue(kp05)))/temp(kp05)                           
                if (rho(kp05+1).gt.0.1.and.kp05.lt.1) then 
-                  xp05=.5d0*(x(k)+x(k1)) 
-                  xp15=.5d0*(x(k1)+x(k1+1)) 
+                  xp05 = .5d0*(x(k)+x(k1)) 
+                  xp15 = .5d0*(x(k1)+x(k1+1)) 
                   if (temp(kp05)*xp05.gt.1.2d0*temp(kp05+1)*xp15) then 
-                     dubef=du(kp05) 
-                     du(kp05)=min(1.2d0*du(kp05),-1.d-2*du(kp05)) 
+                     dubef    = du(kp05) 
+                     du(kp05) = min(1.2d0*du(kp05),-1.d-2*du(kp05)) 
                      print *, 'Artificial Cooling', dubef, du(kp05) 
                   end if 
                end if 
@@ -788,8 +1222,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
       parameter (iqn=17) 
       parameter (avokb=6.02e23*1.381e-16) 
 !                                                                                     
@@ -835,7 +1269,8 @@
 !                                                                       
 !--entropy conversion factor                                            
       sfac=avokb*utemp/uergg 
-!                                                                       
+!           
+      print*, 'I am eosglf!'                                                            
       do k=1,ncell 
          tempk=temp(k) 
          rhok=rho(k)*udens 
@@ -942,7 +1377,7 @@
             call nados(tempk,dens,zbark,abar2,pel,eel,sel,              &
      &                  ptot,etot,stot,dpt,det,dpd,ded,gamsl,etak)      
             dens=rho(k) 
-            call coulomb(dens,zbark,yek,ucoul,pcoul) 
+            call coulomb(dens,zbark,yek,ucoul,pcoul)             
             u(k)=ucoul+ubind/uergg+etot/uou1 
             xp(k)=xpk 
             xn(k)=xnk 
@@ -960,7 +1395,7 @@
             endif 
             !print *,'change occured at cell',k,ifleos(k)
          endif 
-!                                                                       
+!                                                                    
       enddo 
 !      write(*,100) rhomax,kount12,kount21,kount23,kount32              
 !  100 format('eosflg: rhomax, 1->2, 2->1, 2->3, 3->2',1pe10.2,4(1x,I4))
@@ -979,8 +1414,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       dimension rho(idim), u(idim) 
 !                                                                       
@@ -1000,10 +1435,10 @@
 !                                                                       
       if(gamma.eq.1.)then 
          do k=1,ncell 
-            prold(k) = pr(k) 
-            pr(k)=u(k)*rho(k) 
-            vsound(k)=dsqrt(pr(k)/rho(k)) 
-            vsmax=dmax1(vsmax,vsound(k)) 
+            prold(k)  = pr(k) 
+            pr(k)     = u(k)*rho(k) 
+            vsound(k) = dsqrt(pr(k)/rho(k)) 
+            vsmax     = dmax1(vsmax,vsound(k)) 
          enddo 
          return 
       end if 
@@ -1011,10 +1446,10 @@
 !--perfect gas equation of state                                        
 !                                                                       
       do k=1,ncell 
-         prold(k) = pr(k) 
-         pr(k)=u(k)*gama1*rho(k) 
-         vsound(k)=dsqrt(gamma*pr(k)/rho(k)) 
-         vsmax=dmax1(vsound(k),vsmax) 
+         prold(k)  = pr(k) 
+         pr(k)     = u(k)*gama1*rho(k) 
+         vsound(k) = dsqrt(gamma*pr(k)/rho(k)) 
+         vsmax     = dmax1(vsound(k),vsmax) 
       enddo 
       return 
       END                                           
@@ -1032,8 +1467,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       dimension rho(idim), u(idim) 
 !                                                                       
@@ -1057,31 +1492,31 @@
       tempmx=-1e20 
       tempmn=1e20 
       do k=1,ncell 
-         rhok=dble(rho(k)) 
-         uk=dble(u(k)) 
-         adrho=dble(arad)/rhok 
-         t9=dble(temp(k)) 
-         rdmu=dble(bigr/xmu(k)) 
+         rhok  = dble(rho(k)) 
+         uk    = dble(u(k)) 
+         adrho = dble(arad)/rhok 
+         t9    = dble(temp(k)) 
+         rdmu  = dble(bigr/xmu(k)) 
          call rootemp1(t9,uk,rdmu,adrho,iflag) 
          if(iflag.eq.1) then 
             write(*,*)'temperature did not converge!',k 
             write(*,*)t9,ui, rhoi 
          end if 
-         temp(k)=t9 
-         tempmx=dmax1(temp(k),tempmx) 
-         tempmn=dmin1(temp(k),tempmn) 
+         temp(k) = t9 
+         tempmx  = dmax1(temp(k),tempmx) 
+         tempmn  = dmin1(temp(k),tempmn) 
 !                                                                       
 !--compute the various pressures                                        
 !                                                                       
-         prad=dble(arad)*t9*t9*t9*t9*0.3333333333333d0 
-         pgas=rhoi*t9*rdmu 
+         prad     = dble(arad)*t9*t9*t9*t9*0.3333333333333d0 
+         pgas     = rhoi*t9*rdmu 
          prold(k) = pr(k) 
-         pr(k)=pgas+prad 
+         pr(k)    = pgas+prad 
 !                                                                       
 !--compute thermal energy and sound speed                               
 !                                                                       
-         vsound(k)=dsqrt(1.66666666*real(pgas)/rho(k)) 
-         vsmax=dmax1(vsound(k),vsmax) 
+         vsound(k) = dsqrt(1.66666666*real(pgas)/rho(k)) 
+         vsmax     = dmax1(vsound(k),vsmax) 
       enddo 
       print*,'eospgr:max,min temp(K)',tempmx*1e9,tempmn*1e9 
 !                                                                       
@@ -1098,8 +1533,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       double precision umass 
       double precision rhok, uk, tempk, yek, ptot, cs, etak,            &
@@ -1128,104 +1563,121 @@
       logical ifign 
       common /ign  / ifign(idim) 
 !                                                                       
-      tempmx=-1e20 
-      tempmn=1e20 
-      vsmax=0. 
+      tempmx =-1e20 
+      tempmn = 1e20 
+      vsmax  = 0. 
+      276 format(A,I4,1p,20(E10.3))
       do k=1,ncell 
-         rhok=rho(k) 
-         uk=u(k) 
-         tempk=temp(k) 
-         yek=ye(k) 
+        ! if (k==ncell) then
+        !    write(*,276),'vars: ', k, abar(k)
+        !     write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye(k), &
+        !     xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
+        !     abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
+        !  endif
+
+         rhok  = rho(k) 
+         uk    = u(k) 
+         tempk = temp(k) 
+         yek   = ye(k) 
          if (yek.lt.0.) then 
             print *,'k,yek',k,yek 
-            stop 
+            stop "ERROR: yek < 0"
          endif 
 !                                                                       
 !--assume chemical freeze-out                                           
 !                                                                       
          if (ifleos(k).eq.1) then 
-            abark=abar(k) 
+            abark     = abar(k) 
             call rootemp2(k,rhok,uk,tempk,yek,abark,                    &
      &                    ptot,cs,etak,stot)                            
-            xpk=0. 
-            xnk=0. 
-            xmue(k)=etak*tempk 
-            xmuhat(k)=0.0 
-            xalpha(k)=0.0 
-            xheavy(k)=1. 
-            yeh(k)=yek 
-            ifign(k)=.true. 
+            xpk       = 0. 
+            xnk       = 0. 
+            xmue(k)   = etak*tempk 
+            xmuhat(k) = 0.0 
+            xalpha(k) = 0.0 
+            xheavy(k) = 1. 
+            yeh(k)    = yek 
+            ifign(k)  = .true. 
 !                                                                       
 !--ocean eos + nse                                                      
 !                                                                       
          elseif (ifleos(k).eq.2) then 
-            tempk=tempold(k) 
-            xpk=xpold(k) 
-            xnk=xnold(k) 
-            rholdk=rhold(k)*udens 
-            yeoldk=yeold(k) 
+            tempk  = tempold(k) 
+            xpk    = xpold(k) 
+            xnk    = xnold(k) 
+            rholdk = rhold(k)*udens 
+            yeoldk = yeold(k) 
             call rootemp3(k,rhok,uk,tempk,yek,rholdk,yeoldk,            &
      &                    ptot,cs,etak,xpk,xnk,xak,xhk,yehk,abark,stot) 
-            abar(k)=abark 
-            xalpha(k)=xak 
-            xheavy(k)=xhk 
-            yeh(k)=yehk 
-            xmue(k)=etak*tempk 
-            xmuhat(k)=0.0 
-            ifign(k)=.false.                      
+            abar(k)   = abark 
+            xalpha(k) = xak 
+            xheavy(k) = xhk 
+            yeh(k)    = yehk 
+            xmue(k)   = etak*tempk 
+            xmuhat(k) = 0.0 
+            ifign(k)  = .false.                      
 !                                                                       
 !--Swesty and Lattimer eos                                              
 !                                                                       
          else 
-            xpfk=xpf(k) 
-            p2k=pvar2(k) 
-            p3k=pvar3(k) 
-            p4k=pvar4(k) 
-            abark=abar(k) 
+            xpfk  = xpf(k) 
+            p2k   = pvar2(k) 
+            p3k   = pvar3(k) 
+            p4k   = pvar4(k) 
+            abark = abar(k) 
             call rootemp4(k,rhok,uk,yek,tempk,xpfk,p2k,p3k,p4k,         &
      &              ptot,cs,etak,xpk,xnk,xak,xhk,yehk,abark,xmuhk,stot) 
-            xpf(k)=xpfk 
-            pvar2(k)=p2k 
-            pvar3(k)=p3k 
-            pvar4(k)=p4k 
+            xpf(k)   = xpfk 
+            pvar2(k) = p2k 
+            pvar3(k) = p3k 
+            pvar4(k) = p4k 
 !-- assume all dissociated, this could be changed in the future         
-            abar(k)=abark 
-            xalpha(k)=xak 
-            xheavy(k)=xhk 
-            yeh(k)=yehk 
-            xmue(k)=etak*tempk 
-            xmuhat(k)=xmuhk 
-            ifign(k)=.false. 
+            abar(k)   = abark 
+            xalpha(k) = xak 
+            xheavy(k) = xhk 
+            yeh(k)    = yehk 
+            xmue(k)   = etak*tempk 
+            xmuhat(k) = xmuhk 
+            ifign(k)  = .false. 
          endif 
 !                                                                       
 !--store values                                                         
 !                                                                       
          if (xpk.le.1d-20) then 
-            xpk=0. 
+            xpk = 0. 
          end if 
          if (xnk.le.1d-20) then 
-            xnk=0. 
+            xnk = 0. 
          end if 
-         xp(k)=xpk 
-         xn(k)=xnk 
-         eta(k)=etak 
-         temp(k)=tempk 
-         prold(k) = pr(k) 
-         pr(k)=ptot 
-         u2(k)=stot 
-         vsound(k)=dmin1(cs,0.3333d0*clight) 
-         vsmax=dmax1(vsmax,vsound(k)) 
-         tempmx=dmax1(tempmx,temp(k)) 
-         tempmn=dmin1(tempmn,temp(k)) 
-!                                                                       
+         xp(k)     = xpk 
+         xn(k)     = xnk 
+         eta(k)    = etak 
+         temp(k)   = tempk 
+         prold(k)  = pr(k) 
+         pr(k)     = ptot 
+         u2(k)     = stot 
+         vsound(k) = dmin1(cs,0.3333d0*clight) 
+         vsmax     = dmax1(vsmax,vsound(k)) 
+         tempmx    = dmax1(tempmx,temp(k)) 
+         tempmn    = dmin1(tempmn,temp(k)) 
+!         
       enddo 
+
+    !  k = k-1              
+    !  write(*,276),'aftr: ', k, abar(k)
+    !   write(*,276),'aftr: ', k, rho(k), temp(k), u(k), ye(k), &
+    !   xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
+    !   abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
+
       !print *,'eos3: tempmn, tempmx',tempmn,tempmx                     
-      !print *,'eta(1),ifleos(1),temp(1):',eta(1),ifleos(1),temp(1)     
+      !print *,'eta(1),ifleos(1),temp(1):',eta(1),ifleos(1),temp(1)    
+      !print*, abar
+      !call EXIT 
       return 
       END                                           
 !          
       
-      subroutine eos5(ncell,rho,u,ye_spho) 
+      subroutine eos5(ncell,rho,u,ye_table) 
         !*************************************************************          
         !                                                                       
         !     compute pressures and temperatures with the                       
@@ -1236,15 +1688,15 @@
               use eosmodule                           
               implicit double precision (a-h,o-z) 
         !                                                                       
-              parameter (idim=4000) 
-              parameter (idim1=idim+1)
-              parameter (avokb=6.02e23*1.381e-16)                            
+              parameter (idim=10000) 
+              parameter (idim1 = idim+1)
+              parameter (avokb = 6.02e23*1.381e-16)                            
             
               real*8 xrho,xye,xtemp,xtemp2
               real*8 xenr,xprs,xent,xcs2,xdedt,xmunu
               real*8 xdpderho,xdpdrhoe
-              real*8 xabar,xzbar,xmu_e,xmu_n,xmu_p,xmuhat_spho
-              real*8 xxa,xxh,xxn,xxp              
+              real*8 xabar,xzbar,xmu_e,xmu_n,xmu_p,xmuhat_table
+              real*8 xxa,xxh,xxn,xxp 
               integer keytemp,keyerr
         !                                                                       
               double precision umass 
@@ -1252,7 +1704,7 @@
              &                 abark, xpk, xnk, xak, xhk, yehk, rholdk,         &
              &                 yeoldk,xpfk, p2k, p3k, p4k, xmuhk, stot          
         !                                                                       
-              dimension rho(idim), u(idim), ye_spho(idim) 
+              dimension rho(idim), u(idim), ye_table(idim) 
         !                                                                       
               common /prev/ xold(0:idim),vold(0:idim),rhold(idim),              &
              &              prold(idim), tempold(idim), yeold(idim),            &
@@ -1268,6 +1720,7 @@
               common /cpots/ xmue(idim), xmuhat(idim) 
               common /hnucl/ xalpha(idim),xheavy(idim), yeh(idim) 
               common /cgas / gamma 
+              common /typef/ iextf, ieos
               common /const/ gg, clight, arad, bigr, xsecnn, xsecne 
               common /units/ umass, udist, udens, utime, uergg, uergcc 
               common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
@@ -1281,63 +1734,77 @@
               data ergmev /6.2422e5/, sigma1/9d-44/, sigma2/5.6d-45/ 
               data c2cgs /6.15e-4/, c3cgs /5.04e-10/, fermi/1d-13/
         !                                                                       
-              tempmx  =-1e20 !? 
-              tempmn  = 1e20 !?
-              vsmax   = 0.   !?
-              keytemp = 1
+              tempmx =-1e20 !? 
+              tempmn = 1e20 !?
+              vsmax  = 0.   !?
+
+! keytemp: 0 -> coming in with rho,eps,ye (solve for temp)
+!          1 -> coming in with rho,temperature,ye
+!          2 -> coming in with rho,entropy,ye (solve for temp)
+!          3 -> coming in with pressure,temp,ye (solve for rho)
+!
+              if (ieos.eq.5) then
+                keytemp = 2
+              elseif (ieos.eq.6) then
+                keytemp = 0
+              endif
+
               keyerr  = 0
               
-              upr = umass/udist/utime**2
-              uv  = udist/utime
-              sfac= avokb*utemp/uergg
-              !uent = 1!uergg/utemp ! not needed
-              !ueta = ergmev/utemp ! not needed
-              
-              !print*, 'uergg ', uergg
-              !print*, 'udens ', udens     
+              upr  = umass/udist/utime**2
+              uv   = udist/utime
+              sfac = avokb*utemp/uergg
+
               ifign(:) = .false.  
               
-              276 format(A,I4,1p,20(E10.3))
-
-              do k=1,ncell             
-                 xrho=rho(k)*udens
-                 xenr=u(k)*uergg
-                 xtemp=temp(k)*utemp*boltzmev
-                 xye=ye_spho(k)
-
-                !  if (k==ncell) then
-                !     write(*,276),'vars: ', k, rho(k), temp(k), u(k), ye_spho(k), &
-                !     xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
-                !     abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
-                !  endif
+              276 format(A,I4,1p,20(E10.3))            
+              
+              do k=1,ncell                 
+                 xrho  = rho(k)*udens
+                 xenr  = u(k)*uergg
+                 xtemp = temp(k)*utemp*boltzmev
+                 xye   = ye_table(k)
+                 xent  = u2(k)/sfac
                  
-                 ! set upper and lower bounds
-                 if (xye  .ge.0.6  ) xye  = 0.599
-                 if (xrho .lt.166.5) xrho = 166.5 
-                 if (xtemp.lt.0.011) then
-                     !print*, 'print? ',xtemp
-                     xtemp= 0.011                  
+                 ! set upper and lower bounds based on SFHo table limits
+                 if (xye  .gt.0.59999)  xye   = 0.59999
+                 if (xrho .lt.166.054)  then
+                    print*, 'xrho hit min', k
+                    xrho  = 166.054
                  endif
+                 if (xtemp.lt.0.01) then
+                    print*, 'xtemp hit min', k
+                    xtemp = 0.01
+                 endif   
+                 if (xent .lt.0.000131) then
+                    print*, 'xent hit min', k
+                    xent  = 0.000131  
+                 endif
+                 !if (xenr .lt.-1.d17) then
+                    !print*, 'xenr hit min', k
+                 !   xenr  = -1.d17
+                 !endif
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
-                    stop 
+                    stop "ERROR: xye < 0"
                  endif 
+                 
         !                                                                       
-        !--SFHo EoS tables                                               
-        !                     
+        !--SFHo EOS tables                                               
+        !              
                  call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,             &
                     xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-                    xmuhat_spho,keytemp,keyerr,precision)    
+                    xmuhat_table,keytemp,keyerr,precision)   
                  !                                                                       
                  !--store values - CHECK UNITS!!!                                                        
                  !                 
-                 abar(k)=   xabar !
-                 xalpha(k)= xxa   !
-                 xheavy(k)= xxh   !
-                 yeh(k)=    xye   !
-                 xmue(k)=   xmu_e/utemp/boltzmev  ! Units: 1e9 K -> MeV               
-                 xmuhat(k)= xmuhat_spho/utemp/boltzmev                 
+                 abar(k)   = xabar !
+                 xalpha(k) = xxa   !
+                 xheavy(k) = xxh   !
+                 yeh(k)    = xye   !
+                 xmue(k)   = xmu_e/utemp/boltzmev  ! Units: 1e9 K -> MeV               
+                 xmuhat(k) = xmuhat_table/utemp/boltzmev                 
 
                  if (xxp.le.1d-20) then 
                     xxp=0. 
@@ -1346,27 +1813,21 @@
                     xxn=0. 
                  end if 
 
-                 xp(k)=     xxp !
-                 xn(k)=     xxn !
-                 eta(k)=    (xmu_e/xtemp) !
-                 temp(k)=   xtemp/utemp/boltzmev
-                 prold(k) = pr(k) 
-                 pr(k)=     xprs/upr
-                 u2(k)=     xent*sfac ! kb per nucleon
-                 vsound(k)= sqrt(xcs2)/uv                 
+                 xp(k)     = xxp !
+                 xn(k)     = xxn !
+                 eta(k)    = xmu_e/xtemp !
+                 temp(k)   = xtemp/utemp/boltzmev
+                 prold(k)  = pr(k) 
+                 pr(k)     = xprs/upr
+                 u(k)      = xenr/uergg
+                 u2(k)     = xent*sfac
+                 vsound(k) = sqrt(xcs2)/uv                  
 
                  ! zbar would be nice but not completely *necessary*
-                 vsmax=dmax1(vsmax,vsound(k)) 
-                 tempmx=dmax1(tempmx,temp(k)) 
-                 tempmn=dmin1(tempmn,temp(k))                    
-        !                          
-              enddo
-
-            !   k = k-1              
-            !   write(*,276),'aftr: ', k, rho(k), temp(k), u(k), ye_spho(k), &
-            !   xp(k),xn(k),eta(k),prold(k),pr(k),u2(k), vsound(k),          &
-            !   abar(k), xalpha(k), xheavy(k), yeh(k), xmue(k), xmuhat(k)
-            !   call EXIT
+                 vsmax  = dmax1(vsmax,vsound(k)) 
+                 tempmx = dmax1(tempmx,temp(k)) 
+                 tempmn = dmin1(tempmn,temp(k))                          
+              enddo                 
 
               return 
               END        
@@ -1383,8 +1844,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       dimension x(0:idim),f(0:idim),v(0:idim) 
       dimension fmix(idim) 
@@ -1394,47 +1855,50 @@
       common /fturb/ geff(idim), fmix1(idim), fmix2(idim) 
       common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
-      alpha(1)=1.d0/6.d0 
-      alpha(2)=1.d0/6.d0 
-      alpha(3)=1.d0/6.d0 
-      alpha(4)=1.d0/6.d0 
+      alpha(1) = 1.d0/6.d0 
+      alpha(2) = 1.d0/6.d0 
+      alpha(3) = 1.d0/6.d0 
+      alpha(4) = 1.d0/6.d0 
                                                                         
       do k=1,ncell 
-         dx=x(k)-x(k-1) 
-         dv=v(k)-v(k-1) 
-         geff(k)=geff(k)+v(k)*dv/dx 
-         vturbk=dsqrt(vturb2(k)) 
+         dx      = x(k)-x(k-1) 
+         dv      = v(k)-v(k-1) 
+         geff(k) = geff(k)+v(k)*dv/dx 
+         vturbk  = dsqrt(vturb2(k)) 
+
          if (k.eq.1) then 
-            bvf(k)=(rho(k+1)-rho(k))/dx/rho(k)-                         &
-     &           (pr(k+1)-pr(k))/dx/rho(k)/vsound(k)**2                 
+            bvf(k) = (rho(k+1)-rho(k))/dx/rho(k)-                         &
+                     (pr(k+1)-pr(k))/dx/rho(k)/vsound(k)**2                 
          else 
-            bvf(k)=(rho(k+1)-rho(k))/dx/rho(k)-                         &
-     &           (pr(k+1)-pr(k))/dx/rho(k)/vsound(k)**2                 
+            bvf(k) = (rho(k+1)-rho(k))/dx/rho(k)-                         &
+                     (pr(k+1)-pr(k))/dx/rho(k)/vsound(k)**2                 
          end if 
-         bvf(k)=-geff(k)*bvf(k) 
-         dmix(k)=alpha(1)*pr(k)/rho(k)/geff(k) 
-         dk=alpha(2)*dmix(k)*vturbk 
+
+         bvf(k)  =-geff(k)*bvf(k) 
+         dmix(k) = alpha(1)*pr(k)/rho(k)/geff(k) 
+         dk      = alpha(2)*dmix(k)*vturbk
+
          if (k.eq.1) then 
-            dvt=dsqrt(vturb2(k+1))-vturbk 
-            dturb=1/x(k)**2/dx*(x(k)**2*rho(k+1)*                       &
-     &           vturb2(k+1)*(v(k)-dmix(k+1)*alpha(2)*                  &
-     &           dvt/dx) -                                              &
-     &           x(k-1)**2*rho(k)*vturb2(k)*(v(k-1)-                    &
-     &           dmix(k)*alpha(2)*dvt/dx))                              
+            dvt   = dsqrt(vturb2(k+1))-vturbk 
+            dturb = 1/x(k)**2/dx*(x(k)**2*rho(k+1)*                       &
+                   vturb2(k+1)*(v(k)-dmix(k+1)*alpha(2)*                  &
+                   dvt/dx) -                                              &
+                   x(k-1)**2*rho(k)*vturb2(k)*(v(k-1)-                    &
+                   dmix(k)*alpha(2)*dvt/dx))                              
          else 
-            dvt=vturbk-dsqrt(vturb2(k-1)) 
-            dturb=1/x(k)**2/dx*(x(k)**2*rho(k)*                         &
-     &           vturb2(k)*(v(k)-dmix(k)*alpha(2)*                      &
-     &           dvt/dx) -                                              &
-     &           x(k-1)**2*rho(k-1)*vturb2(k-1)*(v(k-1)-                &
-     &           dmix(k-1)*alpha(2)*dvt/dx))                            
+            dvt   = vturbk-dsqrt(vturb2(k-1)) 
+            dturb = 1/x(k)**2/dx*(x(k)**2*rho(k)*                         &
+                   vturb2(k)*(v(k)-dmix(k)*alpha(2)*                      &
+                   dvt/dx) -                                              &
+                   x(k-1)**2*rho(k-1)*vturb2(k-1)*(v(k-1)-                &
+                   dmix(k-1)*alpha(2)*dvt/dx))                            
          end if 
 !                                                                       
 !-- I'm doing a bit of a cheat here by assuming drho/dt=0.              
 !                                                                       
-         fmix(k)=-dturb/rho(k)-vturb2(k)*dvt+                           &
-     &        vturbk*bvf(k)**2*dmix(k)-                                 &
-     &        vturbk**3/dmix(k)                                         
+         fmix(k) =-dturb/rho(k)-vturb2(k)*dvt+                            &
+                vturbk*bvf(k)**2*dmix(k)-                                 &
+                vturbk**3/dmix(k)                                         
       end do 
       return 
       END                                           
@@ -1451,10 +1915,10 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !             
-      logical post_bounce
+      logical post_bounce, first_bounce
       double precision pr_turb
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       dimension x(0:idim),f(0:idim),v(0:idim) 
       dimension q(idim),rho(idim) 
@@ -1463,7 +1927,7 @@
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /carac/ deltam(idim), abar(idim) 
       common /damping/ damp, dcell 
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
@@ -1471,18 +1935,19 @@
 !                                                                       
 !--acceleration by pressure                                             
 !                                                                       
-      prnu(1)=0.d0 
-      prnu(ncell+1)=0.d0 
+      prnu(1)       = 0.d0 
+      prnu(ncell+1) = 0.d0 
+
       do k=1,ncell 
-         km05=k 
-         kp05=k+1 
-         ak=pi4*x(k)*x(k) 
-         xk3=(.5d0*(x(k-1)+x(k)))**2.5 
-         xkp3=(.5d0*(x(k)+x(k+1)))**2.5 
-         akp1=pi4*x(k+1)*x(k+1) 
-         akm1=pi4*x(k-1)*x(k-1) 
-         akp05=0.5d0*(akp1+ak) 
-         akm05=0.5d0*(ak+akm1) 
+         km05  =  k 
+         kp05  =  k+1 
+         ak    =  pi4*x(k)*x(k) 
+         xk3   = (.5d0*(x(k-1)+x(k)))**2.5 
+         xkp3  = (.5d0*(x(k)+x(k+1)))**2.5 
+         akp1  = pi4*x(k+1)*x(k+1) 
+         akm1  = pi4*x(k-1)*x(k-1) 
+         akp05 = 0.5d0*(akp1+ak) 
+         akm05 = 0.5d0*(ak+akm1) 
 !         deltamk=0.5d0*(deltam(km05)+deltam(kp05))                     
 !                                                                       
 !--pressure gradients                                                   
@@ -1493,23 +1958,23 @@
              pressp = pressp+pr_turb(kp05)
              pressm = pressm+pr_turb(km05)
          endif
-         gradp=ak*(pressp - pressm) 
+         gradp = ak*(pressp - pressm) 
          !gradpt=ak*(rho(kp05)*vturb2(kp05)-                             &
      !&        rho(km05)*vturb2(km05))                                   
 !                                                                       
 !--artificial viscosity pressure                                        
 !                                                                       
-         gradq=0.5d0*q(kp05)*(3.d0*akp05-ak) -                          &
-     &         0.5d0*q(km05)*(3.d0*akm05-ak)                            
+         gradq = 0.5d0*q(kp05)*(3.d0*akp05-ak) -                          &
+                 0.5d0*q(km05)*(3.d0*akm05-ak)                            
 !                                                                       
 !         write (99,199) k,x(k),f(k),                                   
 !     $        gradp/deltam(km05),gradq/deltam(km05)                    
-         f(k)=f(k)-(gradp+gradq+gradpt)/deltam(km05) 
+         f(k) = f(k)-(gradp+gradq+gradpt)/deltam(km05) 
 !                                                                       
 !--damping                                                              
 !                                                                       
          if (k.lt.int(dcell)) then 
-            f(k)=f(k)-damp*v(k) 
+            f(k) = f(k)-damp*v(k) 
          end if 
       enddo 
 ! 199  format(I4,4(1x,1pe12.4))                                         
@@ -1528,7 +1993,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
       dimension x(0:idim),f(0:idim) 
       dimension gpot(idim),deltam(idim) 
@@ -1543,36 +2008,37 @@
 !--and calculate forces (actually accelerations)                        
 !                                                                       
       if(dcore.gt.1.d0) then 
-         xmi(0)=xmcore 
-         r2=x(0)**2 
-         f(0)=-gg*xmi(0)/r2 
+         xmi(0) = xmcore 
+         r2     = x(0)**2 
+         f(0)   =-gg*xmi(0)/r2 
       else 
-         xmi(0)=0 
-         f(0)=0 
+         xmi(0) = 0 
+         f(0)   = 0 
       end if 
       do k=1,ncell 
-         xmi(k)=xmi(k-1)+deltam(k) 
-         r2=x(k)**2 
-         f(k)=-gg*xmi(k)/r2 
-!         geff(k)=-gg*xmi(k)/r2 
+         xmi(k) = xmi(k-1)+deltam(k) 
+         r2     = x(k)**2 
+         f(k)   =-gg*xmi(k)/r2 
+!         geff(k) =-gg*xmi(k)/r2 
       enddo 
 !                                                                       
 !--calculate gravitational potential                                    
 !                                                                       
-      const=gg/(clight*clight) 
-      r=x(ncell) 
-      gpot(ncell)=-const*xmi(ncell)/r 
-      rold=r 
+      const       = gg/(clight*clight) 
+      r           = x(ncell) 
+      gpot(ncell) =-const*xmi(ncell)/r 
+      rold        = r 
+
       do k=ncell-1,1,-1 
-         r=x(k) 
-         gpot(k)=gpot(k+1)-(rold-r)*const*xmi(k)/(r*r) 
-         rold=r 
+         r       = x(k) 
+         gpot(k) = gpot(k+1)-(rold-r)*const*xmi(k)/(r*r) 
+         rold    = r 
       enddo 
 !                                                                       
 !--calculate gravitational redshift (w.r.t. r=infinity)                 
 !                                                                       
       do k=1,ncell 
-         gshift(k)=1.d0/dsqrt(1.d0-2.0d0*gpot(k)) 
+         gshift(k) = 1.d0/dsqrt(1.d0-2.0d0*gpot(k)) 
 !         gshift(k)=1.d0                                                
       enddo 
 !                                                                       
@@ -1589,7 +2055,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
       common /cellc/ u(idim),rho(idim),ye(idim),q(idim) 
       common /numb/ ncell, ncell1 
@@ -1597,7 +2063,7 @@
       common /carac/ deltam(idim), abar(idim) 
 !                                                                       
       do i=1,ncell 
-         xmu(i)=abar(i)/(abar(i)*ye(i)+1.) 
+         xmu(i) = abar(i)/(abar(i)*ye(i)+1.) 
       enddo 
       return 
       END                                           
@@ -1629,37 +2095,37 @@
           write(*,*) 'NSE mis-stored entering nserho' 
           write(*,*) 'T9, rho, ye,k',t9,rhoold,yeold,k 
           write(*,*) 'inconsistent with yp, yn',yp,yn 
-          stop 
+          stop "ERROR: kit >= kmax"
       Endif 
-      ypold=yp 
-      ynold=yn 
-      delye=ye-yeold 
-      rhovar=rho-rhoold 
-      ider=0 
+      ypold  = yp 
+      ynold  = yn 
+      delye  = ye-yeold 
+      rhovar = rho-rhoold 
+      ider   = 0 
 !                                                                       
 !--If delye small, skip ye variation.                                   
 !                                                                       
       If(delye.lt.1.d-10) GOTO 50 
-      yelast=yeold 
+      yelast = yeold 
       Do 40 i=1,100 
-          delye=dsign(min(abs(ye-yelast),abs(delye)),delye) 
-          yetmp=yelast+delye 
+          delye = dsign(min(abs(ye-yelast),abs(delye)),delye) 
+          yetmp = yelast+delye 
           call nsesolv(ider,t9,rhoold,yetmp,yp,yn,kit,kmax,ubind,       &
      &                 xa,xh,yeh,zbar,abar)                             
           If (dabs(yetmp-ye).le.tolnse.and.kit.lt.kmax) goto 50 
           If (kit.ge.kmax) then 
-             delye=0.5d0*delye 
-             yp=ypold 
-             yn=ynold 
+             delye = 0.5d0*delye 
+             yp    = ypold 
+             yn    = ynold 
           Elseif(kit.lt.4) Then 
-             yelast=yetmp 
-             delye=2.d0*delye 
-             ypold=yp 
-             ynold=yn 
+             yelast = yetmp 
+             delye  = 2.d0*delye 
+             ypold  = yp 
+             ynold  = yn 
           Else 
-             yelast=yetmp 
-             ypold=yp 
-             ynold=yn 
+             yelast = yetmp 
+             ypold  = yp 
+             ynold  = yn 
           Endif 
    40 Continue 
       write(*,*)'Ye loop failure in ',i,'steps for particle',k 
@@ -1669,39 +2135,39 @@
       write(*,*)kit,zbar,abar 
       write(*,*)kmax,ubind,dubind 
       write(*,*)testk,testzy,testay,testyp,testyn 
-      stop 
+      stop "ERROR: Ye loop failure"
    50 Continue 
 !                                                                       
 !--Begin rho iteration                                                  
 !                                                                       
-      ypold=yp 
-      ynold=yn 
-      rholast=rhoold 
+      ypold   = yp 
+      ynold   = yn 
+      rholast = rhoold 
       If(dabs(rhovar).gt.1d7) Then 
-          delrho=dsign(max(1d7,0.125d0*rhovar),rhovar) 
+          delrho = dsign(max(1d7,0.125d0*rhovar),rhovar) 
       Else 
-          delrho=rhovar 
+          delrho = rhovar 
       Endif 
 !                                                                       
       do 60 i=1,500 
-          delrho=dsign(min(abs(rho-rholast),abs(delrho)),delrho) 
-          rhotmp=rholast + delrho 
+          delrho = dsign(min(abs(rho-rholast),abs(delrho)),delrho) 
+          rhotmp = rholast + delrho 
           call nsesolv(ider,t9,rhotmp,ye,yp,yn,kit,kmax,ubind,          &
      &                 xa,xh,yeh,zbar,abar)                             
           If(dabs((rhotmp-rho)/rho).lt.tolnse.and.kit.lt.kmax) goto 70 
           If (kit.ge.kmax) Then 
-              delrho=.5d0*delrho 
-              yp=ypold 
-              yn=ynold 
+              delrho = .5d0*delrho 
+              yp     = ypold 
+              yn     = ynold 
           Elseif(kit.lt.4) Then 
-             rholast=rhotmp 
-             delrho=2.d0*delrho 
-             ypold=yp 
-             ynold=yn 
+             rholast = rhotmp 
+             delrho  = 2.d0*delrho 
+             ypold   = yp 
+             ynold   = yn 
           Else 
-              rholast=rhotmp 
-              ypold=yp 
-              ynold=yn 
+              rholast = rhotmp 
+              ypold   = yp 
+              ynold   = yn 
           Endif 
    60 Continue 
       write(*,*)'rho loop failure in ',i,'steps for particle',k 
@@ -1711,7 +2177,7 @@
       write(*,*)kit,zbar,abar 
       write(*,*)kmax,ubind,dubind 
       write(*,*)testk,testzy,testay,testyp,testyn 
-      stop 
+      stop "ERROR: rho loop failure"
    70 Continue 
    90 format(A25,3(1pe12.4),I3) 
 !                                                                       
@@ -1734,15 +2200,15 @@
       Else 
           delt9=1d-2 
       Endif 
-   80 t9d=t9+delt9 
-      ypd=yp 
-      ynd=yn 
+   80 t9d = t9+delt9 
+      ypd = yp 
+      ynd = yn 
       call nsesolv(ider,t9d,rho,ye,ypd,ynd,kit,kmax,ubindd,             &
      &             x11a,xh,yeh,zbar,abar)                               
       If(kit.ge.kmax) Then 
           write(*,*) 'dUb/dT step failure in nserho, particle ',k 
           write(*,*) kit,t9d,t9 
-          delt9=.5d0*delt9 
+          delt9 = .5d0*delt9 
           goto 80 
       Endif 
       dubind=(ubindd-ubind)/(t9d-t9) 
@@ -1777,12 +2243,12 @@
           write(*,*) 'NSE mis-stored entering nsetemp' 
           write(*,*) 'T9, rho, ye',t9old,rho,ye 
           write(*,*) 'inconsistent with yp, yn',yp,yn 
-          if (yp.eq.0.) stop 
+          if (yp.eq.0.) stop "ERROR: kit >= kmax and yp == 0"
       Endif 
-      ypold=yp 
-      ynold=yn 
-      t9min=min(t9,t9old) 
-      ider=0 
+      ypold = yp 
+      ynold = yn 
+      t9min = min(t9,t9old) 
+      ider  = 0 
 !                                                                       
 !--pick initial delt9                                                   
 !                                                                       
@@ -1792,32 +2258,32 @@
       elseif(t9min.gt.20.d0) then 
          delt9=2.d0 
       end if 
-      delt9=dsign(delt9,t9-t9old) 
-      ypold=yp 
-      ynold=yn 
-      t9last=t9old 
+      delt9  = dsign(delt9,t9-t9old) 
+      ypold  = yp 
+      ynold  = yn 
+      t9last = t9old 
 !                                                                       
 !--Begin temp iteration                                                 
 !                                                                       
       do i=1,1000 
-          delt9=dsign(min(dabs(t9-t9last),dabs(delt9)),delt9) 
-          t9tmp=t9last+delt9 
+          delt9 = dsign(min(dabs(t9-t9last),dabs(delt9)),delt9) 
+          t9tmp = t9last+delt9 
           call nsesolv(ider,t9tmp,rho,ye,yp,yn,kit,kmax,ubind,          &
      &                   xa,xh,yeh,zbar,abar)                           
           If(dabs((t9tmp-t9)/t9).lt.tolnse.and.kit.lt.kmax) goto 70 
           If (kit.ge.kmax) Then 
-              delt9=.5d0*delt9 
-              yp=ypold 
-              yn=ynold 
+              delt9 = .5d0*delt9 
+              yp    = ypold 
+              yn    = ynold 
           Elseif(kit.lt.4) Then 
-              delt9=2.d0*delt9 
-              t9last=t9tmp 
-              ypold=yp 
-              ynold=yn 
+              delt9  = 2.d0*delt9 
+              t9last = t9tmp 
+              ypold  = yp 
+              ynold  = yn 
           Else 
-              t9last=t9tmp 
-              ypold=yp 
-              ynold=yn 
+              t9last = t9tmp 
+              ypold  = yp 
+              ynold  = yn 
           Endif 
       enddo 
 !                                                                       
@@ -1842,7 +2308,7 @@
       If(kit.ge.kmax) Then 
           write(*,*) 'NSEtemp failed for final T9, particle',k 
           write(*,*) kit,t9,t9tmp 
-          STOP 
+          STOP "ERROR: kit >= kmax"
       Endif 
 !                                                                       
 !--Overstep in T9 to calculate dUb/dT9                                  
@@ -1854,18 +2320,18 @@
       Else 
           delt9=1d-2 
       Endif 
-   80 t9d=t9+delt9 
-      ypd=yp 
-      ynd=yn 
+   80 t9d = t9+delt9 
+      ypd = yp 
+      ynd = yn 
       call nsesolv(ider,t9d,rho,ye,ypd,ynd,kit,kmax,ubindd,             &
      &             xa,xh,yeh,zbar,abar)                                 
       If(kit.ge.kmax) Then 
           write(*,*) 'dUb/dT step failure in nsetemp, particle ',k 
           write(*,*) kit,t9d,t9 
-          delt9=.5d0*delt9 
+          delt9 = .5d0*delt9 
           goto 80 
       Endif 
-      dubind=(ubindd-ubind)/(t9d-t9) 
+      dubind = (ubindd-ubind)/(t9d-t9) 
 !                                                                       
 !                                                                       
 !--step back in T9, in order to calculate dUbind/dT9                    
@@ -1895,7 +2361,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter (delta=0.783) 
       parameter (deltab=1.805) 
 !-- tffac=(6pi^2/2)^2/3 hbar*2/(2 mp kb)*avo^2/3                        
@@ -1935,27 +2401,27 @@
 !                                                                       
       tol=1.d-15 
       if (enue.lt.tol) then 
-         facnue=0.d0 
-         xnorme=0.d0 
+         facnue = 0.d0 
+         xnorme = 0.d0 
       else 
-         facnue=(enue+delta)/enue 
-         xnorme=uergg/(facnue*enue*umeverg) 
+         facnue = (enue+delta)/enue 
+         xnorme = uergg/(facnue*enue*umeverg) 
       end if 
       if (enueb.lt.tol) then 
-         facnueb=0.d0 
-         xnormb=0.d0 
+         facnueb = 0.d0 
+         xnormb  = 0.d0 
       else 
-         facnueb=(enueb-deltab)/enueb 
-         xnormb=uergg/(facnueb*enueb*umeverg) 
+         facnueb = (enueb-deltab)/enueb 
+         xnormb  = uergg/(facnueb*enueb*umeverg) 
       end if 
 !                                                                       
-      tf=tfermi/utemp 
-      denue=0.0 
-      denueb=0.0 
+      tf     = tfermi/utemp 
+      denue  = 0.0 
+      denueb = 0.0 
 !      uconv=1./umevnuc                                                 
-      prefac=4.*3.14159*xsecnn*clight 
-      dt = steps(1) 
-      dt9=9.*dt 
+      prefac = 4.*3.14159*xsecnn*clight 
+      dt     = steps(1) 
+      dt9    = 9.*dt 
       do i=1,ncell 
          if (trapnue(i)) then 
 !                                                                       
@@ -1970,48 +2436,49 @@
 !--compute degeneracy blocking                                          
                call integrals(eta(i),f0,f1,f2,f3,f4,f5,0,df2,df3) 
                call integrals(etanue(i),g0,g1,g2,g3,g4,g5,0,dg2,dg3) 
-               expon=dexp(dmin1(enuet(i)/(temp(i)*utmev)-eta(i),50.d0)) 
+               expon = dexp(dmin1(enuet(i)/(temp(i)*utmev)-eta(i),50.d0)) 
 !--bel: electron end-state blocking                                     
-               bel=expon/(1.+expon) 
-               tneut=dmax1(temp(i),tf*(xn(i)*rho(i)*udens)**(0.66666)) 
-               tfpr=tf*(xp(i)*rho(i)*udens)**(0.66666) 
-               expon=dexp((tneut-tfpr)/temp(i)) 
+               bel   = expon/(1.+expon) 
+               tneut = dmax1(temp(i),tf*(xn(i)*rho(i)*udens)**(0.66666)) 
+               tfpr  = tf*(xp(i)*rho(i)*udens)**(0.66666) 
+               expon = dexp((tneut-tfpr)/temp(i)) 
 !--bpr: proton end-state blocking                                       
-               bpr=expon/(1.+expon) 
-               block=bel*bpr 
-               fac=prefac*rho(i) 
-               facn=fac*enuet(i)*enuet(i)*ynue(i)*xn(i)*block 
-               dy9=ynue(i)/dt9 
+               bpr   = expon/(1.+expon) 
+               block = bel*bpr 
+               fac   = prefac*rho(i) 
+               facn  = fac*enuet(i)*enuet(i)*ynue(i)*xn(i)*block 
+               dy9   = ynue(i)/dt9 
                if (facn.gt.dy9) facn=dy9 
             endif 
-            dynue(i)=dynue(i)-facn 
-            enuei=enuet(i)+delta 
-            facunue=facn*umevnuc*enuei 
-            dnuae(i)=facunue 
-            dunue(i)=dunue(i)-facunue 
-            dunu(i)=dunu(i)-facunue 
-            dye(i)=dye(i)+facn 
+                        
+            dynue(i) = dynue(i)-facn 
+            enuei    = enuet(i)+delta 
+            facunue  = facn*umevnuc*enuei 
+            dnuae(i) = facunue 
+            dunue(i) = dunue(i)-facunue 
+            dunu(i)  = dunu(i)-facunue 
+            dye(i)   = dye(i)+facn 
          else 
 !--correct enue and e2nue for gravitational redshift                    
-            fshift=1./gshift(i) 
+            fshift = 1./gshift(i) 
 !--artificially lower energy here                                       
-            cenue=enue*fshift 
-            ce2nue=e2nue*fshift*fshift 
-            expon=dexp(min(cenue/(temp(i)*utmev)-eta(i),50.d0)) 
+            cenue  = enue*fshift 
+            ce2nue = e2nue*fshift*fshift 
+            expon  = dexp(min(cenue/(temp(i)*utmev)-eta(i),50.d0)) 
 !--bel: electron end-state blocking                                     
-            bel=expon/(1.+expon) 
-            block=bel 
-            fac=xsecnn/(x(i)*x(i)) 
+            bel    = expon/(1.+expon) 
+            block  = bel 
+            fac    = xsecnn/(x(i)*x(i)) 
 !                                                                       
 !  a) energy absorption                                                 
 !                                                                       
-            facunue=xn(i)*fac*ce2nue*rlumnue*fshift*facnue*block 
-            denue=denue+facunue*deltam(i)/fshift 
-            dunu(i)=dunu(i) - facunue 
+            facunue = xn(i)*fac*ce2nue*rlumnue*fshift*facnue*block 
+            denue   = denue+facunue*deltam(i)/fshift 
+            dunu(i) = dunu(i) - facunue 
 !                                                                       
 !  b) change in Ye                                                      
 !                                                                       
-            dye(i)=dye(i) + facunue*xnorme 
+            dye(i) = dye(i) + facunue*xnorme 
          endif 
 !                                                                       
 !--e anti-neutrino absorption by protons                                
@@ -2023,43 +2490,44 @@
             else 
 !--since all the energy from the nueb goes into e+ which is never       
 !--degenerate, the only term that counts is xmuhat                      
-               tprot=dmax1(temp(i),tf*(xp(i)*rho(i)*udens)**(0.66666)) 
-               tfne=tf*(xn(i)*rho(i)*udens)**(0.666666666) 
-               expon=dexp((tprot-tfne)/temp(i)) 
+               tprot = dmax1(temp(i),tf*(xp(i)*rho(i)*udens)**(0.66666)) 
+               tfne  = tf*(xn(i)*rho(i)*udens)**(0.666666666) 
+               expon = dexp((tprot-tfne)/temp(i)) 
 !--bne: neutron end-state blocking                                      
-               bne=expon/(1.+expon) 
-               block=bne 
-               fac=prefac*rho(i) 
-               facp=fac*enuebt(i)*enuebt(i)*ynueb(i)*xp(i)*block 
-               dy9=ynueb(i)/dt9 
+               bne   = expon/(1.+expon) 
+               block = bne 
+               fac   = prefac*rho(i) 
+               facp  = fac*enuebt(i)*enuebt(i)*ynueb(i)*xp(i)*block 
+               dy9   = ynueb(i)/dt9 
                if (facp.gt.dy9) facp=dy9 
             endif 
-            dynueb(i)=dynueb(i)-facp 
-            enuebi=enuebt(i)-deltab 
-            facunueb=facp*umevnuc*enuebi 
-            dnuaeb(i)=facunueb 
-            dunueb(i)=dunueb(i)-facunueb 
-            dunu(i)=dunu(i)-facunueb 
-            dye(i)=dye(i)-facp 
+
+            dynueb(i) = dynueb(i)-facp 
+            enuebi    = enuebt(i)-deltab 
+            facunueb  = facp*umevnuc*enuebi 
+            dnuaeb(i) = facunueb 
+            dunueb(i) = dunueb(i)-facunueb 
+            dunu(i)   = dunu(i)-facunueb 
+            dye(i)    = dye(i)-facp 
          else 
-            fshift=1./gshift(i) 
-            ce2nueb=e2nueb*fshift*fshift 
-            fac=xsecnn/(x(i)*x(i)) 
+            fshift  = 1./gshift(i) 
+            ce2nueb = e2nueb*fshift*fshift 
+            fac     = xsecnn/(x(i)*x(i)) 
 !                                                                       
 !  a) energy absorption                                                 
 !                                                                       
-            facunueb=xp(i)*fac*ce2nueb*rlumnueb*fshift*facnueb 
-            denueb=denueb+facunueb*deltam(i)/fshift 
-            dunu(i)=dunu(i) - facunueb 
+            facunueb = xp(i)*fac*ce2nueb*rlumnueb*fshift*facnueb 
+            denueb   = denueb+facunueb*deltam(i)/fshift 
+            dunu(i)  = dunu(i) - facunueb 
 !                                                                       
 !  b) change in Ye                                                      
 !                                                                       
-            dye(i)=dye(i) - facunueb*xnormb 
+            dye(i) = dye(i) - facunueb*xnormb 
 !                                                                       
          endif 
       enddo 
 !                                                                       
-      fo=ufoe/utime 
+      fo = ufoe/utime 
       !print *, 'denue, denueb, fo', denue, denueb,fo                   
       !print*,'  e-neutrino absorption:',denue*fo,' foes/s'             
       !print*,'e-neutrino bar absorption:',denueb*fo,' foes/s'          
@@ -2068,24 +2536,24 @@
 !                                                                       
 !--change this back to .25                                              
       if (denue.gt.0.10*rlumnue) then 
-         jtrape=1 
+         jtrape = 1 
 !         print*,'nuabs: nue absorption/emission=',                     
 !     1              denue/rlumnue                                      
       elseif (denue.lt.0.05*rlumnue.or.denue.lt.1.d-8) then 
-         jtrape=-1 
+         jtrape =-1 
       else 
-         jtrape=0 
+         jtrape = 0 
       endif 
 !                                                                       
 ! --change this back to .25                                             
       if (denueb.gt.0.10*rlumnueb) then 
-         jtrapb=1 
+         jtrapb = 1 
 !         print*,'nuabs: nueb absorption/emission=',                    
 !     1            denueb/rlumnueb                                      
       elseif (denueb.lt.0.05*rlumnueb.or.denueb.lt.1.d-8) then 
-         jtrapb=-1 
+         jtrapb =-1 
       else 
-         jtrapb=0 
+         jtrapb = 0 
       endif 
       return 
       END                                           
@@ -2102,7 +2570,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
 !                                                                       
       parameter(sinw2=0.23) 
       parameter(fe=(1.+4.*sinw2+8.*sinw2*sinw2)/(6.*3.14159)) 
@@ -2187,8 +2655,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !--1/(2.*avo*pi**2*(hbar*c)**3 in Mev-3 cm-3 nucleon g-1)               
       parameter (prefac=1.09e7) 
 !--mn-mp-me in MeV                                                      
@@ -2288,7 +2756,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (tiny=1d-15) 
       parameter (rcrit=1.) 
 !                                                                       
@@ -2452,7 +2920,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter(fs=1./(12.*3.14159)) 
 !-- cross section Gf / gram is 6.02e23*5.29e-44=3.2e-20                 
       parameter(sigma=fs*3.2e-20) 
@@ -2598,7 +3066,7 @@
 !                                                                       
       integer ncell 
       parameter (tiny=1.d-10) 
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
       dimension x(0:idim), rho(idim), ye(idim) 
       dimension dynue(idim),dynueb(idim),dynux(idim),                   &
@@ -2988,8 +3456,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter(idim=10000) 
+      parameter (idim1 = idim+1) 
 !--1/(avo*pi**2*(hbar*c)**3 in Mev-3 cm-3 nucleon g-1)                  
 !      parameter(prefac=2.19e7)                                         
 !-- tffac=(6pi^2/2)^2/3 hbar*2/(2 mp kb)*avo^2/3                        
@@ -3169,7 +3637,7 @@
       integer jtrape,jtrapb,jtrapx 
 !                                                                       
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
       parameter (small=1d-20) 
       parameter (rcrit=1.) 
 !                                                                       
@@ -3238,38 +3706,38 @@
 !                                                                       
 !--zero-out dunu, dye, dynus, denus                                     
 !                                                                       
-      enuemx=-1e20 
-      enuebmx=-1e20 
-      enuxmx=-1e20 
-      uconv=1./umevnuc 
-      yfac=prefac/udens 
+      enuemx  =-1e20 
+      enuebmx =-1e20 
+      enuxmx  =-1e20 
+      uconv   = 1./umevnuc 
+      yfac    = prefac/udens 
 !                                                                       
       do i=1,ncell 
-         dunu(i)=0.0 
-         dye(i)=0.0 
-         dynue(i)=0.0 
-         dynueb(i)=0.0 
-         dynux(i)=0.0 
-         dunue(i)=0.0 
-         dunueb(i)=0.0 
-         dunux(i)=0.0 
+         dunu(i)   = 0.0 
+         dye(i)    = 0.0 
+         dynue(i)  = 0.0 
+         dynueb(i) = 0.0 
+         dynux(i)  = 0.0 
+         dunue(i)  = 0.0 
+         dunueb(i) = 0.0 
+         dunux(i)  = 0.0 
          if (ynue(i).gt.small) then 
-            enuet(i)=uconv*unue(i)/ynue(i) 
-            enuemx=dmax1(enuemx,enuet(i)) 
+            enuet(i) = uconv*unue(i)/ynue(i) 
+            enuemx   = dmax1(enuemx,enuet(i)) 
          else 
-            enuet(i)=0.0 
+            enuet(i) = 0.0 
          endif 
          if (ynueb(i).gt.small) then 
-            enuebt(i)=uconv*unueb(i)/ynueb(i) 
-            enuebmx=dmax1(enuebmx,enuebt(i)) 
+            enuebt(i) = uconv*unueb(i)/ynueb(i) 
+            enuebmx   = dmax1(enuebmx,enuebt(i)) 
          else 
-            enuebt(i)=0.0 
+            enuebt(i) = 0.0 
          endif 
          if (ynux(i).gt.small) then 
-            enuxt(i)=uconv*unux(i)/(4.*ynux(i)) 
-            enuxmx=dmax1(enuxmx,enuxt(i)) 
+            enuxt(i) = uconv*unux(i)/(4.*ynux(i)) 
+            enuxmx   = dmax1(enuxmx,enuxt(i)) 
          else 
-            enuxt(i)=0.0 
+            enuxt(i) = 0.0 
          endif 
       enddo 
 !                                                                       
@@ -3282,180 +3750,182 @@
          facrho=fac*rho(i) 
 !--Debye radius                                                         
          if (eta(i)*temp(i).ge.15.) then 
-            rd=10.0*facdeb/(eta(i)*utemp*temp(i)) 
+            rd = 10.0*facdeb/(eta(i)*utemp*temp(i)) 
          else 
-            rd=89.0*dsqrt(utemp*temp(i)/(rho(i)*udens)) 
+            rd = 89.0*dsqrt(utemp*temp(i)/(rho(i)*udens)) 
          endif 
          if (xheavy(i).ge.1e-3) then 
 !--mean distance between heavy nuclei (fm)                              
-            rhn=fachn/(pi43*xheavy(i)*udens*rho(i)/abar(i))**0.3333333 
+            rhn    = fachn/(pi43*xheavy(i)*udens*rho(i)/abar(i))**0.3333333 
 !--ratio of Coulomb inter-nuclei energy to thermal energy:              
-            rgamma=gamfac*(abar(i)*yeh(i))**2*dexp(-rhn/rd)/            &
-     &                                  (rhn*utemp*temp(i))             
+            rgamma = gamfac*(abar(i)*yeh(i))**2*dexp(-rhn/rd)/            &
+                                       (rhn*utemp*temp(i))             
          else 
 !--a big number...                                                      
             rhn=1e9 
             rgamma=0.0 
          endif 
-         cohfac=abar(i)*(1.-1.08*yeh(i))/6. 
+         cohfac  = abar(i)*(1.-1.08*yeh(i))/6. 
 !--neutral current/heavies scattering without corrections               
-         alphanh=facrho*xheavy(i)*sigheel*cohfac 
+         alphanh = facrho*xheavy(i)*sigheel*cohfac 
 !--neutral current/nucleon and alpha  scattering                        
-         alphann=facrho*(xp(i)*sigpel+xn(i)*signel+                     &
-     &            xalpha(i)*sigalel)                                    
+         alphann = facrho*(xp(i)*sigpel+xn(i)*signel+                     &
+                   xalpha(i)*sigalel)                                    
 !--charged current/neutron scattering                                   
-         alphacn=facrho*xn(i)*sigabs 
+         alphacn = facrho*xn(i)*sigabs 
 !--charged current/proton scattering                                    
-         alphacp=facrho*xp(i)*sigabs 
+         alphacp = facrho*xp(i)*sigabs 
 !--neutral current/e+e- scattering                                      
-         alphane=facrho*sigeln 
+         alphane = facrho*sigeln 
 !--charged current/e+e- scattering                                      
-         alphace=facrho*sigelc 
-         tmev=utmev*temp(i) 
-         tmev2=tmev*tmev 
+         alphace = facrho*sigelc 
+         tmev    = utmev*temp(i) 
+         tmev2   = tmev*tmev 
 !--compute local electron energies                                      
          if (eta(i)*tmev.ge.1.) then 
-            etai=eta(i) 
+            etai = eta(i) 
             call integrals(etai,f0,f1,f2,f3,f4,f5,0,df2,df3) 
-            elmean=tmev*f3/f2 
-            elmean2=tmev2*f4/f2 
-            etai2=etai*etai 
-            etai4=etai2*etai2 
-            yemean=yfac*tmev2*tmev2/rho(i)*(s3a+0.25*etai4+s3b*etai2) 
+            elmean  = tmev*f3/f2 
+            elmean2 = tmev2*f4/f2 
+            etai2   = etai*etai 
+            etai4   = etai2*etai2 
+            yemean  = yfac*tmev2*tmev2/rho(i)*(s3a+0.25*etai4+s3b*etai2) 
          else 
-            elmean=3.*tmev 
-            elmean2=9.*tmev2 
-            yemean=ye(i)*elmean 
+            elmean  = 3.*tmev 
+            elmean2 = 9.*tmev2 
+            yemean  = ye(i)*elmean 
          endif 
          if (enuet(i).gt.1.) then 
 !--figure out neutrino degeneracy                                       
-            etanu=etanue(i) 
+            etanu = etanue(i) 
             call rooteta(i,tmev,rho(i),ynue(i),unue(i),etanu,tempnu) 
-            etanue(i)=etanu 
-            tempnue(i)=tempnu 
+            etanue(i)  = etanu 
+            tempnue(i) = tempnu 
 !            if (i.eq.1) print *,'ynue(1),enuet(1),etanu',              
 !     1                           ynue(1),enuet(1),etanu                
-            ediff=enuet(i) 
-            ediff2=enuet(i)*enuet(i) 
+            ediff  = enuet(i) 
+            ediff2 = enuet(i)*enuet(i) 
          else 
-            etanue(i)=0.0 
-            tempnue(i)=tmev 
-            ediff=dmax1(elmean,enue) 
-            ediff2=dmax1(elmean2,e2nue) 
+            etanue(i)  = 0.0 
+            tempnue(i) = tmev 
+            ediff      = dmax1(elmean,enue) 
+            ediff2     = dmax1(elmean2,e2nue) 
          endif 
 !--de Broglie wavelength fm                                             
-         debro=1240./ediff 
-         rrd=rd/debro 
+         debro = 1240./ediff 
+         rrd   = rd/debro 
 !         shield=(rrd+.5/rrd)/(rrd+1./rrd+3.)                           
-         shield=1.d0 
-         rrhn=rhn/debro 
+         shield = 1.d0 
+         rrhn   = rhn/debro 
 !         struct=(rrhn**2+(1./rrhn)**3)/(rrhn**2+rgamma)                
-         struct=1.0d0 
-         opacnh=struct*shield*alphanh*ediff2 
-         opac=(alphann+alphacn)*ediff2+(alphane+alphace)*ediff*yemean 
-         dnue(i)=1./(opac+opacnh) 
+         struct  = 1.0d0 
+         opacnh  = struct*shield*alphanh*ediff2 
+         opac    = (alphann+alphacn)*ediff2+(alphane+alphace)*ediff*yemean 
+         dnue(i) = 1./(opac+opacnh) 
          if (enuebt(i).gt.1.) then 
-            etanu=etanueb(i) 
+            etanu = etanueb(i) 
             call rooteta(i,tmev,rho(i),ynueb(i),unueb(i),etanu,tempnu) 
-            etanueb(i)=etanu 
-            tempnueb(i)=tempnu 
-            ediff=enuebt(i) 
-            ediff2=enuebt(i)*enuebt(i) 
+            etanueb(i)  = etanu 
+            tempnueb(i) = tempnu 
+            ediff       = enuebt(i) 
+            ediff2      = enuebt(i)*enuebt(i) 
          else 
-            etanueb(i)=0.0 
-            tempnueb(i)=tmev 
-            ediff=dmax1(elmean,enueb) 
-            ediff2=dmax1(elmean2,e2nueb) 
+            etanueb(i)  = 0.0 
+            tempnueb(i) = tmev 
+            ediff       = dmax1(elmean,enueb) 
+            ediff2      = dmax1(elmean2,e2nueb) 
          endif 
 !--de Broglie wavelength fm                                             
-         debro=1240./ediff 
-         rrd=rd/debro 
+         debro = 1240./ediff 
+         rrd   = rd/debro 
 !         shield=(rrd+0.5/rrd)/(rrd+1./rrd+3.)                          
-         shield=1.0d0 
-         rrhn=rhn/debro 
+         shield = 1.0d0 
+         rrhn   = rhn/debro 
 !         struct=(rrhn**2+(1./rrhn)**3)/(rrhn**2+rgamma)                
-         struct=1.0d0 
-         opacnh=struct*shield*alphanh*ediff2 
-         opac=(alphann+alphacp)*ediff2+(alphane+alphace)*ediff*yemean 
-         dnueb(i)=1./(opac+opacnh) 
+         struct   = 1.0d0 
+         opacnh   = struct*shield*alphanh*ediff2 
+         opac     = (alphann+alphacp)*ediff2+(alphane+alphace)*ediff*yemean 
+         dnueb(i) = 1./(opac+opacnh) 
          if (enuxt(i).gt.1.) then 
-            etanu=etanux(i) 
+            etanu = etanux(i) 
             call rooteta(i,tmev,rho(i),ynux(i),.25*unux(i),etanu,tempnu) 
-            etanux(i)=etanu 
-            tempnux(i)=tempnu 
-            ediff=enuxt(i) 
-            ediff2=enuxt(i)*enuxt(i) 
+            etanux(i)  = etanu 
+            tempnux(i) = tempnu 
+            ediff      = enuxt(i) 
+            ediff2     = enuxt(i)*enuxt(i) 
          else 
-            etanux(i)=0.0 
-            tempnux(i)=tmev 
-            ediff=max(elmean,enux) 
-            ediff2=max(elmean2,e2nux) 
+            etanux(i)  = 0.0 
+            tempnux(i) = tmev 
+            ediff      = max(elmean,enux) 
+            ediff2     = max(elmean2,e2nux) 
          endif 
 !--de Broglie wavelength fm                                             
-         debro=1240./ediff 
-         rrhn=rhn/debro 
+         debro = 1240./ediff 
+         rrhn  = rhn/debro 
 !         struct=(rrhn**2+(1./rrhn)**3)/(rrhn**2+rgamma)                
-         struct=1.0d0 
-         opacnh=struct*alphanh*ediff2 
-         opac=alphann*ediff2+alphane*ediff*yemean 
-         dnux(i)=1./(opac+opacnh) 
+         struct  = 1.0d0 
+         opacnh  = struct*alphanh*ediff2 
+         opac    = alphann*ediff2+alphane*ediff*yemean 
+         dnux(i) = 1./(opac+opacnh) 
       enddo 
 !                                                                       
 !--set neutrino luminosities to zero.                                   
 !                                                                       
-      rlumnue=0. 
-      rlumnueb=0. 
-      rlumnux=0. 
+      rlumnue  = 0. 
+      rlumnueb = 0. 
+      rlumnux  = 0. 
 !                                                                       
 !--initialize energy sums                                               
 !                                                                       
-      enue=0. 
-      enueb=0. 
-      enux=0. 
-      e2nue=0. 
-      e2nueb=0. 
-      e2nux=0. 
+      enue   = 0. 
+      enueb  = 0. 
+      enux   = 0. 
+      e2nue  = 0. 
+      e2nueb = 0. 
+      e2nux  = 0. 
 !                                                                       
 !--if first call, setup neutrino trapping flags                         
 !                                                                       
       if (ifirst) then 
-         ifirst=.false. 
-         kountnue=0 
-         kountnueb=0 
-         kountnux=0 
-         cmaxnue=0.0d0 
-         cmaxnueb=0.0d0 
-         cmaxnux=0.0d0 
+         ifirst    = .false. 
+         kountnue  = 0 
+         kountnueb = 0 
+         kountnux  = 0 
+         cmaxnue   = 0.0d0 
+         cmaxnueb  = 0.0d0 
+         cmaxnux   = 0.0d0 
          do i=1,ncell 
-            dx=x(i) - x(i-1) 
-            che=ftrape*dx 
-            chb=ftrapb*dx 
-            chx=ftrapx*dx 
-            rnue=che/dnue(i) 
-            rnueb=chb/dnueb(i) 
-            rnux=chx/dnux(i) 
-            ai=dble(i) 
+            dx    = x(i) - x(i-1) 
+            che   = ftrape*dx 
+            chb   = ftrapb*dx 
+            chx   = ftrapx*dx 
+            rnue  = che/dnue(i) 
+            rnueb = chb/dnueb(i) 
+            rnux  = chx/dnux(i) 
+            ai    = dble(i) 
 !--fix rnue to 1.                                                       
             if (rnue.lt.rcrit) then 
-               trapnue(i)=.false. 
+               trapnue(i) = .false. 
             else 
-               kountnue=kountnue+1 
-               trapnue(i)=.true. 
-               cmaxnue=dmax1(cmaxnue,ai) 
+               kountnue   = kountnue+1 
+               trapnue(i) = .true. 
+               cmaxnue    = dmax1(cmaxnue,ai) 
             endif 
+
             if (rnueb.lt.rcrit) then 
-               trapnueb(i)=.false. 
+               trapnueb(i) = .false. 
             else 
-               kountnueb=kountnueb+1 
-               trapnueb(i)=.true. 
-               cmaxnueb=dmax1(cmaxnueb,ai) 
+               kountnueb   = kountnueb+1 
+               trapnueb(i) = .true. 
+               cmaxnueb    = dmax1(cmaxnueb,ai) 
             endif 
+
             if (rnux.lt.rcrit) then 
-               trapnux(i)=.false. 
+               trapnux(i) = .false. 
             else 
-               kountnux=kountnux+1 
-               trapnux(i)=.true. 
-               cmaxnux=dmax1(cmaxnux,ai) 
+               kountnux   = kountnux+1 
+               trapnux(i) = .true. 
+               cmaxnux    = dmax1(cmaxnux,ai) 
             endif 
          enddo 
 !                                                                       
@@ -3463,16 +3933,18 @@
 !                                                                       
          do i=1,ncell 
             if (.not.trapnue(i).and.i.lt.cmaxnue) then 
-               trapnue(i)=.true. 
-               kountnue=kountnue+1 
+               trapnue(i) = .true. 
+               kountnue   = kountnue+1 
             endif 
+
             if (.not.trapnueb(i).and.i.lt.cmaxnueb) then 
-               trapnueb(i)=.true. 
-               kountnueb=kountnueb+1 
+               trapnueb(i) = .true. 
+               kountnueb   = kountnueb+1 
             endif 
+
             if (.not.trapnux(i).and.i.lt.cmaxnux) then 
-               trapnux(i)=.true. 
-               kountnux=kountnux+1 
+               trapnux(i) = .true. 
+               kountnux   = kountnux+1 
             endif 
          enddo 
 !         write(*,110) kountnue,kountnueb,kountnux                      
@@ -3505,23 +3977,23 @@
 !-- artificially soften neutrinos by .5                                 
 !                                                                       
       if (rlumnue.ne.0.) then 
-         enue=0.8*enue/rlumnue 
-         e2nue=0.64*e2nue/rlumnue 
+         enue  = 0.8*enue/rlumnue 
+         e2nue = 0.64*e2nue/rlumnue 
       endif 
       if (rlumnueb.ne.0.) then 
-         enueb=0.8*enueb/rlumnueb 
-         e2nueb=0.64*e2nueb/rlumnueb 
+         enueb  = 0.8*enueb/rlumnueb 
+         e2nueb = 0.64*e2nueb/rlumnueb 
       endif 
       if (rlumnux.ne.0.) then 
-         enux=enux/rlumnux 
-         e2nux=e2nux/rlumnux 
+         enux  = enux/rlumnux 
+         e2nux = e2nux/rlumnux 
       endif 
 !                                                                       
 ! divide by the mass fraction                                           
 !--this should be 1.                                                    
-      rlumnue=0.8*rlumnue 
-      rlumnueb=0.8*rlumnueb 
-      rlumnux=rlumnux 
+      rlumnue  = 0.8*rlumnue 
+      rlumnueb = 0.8*rlumnueb 
+      rlumnux  = rlumnux 
 !                                                                       
       unitf=ufoe/utime 
       if (print_nuloss.eqv..true.) then 
@@ -3533,7 +4005,7 @@
 !     &  '               ',enux
   510   format(A,1p,E10.3,A,E10.3) 
       endif 
-!                                                                       
+!                                                                            
       return 
       END                                             
 !                                                                       
@@ -3549,7 +4021,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
 !                                                                       
       dimension rho(idim), ye(idim) 
       dimension dynue(idim), dynueb(idim), dynux(idim),                 &
@@ -3573,9 +4045,9 @@
 !                                                                       
       data avo/6.022d23/ 
 !                                                                       
-      ugserg=dble(utime/uergg) 
-      umevnuct=umevnuc*utime 
-      uconv=1./umevnuc 
+      ugserg   = dble(utime/uergg) 
+      umevnuct = umevnuc*utime 
+      uconv    = 1./umevnuc 
 !                                                                       
 !--compute pair plasma processes                                        
 !  -----------------------------                                        
@@ -3583,68 +4055,71 @@
 !--loop over all particles                                              
 !                                                                       
       do i=1,ncell 
-         yei=ye(i) 
-         tempi=temp(i) 
-         rhoi=rho(i)*udens 
+         yei   = ye(i) 
+         tempi = temp(i) 
+         rhoi  = rho(i)*udens 
          if(tempi.ge.6.)then 
             deltami=deltam(i) 
-            etai=eta(i) 
-            rhocgs=rhoi 
-            tempk=utemp*tempi 
-            deta=etai 
+            etai   = eta(i) 
+            rhocgs = rhoi 
+            tempk  = utemp*tempi 
+            deta   = etai 
             call pppb(rhocgs,tempk,yei,deta,dunuel,dunuxl,              &
      &                    enuel,enuxl,enuel2,enuxl2)                    
 !                                                                       
 !--supress rates by end state degeneracy                                
 !                                                                       
-            tmev=tempi*utmev 
-            expon=dexp(min(enuel/tempnue(i)-etanue(i),50.d0)) 
+            tmev  = tempi*utmev 
+            expon = dexp(min(enuel/tempnue(i)-etanue(i),50.d0)) 
 !--bnue: e-neutrino end-state blocking                                  
-            bnue=expon/(1.+expon) 
-            expon=dexp(min(real(enuel)/tempnueb(i)-etanueb(i),50.d0)) 
+            bnue  = expon/(1.+expon) 
+            expon = dexp(min(real(enuel)/tempnueb(i)-etanueb(i),50.d0)) 
 !--bnueb: anti e-neutrino end-state blocking                            
-            bnueb=expon/(1.+expon) 
-            expon=dexp(min(real(enuxl)/tempnux(i)-etanux(i),50.d0)) 
+            bnueb = expon/(1.+expon) 
+            expon = dexp(min(real(enuxl)/tempnux(i)-etanux(i),50.d0)) 
 !--bnux: x neutrino end-state blocking                                  
-            bnux=expon/(1.+expon) 
-            blocke=bnue*bnueb 
-            blockx=bnux*bnux 
-            dunuel=dunuel*ugserg*blocke 
-            dunuxl=dunuxl*ugserg*blockx 
-            dunu(i)=dunu(i)+dunuxl+dunuel 
+            bnux    = expon/(1.+expon) 
+            blocke  = bnue*bnueb 
+            blockx  = bnux*bnux 
+            dunuel  = dunuel*ugserg*blocke 
+            dunuxl  = dunuxl*ugserg*blockx 
+            dunu(i) = dunu(i)+dunuxl+dunuel 
+
             if (trapnue(i)) then 
-               facnue=0.5*uconv*dunuel/enuel 
-               dynue(i)=dynue(i)+facnue 
-               dunue(i)=dunue(i)+0.5*dunuel 
+               facnue   = 0.5*uconv*dunuel/enuel 
+               dynue(i) = dynue(i)+facnue 
+               dunue(i) = dunue(i)+0.5*dunuel 
             else 
-               shift=gshift(i) 
-               rlnue=0.5*dunuel*deltami*shift 
-               rlumnue=rlumnue+rlnue 
-               enue=enue+enuel*shift*rlnue 
-               e2nue=e2nue+enuel2*shift*shift*rlnue 
+               shift   = gshift(i) 
+               rlnue   = 0.5*dunuel*deltami*shift 
+               rlumnue = rlumnue+rlnue 
+               enue    = enue+enuel*shift*rlnue 
+               e2nue   = e2nue+enuel2*shift*shift*rlnue 
             endif 
+
             if (trapnueb(i)) then 
-               facnue=0.5*uconv*dunuel/enuel 
-               dynueb(i)=dynueb(i)+facnue 
-               dunueb(i)=dunueb(i)+0.5*dunuel 
+               facnue    = 0.5*uconv*dunuel/enuel 
+               dynueb(i) = dynueb(i)+facnue 
+               dunueb(i) = dunueb(i)+0.5*dunuel 
             else 
-               shift=gshift(i) 
-               rlnueb=0.5*dunuel*deltami*shift 
-               rlumnueb=rlumnueb+rlnueb 
-               enueb=enueb+enuel*shift*rlnueb 
-               e2nueb=e2nueb+enuel2*shift*shift*rlnueb 
+               shift    = gshift(i) 
+               rlnueb   = 0.5*dunuel*deltami*shift 
+               rlumnueb = rlumnueb+rlnueb 
+               enueb    = enueb+enuel*shift*rlnueb 
+               e2nueb   = e2nueb+enuel2*shift*shift*rlnueb 
             endif 
+
             if (trapnux(i)) then 
-               facnux=uconv*dunuxl/enuxl 
+               facnux = uconv*dunuxl/enuxl 
 !-- 0.25 to divide the production among 4 nu species                    
-               dynux(i)=dynux(i)+0.25*facnux 
-               dunux(i)=dunux(i)+dunuxl 
+               dynux(i) = dynux(i)+0.25*facnux 
+               dunux(i) = dunux(i)+dunuxl 
             else 
-               shift=gshift(i) 
-               rlnux=dunuxl*deltami*shift 
-               rlumnux=rlumnux+rlnux 
-               enux=enux+enuxl*shift*rlnux 
-               e2nux=e2nux+enuxl2*shift*rlnux 
+               shift   = gshift(i) 
+               rlnux   = dunuxl*deltami*shift 
+               rlumnux = rlumnux+rlnux 
+               enux    = enux+enuxl*shift*rlnux 
+               e2nux   = e2nux+enuxl2*shift*rlnux 
             endif 
          endif 
       enddo 
@@ -3662,8 +4137,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter(idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       dimension rho(idim) 
       dimension unue(idim),unueb(idim),unux(idim) 
@@ -3674,18 +4149,18 @@
       common /eosnu/ prnu(idim1) 
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
 !                                                                       
-      ratmax=0.0 
-      etanuemx=0.0 
+      ratmax   = 0.0 
+      etanuemx = 0.0 
       do i=1,ncell 
 !--gamma=4/3 since nus are always relativistic                          
-         rhoi3=0.3333333333333*rho(i) 
-         prnui=0.0 
-         if (trapnue(i)) prnui=prnui+rhoi3*unue(i) 
-         if (trapnueb(i)) prnui=prnui+rhoi3*unueb(i) 
-         if (trapnux(i)) prnui=prnui+rhoi3*unux(i) 
-         ratmax=dmax1(prnui/pr(i),ratmax) 
-         prnu(i)=prnui 
-         etanuemx=dmax1(etanuemx,etanue(i)) 
+         rhoi3 = 0.3333333333333*rho(i) 
+         prnui = 0.0 
+         if (trapnue(i))  prnui = prnui+rhoi3*unue(i) 
+         if (trapnueb(i)) prnui = prnui+rhoi3*unueb(i) 
+         if (trapnux(i))  prnui = prnui+rhoi3*unux(i) 
+         ratmax   = dmax1(prnui/pr(i),ratmax) 
+         prnu(i)  = prnui 
+         etanuemx = dmax1(etanuemx,etanue(i)) 
       enddo 
       !print *,'nupress: maximum prnu/pr,etanuemx',ratmax,etanuemx      
 !                                                                       
@@ -3716,7 +4191,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
 !                                                                       
       parameter(sinw2=0.23) 
       parameter(ga=-0.5) 
@@ -3995,7 +4470,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter(idim=4000) 
+      parameter(idim=10000) 
       parameter(tiny=1d-15) 
 !                                                                       
       dimension x(0:idim) 
@@ -4120,8 +4595,8 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       dimension x(0:idim),rho(idim),v(0:idim) 
       dimension unue(idim),unueb(idim),unux(idim) 
@@ -4272,7 +4747,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !                                                                       
-      parameter (idim=4000) 
+      parameter (idim=10000) 
 !                                                                       
 !                                                                       
       common /carac/ deltam(idim), abar(idim) 
@@ -4344,7 +4819,7 @@
 !************************************************************           
 !                                                                       
       implicit double precision (a-h,o-z) 
-      parameter(idim=4000) 
+      parameter(idim=10000) 
 !                                                                       
       dimension x(0:idim), v(0:idim),u(idim),                           &
      &     rho(idim), ye(idim)                                          
@@ -4453,8 +4928,8 @@
 !************************************************************           
 !                                                                       
       implicit double precision (a-h,o-z) 
-      parameter(idim=4000) 
-      parameter(idim1=idim+1) 
+      parameter(idim=10000) 
+      parameter(idim1 = idim+1) 
 !                                                                       
       dimension x(0:idim), v(0:idim),u(idim),                           &
      &     rho(idim), ye(idim)                                          
@@ -4476,68 +4951,73 @@
       common /heat/ iheat 
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
 !                                                                       
-      pi43=4.18879 
+      pi43   = 4.18879 
+!                                                                        
+      nrem   = 0 
 !                                                                       
-      nrem=0 
-!                                                                       
-      xcrit=9.d-4 
-      xvcrit=5.d-1 
-      ncr=8 
-      xvalf=0.d0 
+      xcrit  = 9.d-4 
+      xvcrit = 5.d-1 
+      ncr    = 8 
+      xvalf  = 0.d0 
 !      do j=ncr,ncr+3                                                   
       do j=ncr,ncell 
-         xval=1.d0-x(j-1)/x(j) 
+         xval = 1.d0-x(j-1)/x(j) 
          if (xval.gt.xvalf) then 
-            jf=j 
-            xvalf=xval 
+            jf    = j 
+            xvalf = xval 
          end if 
       end do 
+
       if (xvalf.gt.xvcrit) then 
-         ncell=ncell+1 
-         pr(ncell+1)=pr(ncell) 
-         idiv=jf 
-         xj=.5d0*(x(jf-1)+x(jf)) 
+         ncell       = ncell+1 
+         pr(ncell+1) = pr(ncell) 
+         idiv        = jf 
+         xj          = .5d0*(x(jf-1)+x(jf)) 
+
          do i=ncell,idiv+1,-1 
-            v(i)=v(i-1) 
-            xold(i)=xold(i-1) 
-            rhold(i)=rhold(i-1) 
-            yeold(i)=yeold(i-1) 
-            xnold(i)=xnold(i-1) 
-            xpold(i)=xpold(i-1) 
-            rho(i)=rho(i-1) 
-            x(i)=x(i-1) 
+            v(i)     = v(i-1) 
+            xold(i)  = xold(i-1) 
+            rhold(i) = rhold(i-1) 
+            yeold(i) = yeold(i-1) 
+            xnold(i) = xnold(i-1) 
+            xpold(i) = xpold(i-1) 
+            rho(i)   = rho(i-1) 
+            x(i)     = x(i-1) 
+
             if (i.eq.idiv+1) then 
-               deltam(i)=pi43*rho(i)*(x(i)**3-xj**3) 
-               tempold(i)=.9*tempold(i-1) 
-               temp(i)=.95*temp(i-1) 
-               u(i)=.95*u(i-1) 
+               deltam(i)  = pi43*rho(i)*(x(i)**3-xj**3) 
+               tempold(i) = .9*tempold(i-1) 
+               temp(i)    = .95*temp(i-1) 
+               u(i)       = .95*u(i-1) 
             else 
-               deltam(i)=deltam(i-1) 
-               tempold(i)=tempold(i-1) 
-               temp(i)=temp(i-1) 
-               u(i)=u(i-1) 
-            end if 
-            ye(i)=ye(i-1) 
-            xn(i)=xn(i-1) 
-            xp(i)=xp(i-1) 
-            ifleos(i)=ifleos(i-1) 
-            trapnue(i)=trapnue(i-1) 
-            trapnueb(i)=trapnueb(i-1) 
-            trapnux(i)=trapnux(i-1) 
-            eta(i)=eta(i-1) 
-            abar(i)=abar(i-1) 
-            istep(i)=istep(i-1) 
-            steps(i)=steps(i-1) 
-            t0(i)=t0(i-1) 
-            ynue(i)=ynue(i-1) 
-            ynueb(i)=ynueb(i-1) 
-            ynux(i)=ynux(i-1) 
-            unue(i)=unue(i-1) 
-            unueb(i)=unueb(i-1) 
-            unux(i)=unux(i-1) 
+               deltam(i)  = deltam(i-1) 
+               tempold(i) = tempold(i-1) 
+               temp(i)    = temp(i-1) 
+               u(i)       = u(i-1) 
+            end if
+
+            ye(i)       = ye(i-1) 
+            xn(i)       = xn(i-1) 
+            xp(i)       = xp(i-1) 
+            ifleos(i)   = ifleos(i-1) 
+            trapnue(i)  = trapnue(i-1) 
+            trapnueb(i) = trapnueb(i-1) 
+            trapnux(i)  = trapnux(i-1) 
+            eta(i)      = eta(i-1) 
+            abar(i)     = abar(i-1) 
+            istep(i)    = istep(i-1) 
+            steps(i)    = steps(i-1) 
+            t0(i)       = t0(i-1) 
+            ynue(i)     = ynue(i-1) 
+            ynueb(i)    = ynueb(i-1) 
+            ynux(i)     = ynux(i-1) 
+            unue(i)     = unue(i-1) 
+            unueb(i)    = unueb(i-1) 
+            unux(i)     = unux(i-1) 
          enddo 
-         x(jf)=xj 
-         deltam(jf)=pi43*rho(jf)*(x(jf)**3-x(jf-1)**3) 
+
+         x(jf)      = xj 
+         deltam(jf) = pi43*rho(jf)*(x(jf)**3-x(jf-1)**3) 
       end if 
 !                                                                       
       return 
@@ -4556,16 +5036,16 @@
 !                                                                       
 !--find root allowing a maximum of itmax iteration                      
 !                                                                       
-      iflag=0 
+      iflag = 0 
       do i=1,itmax 
-         at93=adrho*temp*temp*temp 
-         df=4.d0*at93 + 1.5d0*rdmu 
-         f=at93*temp + 1.5d0*rdmu*temp - utr 
-         dtemp=f/df 
-         temp=temp - dtemp 
+         at93  = adrho*temp*temp*temp 
+         df    = 4.d0*at93 + 1.5d0*rdmu 
+         f     = at93*temp + 1.5d0*rdmu*temp - utr 
+         dtemp = f/df 
+         temp  = temp - dtemp 
          if(abs(dtemp/temp).lt.tol) return 
       enddo 
-      iflag=1 
+      iflag = 1 
 !                                                                       
 !--iteration went out of bound or did not converge                      
 !                                                                       
@@ -4658,7 +5138,7 @@
 !                                                                       
 !      print *,'rootemp2: no convergence for part. i,rho(cgs)',         
 !     1         i,rhoi                                                  
-      stop 
+      stop "ERROR: rootemp2 did not converge"
 !                                                                       
 !--iteration sucessful, transform back in code units                    
 !                                                                       
@@ -4758,7 +5238,7 @@
             print *,'rhocgs,rhoold',rhocgs,rhoold 
             print *,'yek,yeold',yek,yeold 
             print*,'ediss,etot,ucoul',ediss,etot,ucoul 
-            stop 
+            stop "ERROR: t9 < 2"
          endif 
 !                                                                       
 !--solve nse                                                            
@@ -4793,7 +5273,7 @@
 !                                                                       
       print *,'rootemp3: no convergence for part. k,rho(cgs)',          &
      &         k,rhok                                                   
-      stop 
+      stop "ERROR: rootemp3: did not converge"
 !                                                                       
 !--iteration sucessful, transform back in code units                    
 !                                                                       
@@ -4941,7 +5421,7 @@
 !                                                                       
       print *,'eta convergence failed: rho, ynu, unu, k',               &
      &        rho, ynu, unu, k                                          
-      stop 
+      stop "ERROR: eta convergence failed"
 !                                                                       
       END                                           
 !                                                                       
@@ -5018,13 +5498,13 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx,mlin_grid_size,idump,skip_dump
-      logical from_dump, post_bounce      
+      logical from_dump, post_bounce, first_bounce      
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
       parameter (iqn=17) 
       real ycc,yccave
-      character*128 mlmodel_name
+      character*1024 mlmodel_name
 !                                                                       
       common /cc   / ycc(idim,iqn), yccave(iqn) 
       common /ener1/ dq(idim), dunu(idim) 
@@ -5073,10 +5553,10 @@
       common /dump/ from_dump
       common /idump/ idump
       common /interp/ mlin_grid_size
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
 !                                                                       
-      character*1024 filin,filout 
+      character*1024 filin,filout,eos_table      
 
       data pi4/12.56637d0/ 
       gg=13.34 
@@ -5084,15 +5564,15 @@
       from_dump=.false.
 !                                                                       
 !--read options                                                         
-!                                                                       
+!     
+   10 format(A)                                                                        
       open(11,file='setup') 
       read(11,*)
       read(11,10) filin 
       read(11,*)
       read(11,10) filout 
       read(11,*)
-      read(11,10) mlmodel_name
-   10 format(A) 
+      read(11,10) mlmodel_name    
       read(11,*)
       read(11,*) mlin_grid_size
       read(11,*)      
@@ -5109,6 +5589,8 @@
       read(11,*) iextf
       read(11,*)
       read(11,*) ieos
+      read(11,*)
+      read(11,10) eos_table
       read(11,*)
       read(11,*) dcore 
       read(11,*)
@@ -5127,8 +5609,7 @@
       read(11,*) ufact
       read(11,*)
       read(11,*) yefact 
-      !print *,'cq,cl',cq,cl 
-      !print *,'iextf,ieos',iextf,ieos 
+
       print*,'================ Setup ================'
       print*, 'Input File:            ', trim(filin)
       print*, 'Output File:           ', trim(filout)
@@ -5137,6 +5618,8 @@
       print*, 'Dump # to read:        ', idump
       print*, 'Dump time interval (s):', dtime
       print*, 'Max time (s):          ', tmax
+      print*, 'EOS:                   ', ieos
+      if (ieos.eq.5.or.ieos.eq.6) print*, 'EOS Table Path:        ', trim(eos_table)
       !print*, cq,cl
       !print*, iextf,ieos,dcore
       !print*, ncell,delp,nups,damp,dcell
@@ -5145,7 +5628,7 @@
 !--convert to code time units                      
 !        
       dtime = dtime/10
-      tmax = tmax/10 
+      tmax  = tmax/10 
 !                                                                       
 !--open binary file containing initial conditions                       
 !                                                             
@@ -5166,8 +5649,6 @@
       enddo 
 !                                                                       
 !--read data                                                            
-!                                                                       
-      nqn=17 
 !       
       read(60) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,              &
             pns_ind,pns_x,shock_ind,shock_x,                           &
@@ -5181,11 +5662,11 @@
             (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc),          &
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
-            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
+            (steps(i),i=1,nc),((ycc(i,j),j=1,iqn),i=1,nc),             &
             (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
 !        (vturb2(i),i=1,nc),                                          &
-!
-      print*, 'idump as read = ', idump
+!      
+      print*, 'idump as read =        ', idump
       
       if (shock_ind.ne.0) then
             post_bounce = .true.
@@ -5194,14 +5675,15 @@
       endif
 
       ncell = nc
-      time = t 
+      time = t       
 !                                                                       
       !print *, nc, t, xmcore, rb, ftrape,ftrapb,ftrapx 
       !do k=1,nc 
       !   write(44,*)k,temp(k),u(k),u2(k) 
       !end do 
+      
       do k=1,nc 
-         if (ifleos(k).lt.0.6) stop 
+         if (ifleos(k).lt.0.6) stop "ERROR: ifleos(k) < 0.6"
          if (ifleos(k).eq.3) then 
             ifign(k)=.false. 
          elseif (ifleos(k).eq.2) then 
@@ -5209,13 +5691,14 @@
          end if 
 !         u(k)=0.9*u(k)                                                 
 !         u2(k)=0.9*u2(k)                                               
-      end do 
+      end do       
+
       !do k=1,3 
       !   print *,u2(k),pr(k),ufreez(k) 
       !   print *, unue(k),unueb(k),unux(k) 
       !   print *, ynue(k),ynueb(k),ynux(k) 
       !   print *, xp(k), xn(k), ifleos(k), xmcore 
-      !   do j=1,nqn 
+      !   do j=1,iqn 
       !      print *,ycc(k,j) 
       !   end do 
       !end do 
@@ -5224,23 +5707,23 @@
       rout=x(ncell) 
       
       print*,'================ ',trim(filin),' ================='
-      print *, 'ncell = ', ncell 
-      print *, 'xmcore =     ', xmcore 
-      print *, 'rho(1) =     ', rho(1) 
-      print *, 'x(ncell) =   ',x(ncell)
-      print *, 'pr(ncell) =  ',pr(ncell) 
+      print *, 'ncell     =  ', ncell 
+      print *, 'xmcore    =  ', xmcore 
+      print *, 'rho(1)    =  ', rho(1) 
+      print *, 'x(ncell)  =  ', x(ncell)
+      print *, 'pr(ncell) =  ', pr(ncell) 
       print *, 'deltam(1) =  ', deltam(1), ' (mass of the cell, cell centered)' 
-      print *, 'time =       ',time
+      print *, 'time      =  ', time
       print*,'======================================='
 !      gamma=1.666666666666667                                          
       ncell1=ncell+1 
-      if (ieos.eq.4) then 
+      if (ieos.eq.4.or.ieos.eq.5) then 
          do i=1,ncell 
             !write(71,*)i,u2(i),u(i),abar(i) 
             if (ifleos(i).eq.3) then 
-               s=u2(i) 
-               u2(i)=u(i) 
-               u(i)=s 
+               s     = u2(i) 
+               u2(i) = u(i) 
+               u(i)  = s 
                !write (71,*) i,u2(i),u(i),abar(i) 
             endif 
          enddo 
@@ -5248,17 +5731,18 @@
 !                                                                       
       do i=1,ncell 
          if (unueb(i).lt.0.) then 
-             unueb(i)=0. 
-             ynueb(i)=0.0 
+             unueb(i) = 0. 
+             ynueb(i) = 0.0 
          endif 
          if (unux(i).lt.0.) then 
-             unux(i)=0. 
-             ynux(i)=0.0 
+             unux(i) = 0. 
+             ynux(i) = 0.0 
          endif 
       enddo 
 
-      if (ieos.eq.5) then 
-        call readtable("/home/pkarpov/COLLAPSO1D/project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5")
+      
+      if (ieos.eq.5.or.ieos.eq.6) then 
+        call readtable(trim(eos_table))
       endif
 !                                                                       
       return 
@@ -5274,10 +5758,10 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
-      logical from_dump
+      logical from_dump, post_bounce, first_bounce
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
       parameter (iqn=17) 
 !                                                                       
       real ycc,yccave 
@@ -5313,7 +5797,7 @@
       common /cent/ dj(idim)
       common /dump/ from_dump
       common /idump/ idump
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
@@ -5324,24 +5808,23 @@
       
       from_dump=.true.
 !                                                                       
-      if (ieos.eq.4) then 
+      if (ieos.eq.4.or.ieos.eq.5) then 
          do i=1,ncell 
             if (ifleos(i).eq.3) then 
-               s(i)=u(i) 
-               uint(i)=u2(i) 
+               s(i)    = u(i) 
+               uint(i) = u2(i) 
             else 
-               s(i)=u2(i) 
-               uint(i)=u(i) 
+               s(i)    = u2(i) 
+               uint(i) = u(i) 
             endif 
          enddo 
       else 
          do i=1,ncell 
-            uint(i)=u(i) 
+            uint(i) = u(i) 
          enddo 
       endif 
-      t=time 
-      nc=ncell 
-      nqn=17                                                                                                                            
+      t   = time 
+      nc  = ncell 
 !       
       write(lu) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
             pns_ind,pns_x,shock_ind,shock_x,                           &
@@ -5355,11 +5838,10 @@
             (ufreez(i),i=1,nc),(pr(i),i=1,nc),(s(i),i=1,nc),           &
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
-            (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),             &
+            (steps(i),i=1,nc),((ycc(i,j),j=1,iqn),i=1,nc),             &
             (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
 !          (vturb2(i),i=1,nc),                                          &
-      !print *, nc,t,xmcore,rb,ftrape,ftrapb,ftrapx                     
-!               
+!                                  
       return 
 !                                                                       
 !--an error as occured while writting                                   
@@ -5468,13 +5950,13 @@
       parameter (p5=(2.+3*delta**2-4.*delta**3)/8.) 
       common /epcap/ betafac, c2cu, c3cu 
       common /neutm/ iflxlm, icvb 
-!                                                                       
-      beta=betafac/tempi 
-      beta2=beta*beta 
-      beta3=beta*beta2 
-      beta4=beta*beta3 
-      beta5=beta*beta4 
-      beta6=beta*beta5 
+!       
+      beta  = betafac/tempi 
+      beta2 = beta*beta 
+      beta3 = beta*beta2 
+      beta4 = beta*beta3 
+      beta5 = beta*beta4 
+      beta6 = beta*beta5 
 !                                                                       
 !--compute fermi integrals for electrons                                
 !                                                                       
@@ -5551,13 +6033,13 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx, ntstep, ind, mlin_grid_size
-      logical from_dump, post_bounce
-      character*128 mlmodel_name, rho_file, x_file      
+      logical from_dump, post_bounce, first_bounce
+      character*1024 mlmodel_name, rho_file, x_file      
       character*10 frmtx
       character*11 frmtrho
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
 !                                                                       
       logical ifirst, reset(idim)
 !                                                                       
@@ -5579,10 +6061,10 @@
       common /jtrap/ jtrape,jtrapb,jtrapx 
       common /numb / ncell, ncell1 
       common /nustuff/ ynue(idim),ynueb(idim),ynux(idim),               &
-     &               unue(idim),unueb(idim),unux(idim)                  
+                       unue(idim),unueb(idim),unux(idim)                  
       common /prev / xold(0:idim),vold(0:idim),rhold(idim),             &
-     &              prold(idim), tempold(idim), yeold(idim),            &
-     &              xnold(idim), xpold(idim)                            
+                     prold(idim), tempold(idim), yeold(idim),            &
+                     xnold(idim), xpold(idim)                            
       common /shock/ cq,cl 
       common /state/ xp(idim), xn(idim), eta(idim), ifleos(idim) 
       common /swesty/ xpf(idim), pvar2(idim), pvar3(idim), pvar4(idim) 
@@ -5598,30 +6080,30 @@
       common /units/ umass, udist, udens, utime, uergg, uergcc 
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
       common /dum  / dumx(0:idim),dumv(0:idim),dumu(idim),              &
-     &               dumye(idim)                                        
+                     dumye(idim)                                        
       common /dum2 / dumynue(idim),dumynueb(idim),dumynux(idim),        &
-     &               dumunue(idim),dumunueb(idim),dumunux(idim)         
+                     dumunue(idim),dumunueb(idim),dumunux(idim)         
       common /f1   / f1v(0:idim),f1u(idim),f1ye(idim) 
       common /f2   / f2v(0:idim),f2u(idim),f2ye(idim) 
       !common /fturb/ geff(idim), fmix1(idim), fmix2(idim) 
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       !common /dturb/ dumvt2(idim) 
       common /f1nu / f1ynue(idim),f1ynueb(idim),f1ynux(idim),           &
-     &               f1unue(idim),f1unueb(idim),f1unux(idim)            
+                     f1unue(idim),f1unueb(idim),f1unux(idim)            
       common /f2nu / f2ynue(idim),f2ynueb(idim),f2ynux(idim),           &
-     &               f2unue(idim),f2unueb(idim),f2unux(idim)            
+                     f2unue(idim),f2unueb(idim),f2unux(idim)            
       common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
-     &               enue, enueb, enux, e2nue, e2nueb, e2nux            
+                     enue, enueb, enux, e2nue, e2nueb, e2nux            
 !                                                                       
       common /timei/ istep(idim),t0(idim),steps(idim),                  &
-     &               dum2v(idim)                                        
+                     dum2v(idim)                                        
       common /propt/ dtime,tmax 
       common /nsat/ satc,xtime 
       common /nuprint/ nups,nupk,tacr 
       common /outp/ rout, p1out, p2out
       common /mlmod/ mlmodel_name
       common /dump/ from_dump
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /interp/ mlin_grid_size
 
       save ifirst
@@ -5630,17 +6112,17 @@
 !                                                                       
 !--Compute next dump time and initialise variables.                     
 !                                                                       
-      tol=1.d-3 
-      dt0=1.d0 
-      tnext=time+dtime 
+      tol   = 1.d-3 
+      dt0   = 1.d0 
+      tnext = time+dtime 
 !      xlog2=0.30103                                                    
 !                                                                       
 !--define coefficients for Runge-Kutta integrator                       
 !                                                                       
-      f11=0.5*256./255. 
-      f21=1./256. 
-      f22=255./256. 
-      e1=1./512. 
+      f11 = 0.5*256./255. 
+      f21 = 1./256. 
+      f22 = 255./256. 
+      e1  = 1./512. 
 !                                                                       
 !--first time set time step to default                                  
 !
@@ -5655,25 +6137,25 @@
          dumx(0)=x(0) 
          do i=1,ncell
             if (from_dump.eqv..false.) then
-                steps(i)=dt0/1.d8
+                steps(i) = dt0/1.d8
             end if
-            istep(i)=nint(dtime/steps(i)) 
-            t0(i)=time 
-            tempold(i)=temp(i) 
-            rhold(i)=rho(i) 
-            yeold(i)=ye(i) 
-            xnold(i)=xn(i) 
-            xpold(i)=xp(i) 
+            istep(i)   = nint(dtime/steps(i)) 
+            t0(i)      = time 
+            tempold(i) = temp(i) 
+            rhold(i)   = rho(i) 
+            yeold(i)   = ye(i) 
+            xnold(i)   = xn(i) 
+            xpold(i)   = xp(i) 
          enddo 
          
          write(*,'(A)')'<      Hydro Setup     >'       
          print_nuloss=.false. 
          call hydro(time,ncell,x,v,                                     &
-     &           u,rho,ye,f1v,f1u,f1ye,q,                               &
-     !fmix1,                         &
-     &           ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,                 &
-     &           unue,unueb,unux,f1unue,f1unueb,f1unux,                 &
-     &           print_nuloss,ntstep)                                          
+                    u,rho,ye,f1v,f1u,f1ye,q,                            &
+                   ! fmix1,                                              &
+                    ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,              &
+                    unue,unueb,unux,f1unue,f1unueb,f1unux,              &
+                    print_nuloss,ntstep)                                          
       end if 
       !do i=30,40
       !    print*, i, ye(i)
@@ -5682,7 +6164,7 @@
 !--set step counter                                                     
 !                                                                       
       do i=1,ncell 
-         istep(i)=nint(2.*dtime/steps(i)) 
+         istep(i) = nint(2.*dtime/steps(i)) 
       enddo 
 !                                                                       
 !--integration                                                          
@@ -5703,20 +6185,19 @@
 !                                                                       
          !print *, '[steps] ',steps(1),x(0),x(1)                        
          do i=1,ncell 
-            dtf11=f11*steps(i) 
-            dumx(i)=x(i) + dtf11*v(i) 
-            dumv(i)=v(i) + dtf11*f1v(i) 
-            if (time.lt.0.02.and.rho(i).lt.5.d6)                        &
-     &           dumv(i)=min(dumv(i),-0.1)                              
-            dumu(i)=u(i) + dtf11*f1u(i) 
-            dumye(i)=ye(i) + dtf11*f1ye(i) 
-            dumynue(i)=ynue(i) + dtf11*f1ynue(i) 
-            dumynueb(i)=ynueb(i) + dtf11*f1ynueb(i) 
-            dumynux(i)=ynux(i) + dtf11*f1ynux(i) 
-            dumunue(i)=unue(i) + dtf11*f1unue(i) 
-            dumunueb(i)=unueb(i) + dtf11*f1unueb(i) 
-            dumunux(i)=unux(i) + dtf11*f1unux(i) 
-            !dumvt2(i)=vturb2(i) + dtf11*fmix1(i) 
+            dtf11   = f11*steps(i) 
+            dumx(i) = x(i) + dtf11*v(i) 
+            dumv(i) = v(i) + dtf11*f1v(i) 
+            if (time.lt.0.02.and.rho(i).lt.5.d6) dumv(i) = min(dumv(i),-0.1)                              
+            dumu(i)     = u(i) + dtf11*f1u(i) 
+            dumye(i)    = ye(i) + dtf11*f1ye(i) 
+            dumynue(i)  = ynue(i) + dtf11*f1ynue(i) 
+            dumynueb(i) = ynueb(i) + dtf11*f1ynueb(i) 
+            dumynux(i)  = ynux(i) + dtf11*f1ynux(i) 
+            dumunue(i)  = unue(i) + dtf11*f1unue(i) 
+            dumunueb(i) = unueb(i) + dtf11*f1unueb(i) 
+            dumunux(i)  = unux(i) + dtf11*f1unux(i) 
+            !dumvt2(i)   = vturb2(i) + dtf11*fmix1(i) 
             reset(i)=.false. 
             if (dumye(i).lt.0.02) then 
                dumye(i)=.02 
@@ -5725,16 +6206,17 @@
 !                                                                       
 !--get forces at half the time step, using predictions                  
 !                                                                       
-         thalf=time + f11*steps(1) 
-         print_nuloss=.false. 
+         thalf        = time + f11*steps(1) 
+         print_nuloss = .true.
          !call write_data(ntstep*2,ncell,x,v)
 
-         call hydro(thalf,ncell,dumx,dumv,                              &
-     &         dumu,rho,dumye,f2v,f2u,f2ye,q,                           &
-     !fmix2,                     &
-     &         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
-     &         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
-     &         print_nuloss,ntstep)        
+         call hydro(thalf,ncell,dumx,dumv,                                   &
+                    dumu,rho,dumye,f2v,f2u,f2ye,q,                           &
+                    !fmix2,                     &
+                    dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
+                    dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
+                    print_nuloss,ntstep) 
+                                                            
 !                                                                       
 !--advance all the gas particles                                        
 !        
@@ -5744,20 +6226,19 @@
           !print*, i, ye(i)+dtf21*f1ye(i)+dtf22*f2ye(i) 
          !enddo
          do i=1,ncell 
-            dtf21=f21*steps(i) 
-            dtf22=f22*steps(i) 
-            dumx(i)=x(i) + dtf21*v(i) + dtf22*dumv(i) 
-            dumv(i)=v(i) + dtf21*f1v(i) + dtf22*f2v(i) 
-            if (time.lt.0.02.and.rho(i).lt.5.d6)                        &
-     &           dumv(i)=min(dumv(i),-0.1)                              
-            dumu(i)=u(i) + dtf21*f1u(i) + dtf22*f2u(i) 
-            dumye(i)=ye(i) + dtf21*f1ye(i) + dtf22*f2ye(i) 
-            dumynue(i)=ynue(i) + dtf21*f1ynue(i) + dtf22*f2ynue(i) 
-            dumynueb(i)=ynueb(i) + dtf21*f1ynueb(i) + dtf22*f2ynueb(i) 
-            dumynux(i)=ynux(i) + dtf21*f1ynux(i) + dtf22*f2ynux(i) 
-            dumunue(i)=unue(i) + dtf21*f1unue(i) + dtf22*f2unue(i) 
-            dumunueb(i)=unueb(i) + dtf21*f1unueb(i) + dtf22*f2unueb(i) 
-            dumunux(i)=unux(i) + dtf21*f1unux(i) + dtf22*f2unux(i) 
+            dtf21   = f21*steps(i) 
+            dtf22   = f22*steps(i) 
+            dumx(i) = x(i) + dtf21*v(i) + dtf22*dumv(i) 
+            dumv(i) = v(i) + dtf21*f1v(i) + dtf22*f2v(i) 
+            if (time.lt.0.02.and.rho(i).lt.5.d6) dumv(i)=min(dumv(i),-0.1)                              
+            dumu(i)     = u(i) + dtf21*f1u(i) + dtf22*f2u(i) 
+            dumye(i)    = ye(i) + dtf21*f1ye(i) + dtf22*f2ye(i) 
+            dumynue(i)  = ynue(i) + dtf21*f1ynue(i) + dtf22*f2ynue(i) 
+            dumynueb(i) = ynueb(i) + dtf21*f1ynueb(i) + dtf22*f2ynueb(i) 
+            dumynux(i)  = ynux(i) + dtf21*f1ynux(i) + dtf22*f2ynux(i) 
+            dumunue(i)  = unue(i) + dtf21*f1unue(i) + dtf22*f2unue(i) 
+            dumunueb(i) = unueb(i) + dtf21*f1unueb(i) + dtf22*f2unueb(i) 
+            dumunux(i)  = unux(i) + dtf21*f1unux(i) + dtf22*f2unux(i) 
             !dumvt2(i)=vturb2(i) + dtf21*fmix1(i) + dtf22*fmix2(i) 
             if (dumye(i).lt.0.02) then 
                dumye(i)=.02 
@@ -5768,78 +6249,138 @@
          !enddo         
 !                                                                       
 !     set saturation const=0                                            
-         satc=0 
+         satc = 0 
 !                                                                       
 !--get forces at end of time step                                       
 !                                                                       
-         tfull=time + steps(1) 
-         print_nuloss=.true. 
+         tfull        = time + steps(1) 
+         print_nuloss = .false. 
          !call write_data(ntstep*2+1,ncell,x,v)
          !print*, '.......................'
          !do i=30,40
          ! print*, i, dumye(i)
          !enddo         
          !print*, '-----------------------'
-         call hydro(tfull,ncell,dumx,dumv,                              &
-     &         dumu,rho,dumye,f2v,f2u,f2ye,q,                           &
-     !fmix2,                     &
-     &         dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
-     &         dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
-     &         print_nuloss,ntstep)    
-      !call exit(0)     
+
+
+         !print*, 'ebetaeq', maxval(ebetaeq)
+         !print*, 'pbetaeq', maxval(pbetaeq)
+        !  print*, 'deltam', maxval(deltam), maxloc(deltam)
+        !  print*, 'abar', maxval(abar), maxloc(abar)
+        !  print*, 'u', maxval(u)
+        !  print*, 'rho', maxval(rho), maxloc(rho), minval(rho), minloc(rho)
+        !  print*, 'ye', maxval(ye)
+        !  print*, '--> q', maxval(q), maxloc(q), minval(q), minloc(q)
+        !  print*, q(:10)
+        !  print*, 'x', maxval(x)
+        !  print*, 'v', maxval(v)
+        !  print*, 'f', maxval(f)
+        !  print*, 'pr', maxval(pr)
+        !  print*, 'vsound', maxval(vsound), maxloc(vsound)
+        !  print*, 'u2', maxval(u2), maxloc(u2)
+        !  print*, 'etanue', maxval(etanue), maxloc(etanue)
+        !  print*, 'etanueb', maxval(etanueb)
+        !  print*, 'etanux', maxval(etanux)
+        !  print*, 'ynue', maxval(ynue)
+        !  print*, 'ynueb', maxval(ynueb)
+        !  print*, 'ynux', maxval(ynux)
+        !  print*, 'unue', maxval(unue)
+        !  print*, 'unueb', maxval(unueb)
+        !  print*, 'unux', maxval(unux)
+        !  print*, 'xn', maxval(xn)
+        !  print*, 'xp', maxval(xp)
+        !  print*, 'eta', maxval(eta)
+        !  print*, '-----'
+        !  print*, ''
+
+         call hydro(tfull,ncell,dumx,dumv,                                   &
+                    dumu,rho,dumye,f2v,f2u,f2ye,q,                           &
+                    !fmix2,                     &
+                    dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
+                    dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
+                    print_nuloss,ntstep)  
+                    
+        !print*, 'ebetaeq', maxval(ebetaeq)
+        !print*, 'pbetaeq', maxval(pbetaeq)
+        ! print*, 'deltam', maxval(deltam)
+        ! print*, 'abar', maxval(abar)
+        ! print*, 'u', maxval(u)
+        ! print*, 'rho', maxval(rho), maxloc(rho), minval(rho), minloc(rho)
+        ! print*, 'ye', maxval(ye)
+        ! print*, '--> q', maxval(q), maxloc(q), minval(q), minloc(q)
+        ! print*, q(:10)
+        ! print*, 'x', maxval(x)
+        ! print*, 'v', maxval(v)
+        ! print*, 'f', maxval(f)
+        ! print*, 'pr', maxval(pr)
+        ! print*, 'vsound', maxval(vsound), maxloc(vsound)
+        ! print*, 'u2', maxval(u2), maxloc(u2)
+        ! print*, 'etanue', maxval(etanue), maxloc(etanue)
+        ! print*, 'etanueb', maxval(etanueb)
+        ! print*, 'etanux', maxval(etanux)
+        ! print*, 'ynue', maxval(ynue)
+        ! print*, 'ynueb', maxval(ynueb)
+        ! print*, 'ynux', maxval(ynux)
+        ! print*, 'unue', maxval(unue)
+        ! print*, 'unueb', maxval(unueb)
+        ! print*, 'unux', maxval(unux)
+        ! print*, 'xn', maxval(xn)
+        ! print*, 'xp', maxval(xp)
+        ! print*, 'eta', maxval(eta)  
+
 !                                                                       
 !--estimate integration error and set time step. If reduction           
 !  the maximum time step is set to dtime.                               
 !  Error checking is supressed for particles having been                
 !  reset.                                                               
 !                                                                       
-         rapmax=0. 
-         ermax=-1.e10 
-         stepmin=1.e30 
-         stepmax=0. 
-         ierr=0 
-         nreset=0 
-         denmax=0. 
-         tempmax=0. 
+         rapmax  = 0. 
+         ermax   =-1.e10 
+         stepmin = 1.e30 
+         stepmax = 0. 
+         ierr    = 0 
+         nreset  = 0 
+         denmax  = 0. 
+         tempmax = 0. 
          do i=1,ncell 
             if(reset(i)) then 
-               steps(i)=1.e20 
-               nreset=nreset + 1 
+               steps(i) = 1.e20 
+               nreset   = nreset + 1 
             else 
-               dxi=(x(i)-x(i-1)) 
-               vsi=0.05*vsound(i) 
-               ysi=ye(i) 
+               dxi = (x(i)-x(i-1)) 
+               vsi = 0.05*vsound(i) 
+               ysi = ye(i) 
                if (ifleos(i).eq.1) then 
-                  usi=u(i) 
+                  usi = u(i) 
                elseif (ifleos(i).eq.2) then 
 !--this because in NSE, we can have u(i)< lt 0                          
 !--so take energy with respect to iron                                  
-                  usi=u(i)+8.8*umevnuc 
+                  usi = u(i)+8.8*umevnuc 
                elseif (ifleos(i).eq.3.or.ifleos(i).eq.4) then
                   if (ieos.eq.3) then 
-                     usi=u(i)+8.8*umevnuc 
+                     usi = u(i)+8.8*umevnuc 
                   else 
 !--variable of state is entropy                                         
-                     usi=u(i)*temp(i) 
+                     usi = u(i)*temp(i) 
                   endif 
                else
                   usi=u(i)                   
                endif 
-               erx=abs(dumv(i))/dxi 
-               erv=abs(f1v(i)-f2v(i))/(abs(v(i))+vsi) 
-               eru=abs(f1u(i)-f2u(i))/u(i) 
-               erye=abs(f1ye(i)-f2ye(i))/ysi 
-               erynue=abs(f1ynue(i)-f2ynue(i))/(ysi+ynue(i)) 
-               erynueb=abs(f1ynueb(i)-f2ynueb(i))/(ysi+ynueb(i)) 
-               erynux=abs(f1ynux(i)-f2ynux(i))/(ysi+ynux(i)) 
-               erunue=abs(f1unue(i)-f2unue(i))/(usi+unue(i)) 
-               erunueb=abs(f1unueb(i)-f2unueb(i))/(usi+unueb(i)) 
-               erunux=abs(f1unux(i)-f2unux(i))/(usi+unux(i)) 
+               erx     = abs(dumv(i))/dxi 
+               erv     = abs(f1v(i)-f2v(i))/(abs(v(i))+vsi) 
+               eru     = abs(f1u(i)-f2u(i))/u(i) 
+               erye    = abs(f1ye(i)-f2ye(i))/ysi 
+               erynue  = abs(f1ynue(i)-f2ynue(i))/(ysi+ynue(i)) 
+               erynueb = abs(f1ynueb(i)-f2ynueb(i))/(ysi+ynueb(i)) 
+               erynux  = abs(f1ynux(i)-f2ynux(i))/(ysi+ynux(i)) 
+               erunue  = abs(f1unue(i)-f2unue(i))/(usi+unue(i)) 
+               erunueb = abs(f1unueb(i)-f2unueb(i))/(usi+unueb(i)) 
+               erunux  = abs(f1unux(i)-f2unux(i))/(usi+unux(i)) 
 !                                                                       
 !--get maximum error and determine time step                            
 !                                                                       
                erm=dmax1(erx,erv,eru,erye,                              &
-     &            erynue,erynueb,erynux,erunue,erunueb,erunux)          
+                         erynue,erynueb,erynux,erunue,erunueb,erunux)          
                if(erm.gt.ermax)then 
                   if(erm.eq.erx)then 
                      ierr=1 
@@ -5862,18 +6403,18 @@
                   elseif(erm.eq.erunux) then 
                      ierr=15 
                   endif 
-                  imax=i 
-                  ermax=erm 
+                  imax  = i 
+                  ermax = erm 
                endif 
-               rap=steps(i)*erm*e1/tol + tiny 
-               rapmax=dmax1(rapmax,rap) 
-               rmod=min(2.0d0,1./dsqrt(rap)) 
-               steps(i)=min(steps(i)*rmod,dtime,dt0) 
+               rap      = steps(i)*erm*e1/tol + tiny 
+               rapmax   = dmax1(rapmax,rap) 
+               rmod     = min(2.0d0,1./dsqrt(rap)) 
+               steps(i) = min(steps(i)*rmod,dtime,dt0) 
 !               if (time.gt.1.d-3) then                                 
 !                  print *, steps(i)*rmod,steps(i),rmod,dtime,dt0       
 !               end if                                                  
-               tempmax=max(temp(i),tempmax) 
-               denmax=max(rho(i),denmax) 
+               tempmax = max(temp(i),tempmax) 
+               denmax  = max(rho(i),denmax) 
             end if 
          enddo 
 !         write(*,*)'max error flag: ',ierr,imax,ebetaeq(imax)          
@@ -5897,16 +6438,16 @@
 !                                                                       
          dtmin=1.e30 
          do i=1,ncell 
-            dtmin=dmin1(dtmin,steps(i)) 
-            stepmax=dmax1(stepmax,steps(i)) 
-            stepmin=dmin1(stepmin,steps(i)) 
+            dtmin   = dmin1(dtmin,steps(i)) 
+            stepmax = dmax1(stepmax,steps(i)) 
+            stepmin = dmin1(stepmin,steps(i)) 
          enddo 
          xtime=xtime*0.8d0**satc 
          !print *,'xtime=',xtime,'satc=',satc                           
          do i=1,ncell 
             steps(i)=min(dtmin,xtime) 
             if (time.lt.1.d-7) then 
-               steps(i)=min(steps(i),1.d-9) 
+               steps(i) = min(steps(i),1.d-9) 
             end if 
          enddo 
 !         write(*,110)'step:t,dt,rapmax,nreset', tfull,dtmin,rapmax,    
@@ -5924,31 +6465,31 @@
 !                                                                       
          !print *, 'XXXXXXXXXXXXXXXXXXXX update system'                 
          do i=1,ncell 
-            x(i)=dumx(i) 
-            v(i)=dumv(i) 
-            u(i)=dumu(i) 
-            ye(i)=dumye(i) 
-            f1v(i)=f2v(i) 
-            f1u(i)=f2u(i) 
-            f1ye(i)=f2ye(i) 
-            ynue(i)=dumynue(i) 
-            ynueb(i)=dumynueb(i) 
-            ynux(i)=dumynux(i) 
-            f1ynue(i)=f2ynue(i) 
-            f1ynueb(i)=f2ynueb(i) 
-            f1ynux(i)=f2ynux(i) 
-            unue(i)=dumunue(i) 
-            unueb(i)=dumunueb(i) 
-            unux(i)=dumunux(i) 
-            !vturb2(i)=dumvt2(i) 
-            f1unue(i)=f2unue(i) 
-            f1unueb(i)=f2unueb(i) 
-            f1unux(i)=f2unux(i) 
+            x(i)       = dumx(i) 
+            v(i)       = dumv(i) 
+            u(i)       = dumu(i) 
+            ye(i)      = dumye(i) 
+            f1v(i)     = f2v(i) 
+            f1u(i)     = f2u(i) 
+            f1ye(i)    = f2ye(i) 
+            ynue(i)    = dumynue(i) 
+            ynueb(i)   = dumynueb(i) 
+            ynux(i)    = dumynux(i) 
+            f1ynue(i)  = f2ynue(i) 
+            f1ynueb(i) = f2ynueb(i) 
+            f1ynux(i)  = f2ynux(i) 
+            unue(i)    = dumunue(i) 
+            unueb(i)   = dumunueb(i) 
+            unux(i)    = dumunux(i) 
+            !vturb2(i)  = dumvt2(i) 
+            f1unue(i)  = f2unue(i) 
+            f1unueb(i) = f2unueb(i) 
+            f1unux(i)  = f2unux(i) 
          enddo 
          if (x(ncell).gt.rout) then 
-            pr(ncell+1)=2.*p1out 
+            pr(ncell+1) = 2.*p1out 
          else 
-            pr(ncell+1)=0.1*p1out 
+            pr(ncell+1) = 0.1*p1out 
          end if 
 !                                                                       
 !--burning                                                              
@@ -5962,18 +6503,18 @@
             if(iflg.eq.1)then 
                call eosflg(ncell,rho,ye,u,f1ye,f1u) 
                do i=1,ncell 
-                  tempold(i)=temp(i) 
-                  rhold(i)=rho(i) 
-                  yeold(i)=ye(i) 
-                  xnold(i)=xn(i) 
-                  xpold(i)=xp(i) 
+                  tempold(i) = temp(i) 
+                  rhold(i)   = rho(i) 
+                  yeold(i)   = ye(i) 
+                  xnold(i)   = xn(i) 
+                  xpold(i)   = xp(i) 
                end do 
-               call hydro(tfull,ncell,x,v,                              &
-     &              u,rho,ye,f1v,f1u,f1ye,q,                            &
-     !fmix1,                      &
-     &              ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,              &
-     &              unue,unueb,unux,f1unue,f1unueb,f1unux,              &
-     &              print_nuloss,ntstep)                                       
+               call hydro(tfull,ncell,x,v,                                    &
+                          u,rho,ye,f1v,f1u,f1ye,q,                            &
+                          !fmix1,                      &
+                          ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,              &
+                          unue,unueb,unux,f1unue,f1unueb,f1unux,              &
+                          print_nuloss,ntstep)                                       
             endif 
          endif 
          time=tfull 
@@ -6000,21 +6541,21 @@
 !                                                                       
 !--flag particles according to physical state                           
 !
-         if (ieos.ne.5) then                                                                       
+         if (ieos.ne.5.and.ieos.ne.6) then                                                                       
             call eosflg(ncell,rho,ye,u,f1ye,f1u) 
          endif
 !                                                                       
 !--do various neutrino flagging and checking                            
 !--skip neutrino                                                        
          call nucheck(ncell,x,ye,                                       &
-     &            ynue,ynueb,ynux,unue,unueb,unux)                      
+                      ynue,ynueb,ynux,unue,unueb,unux)                      
 !                                                                       
          do i=1,ncell 
-            tempold(i)=temp(i) 
-            rhold(i)=rho(i) 
-            yeold(i)=ye(i) 
-            xnold(i)=xn(i) 
-            xpold(i)=xp(i) 
+            tempold(i) = temp(i) 
+            rhold(i)   = rho(i) 
+            yeold(i)   = ye(i) 
+            xnold(i)   = xn(i) 
+            xpold(i)   = xp(i) 
          enddo 
          convf=ufoe/utime 
          nupk=nupk+1 
@@ -6023,7 +6564,7 @@
 !         end if                                                        
          if (mod(nupk,nups).eq.0) then 
             write(59,120)time,convf*rlumnue,enue,convf*rlumnueb,enueb,  &
-     &           convf*rlumnux,enux                                     
+                         convf*rlumnux,enux                                     
             ke=0. 
             do i=1,ncell 
                if (v(i).gt.0) then 
@@ -6046,19 +6587,18 @@
   120    format((1pe12.5),6(1x,1pe10.2))
 !                                                                       
 !--start new time step                                                  
-!                                                                       
+!                         
          if(time.lt.tnext)then 
             !print *, '****time*****',time                              
   520       format(A,I12,A) 
             print 520,'<',ntstep,                                       &
-     &      '          > ----------------------------------'            
+            '          > ----------------------------------'            
             write(*,500)'[    time/tmax, dt (s) ]',                     &
-     &           time*utime,'/',tmax*utime,steps(1)*utime                              
+                        time*utime,'/',tmax*utime,steps(1)*utime                              
   500       format(A,1p,E10.3,A,E9.3,E15.3)
   
             if (post_bounce.eqv..true.) then
-                write(*,501)'[    bounce time (s)   ]',                     &
-         &           bounce_time*utime                              
+                write(*,501)'[    bounce time (s)   ]', bounce_time*utime                              
       501       format(A,1p,E10.3)
             endif
 !
@@ -6068,6 +6608,7 @@
                call printout(lu) 
                close (lu) 
             end if 
+            !if (ntstep.eq.93) stop
             ntstep=ntstep+1 
             go to 99 
          end if 
@@ -6077,24 +6618,26 @@
       END  
 
 
-      subroutine write_value(t,x)
+      subroutine write_value(ncell,a,b,c,d,xfile)
        
         implicit double precision (a-h,o-z) 
+        parameter (idim=10000)
 
-        double precision :: t, x
-        character*30 :: xfile
-        logical :: exist
+        double precision :: a(0:idim), b(idim),c(0:ncell), d(idim)
+        character*30     :: xfile
+        logical          :: exist
                 
-        xfile = 'lumnue.txt'      
-
         inquire(file=xfile, exist=exist)
         if (exist) then
-            open(unit=996, file=trim(xfile), status="old", position="append", action="write")
-        else
+            !open(unit=996, file=trim(xfile), status="old", position="append", action="write")
+            open(unit=996, file=trim(xfile), status="replace", action="write")
+        else 
             open(unit=996, file=trim(xfile), status="new", action="write")
         end if
-                
-        write(996,*), t, x
+        
+        do i=1,ncell
+            write(996,*), a(i),b(i),c(i),d(i)
+        enddo
 
         close(unit=996)
 
@@ -6170,86 +6713,86 @@
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
       common /const/ gg, clight, arad, bigr, xsecnn, xsecne 
 !                                                                       
-      data ggcgs/6.67e-8/, avo/6.02e23/ 
+      data ggcgs/6.67e-8/,      avo/6.02e23/ 
       data aradcgs /7.565e-15/, boltzk/1.381e-16/ 
-      data hbar/1.055e-27/, ccgs/3e10/ 
-      data emssmev/0.511e0/, boltzmev/8.617e-11/ 
-      data ergmev /6.2422e5/, sigma1/9d-44/, sigma2/5.6d-45/ 
-      data c2cgs /6.15e-4/, c3cgs /5.04e-10/, fermi/1d-13/ 
+      data hbar/1.055e-27/,     ccgs/3e10/ 
+      data emssmev/0.511e0/,    boltzmev/8.617e-11/ 
+      data ergmev /6.2422e5/,   sigma1/9d-44/,    sigma2/5.6d-45/ 
+      data c2cgs /6.15e-4/,     c3cgs /5.04e-10/, fermi/1d-13/ 
 !                                                                       
 !--1) work out code units:                                              
 !                                                                       
 !--specifie mass unit (g)                                               
 !                                                                       
-      umass=2d33 
+      umass = 2d33 
 !                                                                       
 !--specifie distance unit (cm)                                          
 !                                                                       
-      udist=1e9 
+      udist = 1e9 
 !                                                                       
 !--transformation factor for :                                          
 !                                                                       
 ! 1a) density                                                           
 !                                                                       
-      ud1=dble(umass)/dble(udist)**3 
-      udens=ud1 
+      ud1   = dble(umass)/dble(udist)**3 
+      udens = ud1 
 !                                                                       
 ! 1b) time                                                              
 !                                                                       
 !     ut1=dsqrt(dble(udist)**3/(dble(gg)*umass))                        
 !     utime=ut1                                                         
-      ut1=1.d1 
-      utime=ut1 
+      ut1   = 1.d1 
+      utime = ut1 
 !                                                                       
 ! 1c) ergs                                                              
 !                                                                       
-      ue1=dble(umass)*dble(udist)**2/dble(utime)**2 
+      ue1 = dble(umass)*dble(udist)**2/dble(utime)**2 
 !--uerg will overflow                                                   
 !      uerg=ue1                                                         
 !                                                                       
 ! 1d) ergs per gram                                                     
 !                                                                       
-      ueg1=dble(udist)**2/dble(utime)**2 
-      uergg=ueg1 
+      ueg1  = dble(udist)**2/dble(utime)**2 
+      uergg = ueg1 
 !                                                                       
 ! 1e) ergs per cc                                                       
 !                                                                       
-      uec1=dble(umass)/(dble(udist)*dble(utime)**2) 
-      uergcc=uec1 
+      uec1   = dble(umass)/(dble(udist)*dble(utime)**2) 
+      uergcc = uec1 
 !                                                                       
 !--2) constants                                                         
 !                                                                       
 ! 2a) gravitational                                                     
 !                                                                       
-      gg1=dble(ggcgs)*umass*dble(utime)**2/(dble(udist)**3) 
-      gg=gg1 
+      gg1 = dble(ggcgs)*umass*dble(utime)**2/(dble(udist)**3) 
+      gg  = gg1 
 !                                                                       
 ! 2aa) velocity of light                                                
 !                                                                       
-      clight=dble(ccgs*utime/udist) 
+      clight = dble(ccgs*utime/udist) 
                                                                         
 !                                                                       
 ! 2b) Stefan Boltzmann (note that T unit is 1e9 K here)                 
 !                                                                       
-      utemp=1e9 
-      arad1=dble(aradcgs)/ue1*dble(udist)**3*dble(utemp)**4 
-      arad=arad1 
+      utemp = 1e9 
+      arad1 = dble(aradcgs)/ue1*dble(udist)**3*dble(utemp)**4 
+      arad  = arad1 
 !                                                                       
 ! 2c) Perfect Gas "R" constant                                          
 !                                                                       
-      bigr1=dble(avo)*dble(boltzk)/ue1*umass*dble(utemp) 
-      bigr=bigr1 
+      bigr1 = dble(avo)*dble(boltzk)/ue1*umass*dble(utemp) 
+      bigr  = bigr1 
 !                                                                       
 ! 2d) nucleon+nu x-section/4pi, in udist**2/umass/Mev**2                
 !                                                                       
-      xsecnn1=sigma1*umass*dble(avo)/dble(udist*udist) 
-      xsecnn=xsecnn1/(4d0*3.14159d0) 
+      xsecnn1 = sigma1*umass*dble(avo)/dble(udist*udist) 
+      xsecnn  = xsecnn1/(4d0*3.14159d0) 
 !                                                                       
 ! 2e) e+nu x-section/4pi, in Enu(Mev)*udist**2/umass/Mev**2/utemp**4    
 !                                                                       
-      xsecne1=sigma2*umass*dble(ergmev)*(dble(utemp)*dble(boltzk))**4/  &
-     &     (dble(udist)**2*ud1*3.14159d0*(dble(hbar)*dble(ccgs))**3)    
-      xsecne=xsecne1/(4d0*3.14159d0) 
+      xsecne1 = sigma2*umass*dble(ergmev)*(dble(utemp)*dble(boltzk))**4/  &
+                (dble(udist)**2*ud1*3.14159d0*(dble(hbar)*dble(ccgs))**3)    
+      xsecne  = xsecne1/(4d0*3.14159d0) 
 !                                                                       
 !--3a) Conversion to the Ocean eos units from code units:               
 !     in the ocean eos; density unit=1e7g/cc                            
@@ -6257,11 +6800,11 @@
 !                       energy/mass=1.0e17cgs                           
 !                       energy/vol =1.0e24cgs                           
 !                                                                       
-      uotemp=1d9/dble(utemp) 
-      uotemp1=1.d0/uotemp 
-      uopr=1.d24/dble(uergcc) 
-      uorho1=ud1/1.d7 
-      uou1=dble(uergg)/1.d17 
+      uotemp  = 1d9/dble(utemp) 
+      uotemp1 = 1.d0/uotemp 
+      uopr    = 1.d24/dble(uergcc) 
+      uorho1  = ud1/1.d7 
+      uou1    = dble(uergg)/1.d17 
                                                                         
                                                                         
                                                                         
@@ -6269,17 +6812,17 @@
 !                                                                       
 !--3b) Conversion to the Swesty-Lattimer units from code units:         
 !                                                                       
-      usltemp=utemp*boltzmev 
-      uslrho=ud1*avo*fermi**3 
-      uslp=uec1*fermi**3/1.602d-6 
+      usltemp = utemp*boltzmev 
+      uslrho  = ud1*avo*fermi**3 
+      uslp    = uec1*fermi**3/1.602d-6 
       if (ieos.eq.3) then 
 !--if u is internal energy                                              
-         uslu=dble(ergmev)*dble(uergg)/dble(avo) 
-         u2slu=dble(uergg)/dble(utemp)/(dble(avo)*dble(boltzk)) 
+         uslu  = dble(ergmev)*dble(uergg)/dble(avo) 
+         u2slu = dble(uergg)/dble(utemp)/(dble(avo)*dble(boltzk)) 
       elseif (ieos.eq.4) then 
 !--if u is specific entropy                                             
-         uslu=dble(uergg)/dble(utemp)/(dble(avo)*dble(boltzk)) 
-         u2slu=dble(ergmev)*dble(uergg)/dble(avo) 
+         uslu  = dble(uergg)/dble(utemp)/(dble(avo)*dble(boltzk)) 
+         u2slu = dble(ergmev)*dble(uergg)/dble(avo) 
       endif 
       print *,'ieos,uslu',ieos,uslu 
 !                                                                       
@@ -6287,26 +6830,26 @@
 !                                                                       
 ! 4a) temp code unit in Mev                                             
 !                                                                       
-      utmev=utemp*boltzmev 
+      utmev = utemp*boltzmev 
 !                                                                       
 ! 4b) energy code unit in foes                                          
 !                                                                       
-      ufoe1=ue1/1d51 
-      ufoe=ufoe1 
+      ufoe1 = ue1/1d51 
+      ufoe  = ufoe1 
 !                                                                       
 ! 4c) Mev/nucleon in code units                                         
 !                                                                       
-      umevnuc=avo/(ergmev*uergg) 
+      umevnuc = avo/(ergmev*uergg) 
 !                                                                       
 ! 4e) Mev to errgs times avogadro's number                              
 !                                                                       
-      umeverg=avo*1.602e-6 
+      umeverg = avo*1.602e-6 
 !                                                                       
 !--5) epcapture betafac, c2, and c3.                                    
 !                                                                       
-      betafac=emssmev/utmev 
-      c2cu=c2cgs*utime 
-      c3cu=c3cgs*utime*ergmev 
+      betafac = emssmev/utmev 
+      c2cu    = c2cgs*utime 
+      c3cu    = c3cgs*utime*ergmev 
 !                                                                       
       write(*,100)umass,udist,udens,utime,uergg,uergcc 
   100 format(1x,5(1pe12.5,1x),/,1x,2(1pe12.5,1x)) 
@@ -6322,27 +6865,27 @@
 !                                                                *      
 !*****************************************************************      
 !                                                                       
-      parameter (idim=4000) 
-      parameter (idim1=idim+1) 
+      parameter (idim=10000) 
+      parameter (idim1 = idim+1) 
       parameter (iqn=17) 
       parameter (nel=14) 
 !                                                                       
       integer ifleos 
       double precision pf(7,17),pb(7,14),rrat(17),rlam(15),ya(15),      &
-     &                 def(14),ff(14),yold(15),t9,rhoi,tburn,dtold,     &
-     &                 dtburn,dfmin,dfm,err,eps,dtsec,enrg,             &
-     &                 errmax,scale,a(14),yinput(15),zn(14),            &
-     &                 yel,coefg,coeft,ar(14),ar11,ui,tempi,            &
-     &                 abari,yei,rhoit,xpn,etai,time                    
+                       def(14),ff(14),yold(15),t9,rhoi,tburn,dtold,     &
+                       dtburn,dfmin,dfm,err,eps,dtsec,enrg,             &
+                       errmax,scale,a(14),yinput(15),zn(14),            &
+                       yel,coefg,coeft,ar(14),ar11,ui,tempi,            &
+                       abari,yei,rhoit,xpn,etai,time                    
                                                                         
       double precision deltam,abar,u,rho,ye,q,xp,xn,eta,xalpha,         &
-     &     xheavy,yeh,pr,vsound,u2,vsmax,temp,amas,znum                 
+                       xheavy,yeh,pr,vsound,u2,vsmax,temp,amas,znum                 
       double precision umass,udist,udens,utime,                         &
-     &     uergg,uergcc,gamma,uvit,uit,deltat                           
-      double precision t9nse, rhoswe, rhonue, rhonux, xmue,             &
-     &     xmuhat                                                       
+                       uergg,uergcc,gamma,uvit,uit,deltat                           
+      double precision t9nse, rhoswe, rhonue, rhonux, xmue, xmuhat                                                       
       double precision ptot,cs,yehi,stot,ufact,yefact 
       double precision ufreez 
+      real ycc,yccave
 !                                                                       
       common /ceos / amas(iqn), znum(iqn) 
       common /cc   / ycc(idim,iqn), yccave(iqn) 
@@ -6371,20 +6914,19 @@
       character*2 element(nel) 
 !                                                                       
       data   amas /  1.d00,  1.0d0, 1.0d0, 4.d00, 12.d00, 16.d00,       &
-     &              20.d00, 24.d00,28.d00, 32.d00, 36.d00, 40.d00,      &
-     &              44.0d0, 48.0d0, 52.0d0, 56.0d0, 60.0d0/             
+                    20.d00, 24.d00,28.d00, 32.d00, 36.d00, 40.d00,      &
+                    44.0d0, 48.0d0, 52.0d0, 56.0d0, 60.0d0/             
       data   znum /  0.d00,  1.0d0,  0.0d0, 2.d00,  6.d00,  8.d00,      &
-     &              10.d00, 12.d00, 14.d00, 16.d00, 18.d00, 20.d00,     &
-     &              22.0d0, 24.0d0, 26.0d0, 28.0d0, 30.0d0/             
+                    10.d00, 12.d00, 14.d00, 16.d00, 18.d00, 20.d00,     &
+                    22.0d0, 24.0d0, 26.0d0, 28.0d0, 30.0d0/             
 !                                                                       
       data eps/1.d-3/ , maxstep/10000/ 
       data first/.true./ 
       data a/4.,12.,16.,20.,24.,28.,32.,36.,40.,44.,48.,52.,            &
-     &       56.,60./                                                   
+             56.,60./                                                   
       data zn/2.,6.,8.,10.,12.,14.,16.,18.,20.,22.,24.,26.,28.,30./ 
       data element/'He','C ','O ','Ne','Mg','Si','S ','Ar','Ca','Ti',   &
-     &             'Cr','Fe','Ni','Zn'/                                 
-      nqn=17 
+                   'Cr','Fe','Ni','Zn'/                                 
       idisk2=10 
 !                                                                       
 !--if first passage read rates                                          
@@ -6465,7 +7007,7 @@
 !                                                                       
             call genpar(rhoi,t9,a,zn,ya,yel,ar,ar11,coefg,coeft) 
             call rates(icell,t9,pf,pb,rrat,rlam,yel,coefg,coeft,a,ar,   &
-     &                 ar11,zn)                                         
+                       ar11,zn)                                         
 !                                                                       
 !--compute ydot(i)=ff(i) : system of differential equations             
 !  with present ya(i) rho and rates                                     
@@ -6516,13 +7058,13 @@
             tempi=t9 
             yei=yel 
             abari=0.d0 
-            do j=4,nqn 
+            do j=4,iqn 
                abari=abari+dble(ya(j-3))*amas(j)**2 
             enddo 
             if(tburn.ge.dtsec)then 
                iout=1 
                call rootemp2(icell,rhoit,uit,tempi,yei,abari,           &
-     &              ptot,cs,etai,stot)                                  
+                             ptot,cs,etai,stot)                                  
                t9=tempi 
                pr(icell)=ptot/uergcc 
                vsound(icell)=cs/uvit 
@@ -6536,7 +7078,7 @@
                   goto 95 
                else 
                   call rootemp2(icell,rhoit,uit,tempi,yei,abari,        &
-     &                 ptot,cs,etai,stot)                               
+                                ptot,cs,etai,stot)                               
                   t9=tempi 
                endif 
             end if 
@@ -6569,7 +7111,8 @@
       call flush(80) 
 !                                                                       
       return 
-      END                                           
+      END 
+
       double precision function accur(y,n) 
       implicit double precision (a-h,o-z) 
       dimension y(15),a(14) 
@@ -6577,14 +7120,15 @@
 ! program checks accuracy of mass conservation sum (a(i)*y(i)=1)        
 !---------------------------------------------------------------        
       data a/4.,12.,16.,20.,24.,28.,32.,36.,40.,44.,48.,52.,            &
-     &       56.,60./                                                   
+             56.,60./                                                   
       summ=0.0 
       do 10 i=1,n 
       summ=summ+a(i)*y(i) 
    10 continue 
       accur=summ - 1.0 
       return 
-      END                                           
+      END    
+
       subroutine derivn(y,rob,ff,rrat,rlam) 
 !-----------------------------------------------------------------      
 ! calculates time derivatives of abundances i.e.                        
@@ -6600,24 +7144,25 @@
       ff(1)=ff(1)-rob*rrat(i)*y(1)*y(i)+rlam(i+1)*y(i+1) 
    20 continue 
       ff(1)=ff(1)-0.5*rrat(1)*rob**2*y(1)**3                            &
-     &      +3.0*rlam(2)*y(2)                                           &
-     &      +0.5*rrat(15)*rob*y(2)**2                                   &
-     &      +rrat(16)*rob*y(2)*y(3)                                     &
-     &      +0.5*rrat(17)*rob*y(3)**2                                   
+            +3.0*rlam(2)*y(2)                                           &
+            +0.5*rrat(15)*rob*y(2)**2                                   &
+            +rrat(16)*rob*y(2)*y(3)                                     &
+            +0.5*rrat(17)*rob*y(3)**2                                   
       ff(2)=1./6.*rrat(1)*rob**2*y(1)**3+rlam(3)*y(3)                   &
-     &      -rrat(2)*rob*y(1)*y(2)-rlam(2)*y(2)                         &
-     &      -rrat(15)*rob*y(2)**2                                       &
-     &      -rrat(16)*rob*y(2)*y(3)                                     
+            -rrat(2)*rob*y(1)*y(2)-rlam(2)*y(2)                         &
+            -rrat(15)*rob*y(2)**2                                       &
+            -rrat(16)*rob*y(2)*y(3)                                     
       do 30 i=3,14 
       ff(i)=rrat(i-1)*rob*y(1)*y(i-1)+rlam(i+1)*y(i+1)                  &
-     &      -rrat(i)*rob*y(1)*y(i)-rlam(i)*y(i)                         
+            -rrat(i)*rob*y(1)*y(i)-rlam(i)*y(i)                         
    30 continue 
       ff(3)=ff(3)-rrat(16)*rob*y(2)*y(3)-rrat(17)*rob*y(3)**2 
       ff(4)=ff(4)+0.5*rrat(15)*rob*y(2)**2 
       ff(5)=ff(5)+rrat(16)*rob*y(2)*y(3) 
       ff(6)=ff(6)+0.5*rrat(17)*rob*y(3)**2 
       return 
-      END                                           
+      END 
+
       subroutine epsb(yold,y,n,enrg) 
 !--------------------------------------------------------------         
 ! change of total nuclear binding energy/mass                           
@@ -6627,15 +7172,16 @@
       dimension yold(15),y(15),amex(14) 
       common /mass/ amex 
       data amex /2.425, 0.0, -4.737, -7.046, -13.933, -21.492,          &
-     &           -26.016, -30.231, -34.845, -37.549, -42.818,           &
-     &           -48.331, -53.902, -54.185/                             
+                 -26.016, -30.231, -34.845, -37.549, -42.818,           &
+                 -48.331, -53.902, -54.185/                             
       enrg=0.0 
       do 10 i=1,n 
    10 enrg=enrg-(y(i)-yold(i))*amex(i) 
       enrg=9.616221376d17*enrg 
       if(abs(enrg).lt.1.d4) enrg=0. 
       return 
-      END                                           
+      END  
+
       subroutine genpar(rho,t9,a,z,y,ye,ar,ar11,coefg,coeft) 
 !*************************************************************          
 !                                                            *          
@@ -6659,7 +7205,8 @@
       coefg=1.67100d-12/t9 
       coeft=3.58039d4*coefg**(0.3333333333333) 
       return 
-      END                                           
+      END        
+
       subroutine lequb (a,b,n) 
 !-------------------------------------------------------------          
 !     program solves system of linear equations a*x=b                   
@@ -6699,7 +7246,8 @@
    12 r=r+a(i,jj)*b(jj) 
    13 b(i)=(b(i)-r)/a(i,i) 
    15 return 
-      END                                           
+      END      
+
       subroutine matr(y,rob,rrat,rlam,dt,g) 
 !--------------------------------------------------------------         
 ! g(i,j) matrix for multi-dimensional newton-raphson                    
@@ -6721,7 +7269,7 @@
       g(1,1)=g(1,1)-1.5*rrat(1)*rob**2*y(1)**2 
       g(2,1)=0.5*rrat(1)*rob**2*y(1)**2-rrat(2)*rob*y(2) 
       g(2,2)=-rrat(2)*rob*y(1)-rlam(2)-2.0*rrat(15)*rob*y(2)            &
-     &       -rrat(16)*rob*y(3)                                         
+             -rrat(16)*rob*y(3)                                         
       g(2,3)=rlam(3)-rrat(16)*rob*y(2) 
       do 60 i=3,14 
       g(i,i-1)=g(i,i-1)+rrat(i-1)*rob*y(1) 
@@ -6741,7 +7289,8 @@
       g(i,i)=g(i,i)-1.0/dt 
    80 continue 
       return 
-      END                                           
+      END       
+
       subroutine newab(yold,y,rob,rrat,rlam,ff,dt,err,eps) 
       implicit double precision (a-h,o-z) 
       dimension yold(15),y(15),rrat(17),rlam(15),ff(14) 
@@ -6798,17 +7347,17 @@
       if(ers.lt.eps) goto 110 
       call derivn(y,rob,ff,rrat,rlam) 
       if(knew.gt.maxit)then 
-         write(*,*)' error: knew gt maxit' 
-         stop 
+         stop "ERROR: knew > maxit"
       end if 
       goto 35 
   110 return 
-      END                                           
+      END    
+
       subroutine rates(icell,t9,pf,pb,rrat,rlam,ye,coefg,coeft,a,       &
-     &                 ar,ar11,z)                                       
+                       ar,ar11,z)                                       
       implicit double precision (a-h,o-z) 
       dimension pf(7,17),pb(7,14),rrat(17),rlam(15),a(14),              &
-     &          ar(14),z(14), ptemp(7)                                  
+                ar(14),z(14), ptemp(7)                                  
 !--------------------------------------------------------               
 ! calculates rates                                                      
 ! rrat(i) forward rates (captures 1-14) 15:CC 16:CO 17:OO               
@@ -6835,40 +7384,41 @@
          enddo 
          rrat(i)=rk(ptemp,t91,t92,t93,t94,t95,t96) 
          rrat(i)=rrat(i)*scrng(z(1),z(i),a(1),a(i),ar(1),ar(i),ye,      &
-     &                       coefg,coeft)                               
+                             coefg,coeft)                               
    10 continue 
       do it=1,7 
          ptemp(it)=pf(it,1) 
       enddo 
       rrat(1)=rk(ptemp,t91,t92,t93,t94,t95,t96) 
       rrat(1)=rrat(1)*scrng(z(1),z(1),a(1),a(1),ar(1),ar(1),ye,         &
-     &                       coefg,coeft)                               
+                             coefg,coeft)                               
       rrat(1)=rrat(1)*scrng(z(1),4.d0,a(1),8.d0,ar(1),ar11,             &
-     &                       ye,coefg,coeft)                            
+                             ye,coefg,coeft)                            
       do it=1,7 
          ptemp(it)=pf(it,15) 
       enddo 
       rrat(15)=rk(ptemp,t91,t92,t93,t94,t95,t96) 
       rrat(15)=rrat(15)*scrng(z(2),z(2),a(2),a(2),ar(2),ar(2),          &
-     &                            ye,coefg,coeft)                       
+                                  ye,coefg,coeft)                       
       do it=1,7 
          ptemp(it)=pf(it,16) 
       enddo 
       rrat(16)=rk(ptemp,t91,t92,t93,t94,t95,t96) 
       rrat(16)=rrat(16)*scrng(z(2),z(3),a(2),a(3),ar(2),ar(3),          &
-     &                            ye,coefg,coeft)                       
+                                  ye,coefg,coeft)                       
       do it=1,7 
          ptemp(it)=pf(it,17) 
       enddo 
       rrat(17)=rk(ptemp,t91,t92,t93,t94,t95,t96) 
       rrat(17)=rrat(17)*scrng(z(3),z(3),a(3),a(3),ar(3),ar(3),          &
-     &                            ye,coefg,coeft)                       
+                                  ye,coefg,coeft)                       
       do it=1,7 
          ptemp(it)=pb(it,14) 
       enddo 
       rlam(14)=rk(ptemp,t91,t92,t93,t94,t95,t96) 
       return 
-      END                                           
+      END  
+
       subroutine rrate(pf,pb,iprint,idisk2) 
       implicit double precision (a-h,o-z) 
       dimension pf(7,17),pb(7,14) 
@@ -6879,33 +7429,35 @@
 !                                                                       
       character*72 string 
       do 10 i=1,17 
-      if(i.eq.14) goto 10 
-      read(idisk2,1000)string 
+        if(i.eq.14) goto 10 
+        read(idisk2,1000)string 
 !      write(*,1000)string                                              
-      read(idisk2,2000) (pf(j,i),j=1,7) 
+        read(idisk2,2000) (pf(j,i),j=1,7) 
    10 continue 
-      do 20 i=2,14 
-      read(idisk2,1000)string 
+        do 20 i=2,14 
+            read(idisk2,1000)string 
 !      write(*,1000)string                                              
-      read(idisk2,2000) (pb(j,i),j=1,7) 
+            read(idisk2,2000) (pb(j,i),j=1,7) 
    20 continue 
  1000 format(a72) 
  2000 format(4d13.6) 
       return 
-      END                                           
+      END   
+
       double precision function scrng(z1,z2,a1,a2,ar1,                  &
-     &                 ar2,ye,coefg,coeft)                              
+                                      ar2,ye,coefg,coeft)                              
       implicit double precision (a-h,o-z) 
-      gamma=coefg*z1*z2*2./(ar1+ar2) 
-      tau=coeft*(a1*a2/(a1+a2)*z1**2*z2**2)**(0.33333333333) 
-      scrng=dexp(1.25*gamma-0.0975*tau*(3.*gamma/tau)**2) 
+        gamma = coefg*z1*z2*2./(ar1+ar2) 
+        tau   = coeft*(a1*a2/(a1+a2)*z1**2*z2**2)**(0.33333333333) 
+        scrng = dexp(1.25*gamma-0.0975*tau*(3.*gamma/tau)**2) 
       return 
-      END                                           
+      END
+
       function rk(p,t91,t92,t93,t94,t95,t96) 
       implicit double precision (a-h,o-z) 
       dimension p(7) 
-      rk=p(1)+p(2)*t91+p(3)*t92+p(4)*t93+p(5)*t94+p(6)*t95              &
-     &   +p(7)*t96                                                      
-      rk=dexp(rk) 
+        rk = p(1)+p(2)*t91+p(3)*t92+p(4)*t93+p(5)*t94+p(6)*t95              &
+             +p(7)*t96                                                      
+        rk = dexp(rk) 
       return 
       END

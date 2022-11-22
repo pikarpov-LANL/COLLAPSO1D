@@ -29,7 +29,6 @@ program resnet_forward
 
     real(real32) :: input(224, 224, 3, 10)
     real(real32), pointer :: output(:, :)
-    real(real32), allocatable :: output_h(:, :)
 
     character(:), allocatable :: filename
     integer :: arglen, stat
@@ -48,7 +47,6 @@ program resnet_forward
     call torch_mod%load(filename)
     call torch_mod%forward(in_tensor, out_tensor)
     call out_tensor%to_array(output)
-    output_h = output
 
-    print *, output_h(1:5, 1)
+    print *, output(1:5, 1)
 end program

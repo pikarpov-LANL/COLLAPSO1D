@@ -7993,59 +7993,59 @@ c       write(*,1)fia
  1     format(1p8e10.3)
        return
        end
-	SUBROUTINE SPLINE(X,Y,N,Y2)
+        SUBROUTINE SPLINE(X,Y,N,Y2)
 c  Computes spline coefficients; Y(X) is input data; Y2 is output.
-	implicit real*8(a-h,o-z)
+        implicit real*8(a-h,o-z)
         DIMENSION X(N),Y(N),Y2(N),U(500)
-	Y2(1)=0.
-	U(1)=0.
-	DO 11 I=2,N-1
-	SIG=(X(I)-X(I-1))/(X(I+1)-X(I-1))
-	P=SIG*Y2(I-1)+2.
-	Y2(I)=(SIG-1.)/P
- 11	U(I)=(6.*((Y(I+1)-Y(I))/(X(I+1)-X(I))-(Y(I)-Y(I-1))
+        Y2(1)=0.
+        U(1)=0.
+        DO 11 I=2,N-1
+        SIG=(X(I)-X(I-1))/(X(I+1)-X(I-1))
+        P=SIG*Y2(I-1)+2.
+        Y2(I)=(SIG-1.)/P
+ 11     U(I)=(6.*((Y(I+1)-Y(I))/(X(I+1)-X(I))-(Y(I)-Y(I-1))
      1 /(X(I)-X(I-1)))/(X(I+1)-X(I-1))-SIG*U(I-1))/P
-	Y2(N)=0.
-	DO 12 K=N-1,1,-1
- 12	Y2(K)=Y2(K)*Y2(K+1)+U(K)
-	RETURN
-	END
-	SUBROUTINE SPLINT(XA,YA,Y2A,N,X,Y,KLO,KHI)
+        Y2(N)=0.
+        DO 12 K=N-1,1,-1
+ 12     Y2(K)=Y2(K)*Y2(K+1)+U(K)
+        RETURN
+        END
+        SUBROUTINE SPLINT(XA,YA,Y2A,N,X,Y,KLO,KHI)
 c     Computes spline fit of Y(X); YA(XA) is input data, Y2A are spline
 c  coefficents, klo and khi are running indices which bracket X.
-	implicit real*8(a-h,o-z)
+        implicit real*8(a-h,o-z)
         DIMENSION XA(N),YA(N),Y2A(N)
 cc  Determine the bracketing indices
- 	IF(KHI-KLO.GT.1)GOTO 1
-	IF(XA(KHI).GT.X.AND.XA(KLO).LE.X) GOTO 2
-	KHI=KHI-1
-	KLO=KLO-1
-	IF(XA(KHI).GT.X.AND.XA(KLO).LE.X) GOTO 2
-	KHI=KHI+2
-	KLO=KLO+2
-	IF(XA(KHI).GT.X.AND.XA(KLO).LE.X) GOTO 2
-	KLO=1
-	KHI=N
- 1	IF(KHI-KLO.EQ.1) GOTO 2
-	K=(KHI+KLO)/2
-	IF(XA(K).GT.X)THEN
-	KHI=K
-	ELSE
-	KLO=K
-	ENDIF
-	GOTO 1
- 2	H=XA(KHI)-XA(KLO)
-	IF(H.EQ.0.) PAUSE 'BAD XA INPUT. '
+        IF(KHI-KLO.GT.1)GOTO 1
+        IF(XA(KHI).GT.X.AND.XA(KLO).LE.X) GOTO 2
+        KHI=KHI-1
+        KLO=KLO-1
+        IF(XA(KHI).GT.X.AND.XA(KLO).LE.X) GOTO 2
+        KHI=KHI+2
+        KLO=KLO+2
+        IF(XA(KHI).GT.X.AND.XA(KLO).LE.X) GOTO 2
+        KLO=1
+        KHI=N
+ 1      IF(KHI-KLO.EQ.1) GOTO 2
+        K=(KHI+KLO)/2
+        IF(XA(K).GT.X)THEN
+        KHI=K
+        ELSE
+        KLO=K
+        ENDIF
+        GOTO 1
+ 2      H=XA(KHI)-XA(KLO)
+        IF(H.EQ.0.) PAUSE 'BAD XA INPUT. '
 cc  Compute spline fit.
-	A=(XA(KHI)-X)/H
-	B=(X-XA(KLO))/H
-	Y=A*YA(KLO)+B*YA(KHI)+
+        A=(XA(KHI)-X)/H
+        B=(X-XA(KLO))/H
+        Y=A*YA(KLO)+B*YA(KHI)+
      1 ((A**3-A)*Y2A(KLO)+(B**3-B)*Y2A(KHI))*H**2/6.
 c	write(*,5)klo,khi,x,xa(klo),xa(khi),ya(klo),ya(khi)
 c     > ,y2a(klo),y2a(khi),y
  5      format(2i3,1p8e9.2)
         RETURN
-	END
+        END
 C23456789012345678901234567890123456789012345678901234567890123456789012
 C***********************************************************************
 C

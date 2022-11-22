@@ -1,12 +1,36 @@
 <Input File>
-sukhbold2016/s20.0_presn
+sukhbold2016/s19.0_presn
 
 <Output File>
 Data
 
+<Goal Size of the PNS>
+300
+
+<Goal Size of Convective Grid>
+300
+
+<Goal Total Resolution>
+1000
+
+<Enclosed Mass Cutoff for the PNS (Msol)>
+1.3
+
+<Enclosed Mass Cutoff for Convective Region (Msol)>
+1.48
+
 <Initial Cell Mass>
-3e-4
+5e-5
+
+<Cell Mass Growth Rate past enclosed mass cutoff>
+1e-3
 
 <Maximum Radius of the Grid (cm)>
-1e10
+2e9
+
+<EOS option>
+5
+
+<EOS Table Path>
+../project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5
 

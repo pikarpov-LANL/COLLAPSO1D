@@ -1,0 +1,12 @@
+<Input File>
+woosley2000/s20presn
+
+<Output File>
+Data
+
+<Initial Cell Mass>
+4e-4
+
+<Maximum Radius of the Grid (cm)>
+1e10
+

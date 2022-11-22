@@ -10,20 +10,32 @@ sudo apt install gfortran
 ### PyTorch
 To install the latest PyTorch for <ins>CPU</ins>, follow the official [instructions](https://pytorch.org/). I would highly recommend installing it in a dedicated conda environemnt. As an example, here is how to create one and install PyTorch:
 ```
-conda create -n torch_cpu python=3.10
-conda activate torch_cpu
+conda create -n py310 python=3.10
+conda activate py310
 
 # check the pytorch installation instructions!
-pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 ```
-
-Lastly, we need to make sure all compilers link correctly.
+!!! Warning
+    `torch>=1.12.0` will work for inferencing, hence for the CCSN code will be fine, but loading and training the model will fail. Thus, `resnet_forward` will still work, but `polynomial` example will fail.
 
 ### CMake
 Make sure you have cmake or install it by (tested on cmake==3.22.1)
 ```bash
 sudo apt install cmake
 ```
+
+### HDF5
+EOS tables (SFHo by default) require an hdf5 installation. If missing, get it via:
+```
+sudo apt-get install libhdf5-dev
+```
+Then you need to provide paths to the hdf5 libraries in the `Makefile`. If yours differ from default, edit the following variables:
+```
+HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
+HDF5INCS=-I/usr/include/hdf5/serial
+```
+
 
 ### ~/.bashrc
 Add the following to you `~/.bashrc` and then `source ~/.bashrc`:

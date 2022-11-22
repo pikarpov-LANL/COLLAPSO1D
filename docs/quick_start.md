@@ -32,8 +32,9 @@ All of the simulation parameters can be adjust here (don't forget about `<Number
 ```shell
 vi project/1dmlmix/setup
 ```
-Next to compile:
+Next to compile the eos tables and then the project itself:
 ```shell
+make eos
 make project
 ```
 Lastly to run:
@@ -62,27 +63,12 @@ cd project/1dmlmix
 
 ## Make Commands
 
-Data preparation:
-```shell
-make data
-```
-Model compilation
-```shell
-make project
-```
-To convert from binary output to readable tables, you need to run `readout`. Compile it by:
-```shell
-make readout
-```
-Combined data prep, model compilation, and to get a binary to readable output executable:
-```shell
-make
-```
-In addition, you can prepare examples:
-```shell
-make examples
-```
-Lastly, clean up everything:
-```shell
-make clean
-```
+| Command         | Description                                                                                   |
+| :-------------- | :-------------------------------------------------------------------------------------------- |
+| `make`          | combined data prep, eos tables, model compilation, and a binary to readable output executable |
+| `make data`     | data preparation                                                                              |
+| `make eos`      | EOS Table read routines required for project compilation                                      |
+| `make project`  | model compilation                                                                             |
+| `make readout`  | to convert from binary output to readable tables, you need to run `./readout`                 |
+| `make examples` | prepare PyTorch in Fortran integration examples                                               |
+| `make clean`    | clean up everything                                                                           |

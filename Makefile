@@ -2,6 +2,9 @@
 CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
 #CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
 
+HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
+HDF5INCS=-I/usr/include/hdf5/serial
+
 CONFIG:=Debug
 OPENACC:=0
 COMPILER:= gfortran
@@ -14,7 +17,6 @@ INST:=$(WORKDIR)/install
 PROJECT_NAME:=1dmlmix
 PROJECT_DIR:=$(WORKDIR)/project
 EXAMPLES_DIR:=$(WORKDIR)/examples
-PREP_DATA:=prep_sukhbold.f
 DATA_DIR:=$(WORKDIR)/prep_data
 DATA_FILE:=$(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup_prep)
 EOSDRIVER_DIR:=EOSdriver
@@ -31,9 +33,6 @@ FOBJECTS=$(FSOURCES:.f=.o)
 
 F90FLAGS= -O3 -g
 LDFLAGS= -O3 -g
-
-HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
-HDF5INCS=-I/usr/include/hdf5/serial
 # --- end eos table ---
 
 .PHONY: all project examples data eos clean_eos clean
@@ -87,11 +86,12 @@ examples:
 	make install	
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(EXAMPLES_DIR)/$${f}; done
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(EXAMPLES_DIR)/$${f}; done
+	@echo "=== Prepared examples ==="
 
 data:
 	@echo "=== Using prep_data/setup ==="
 	cd prep_data && \
-	gfortran -std=legacy $(PREP_DATA) -o prep_data && \
+	gfortran -std=legacy prep_data.f90 nuc_eos.a -L$(HDF5PATH) -lhdf5_fortran -lhdf5 -lz -o prep_data && \
 	./prep_data
 	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
 	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="
@@ -104,7 +104,9 @@ eos: $(OBJECTS) $(FOBJECTS)
 	ar r $(EOSDRIVER_DIR)/nuc_eos.a $(EOSDRIVER_DIR)/*.o 	
 	if [ -s  eosmodule.mod ]; then mv eosmodule.mod $(EOSDRIVER_DIR)/; fi	
 	cp $(EOSDRIVER_DIR)/nuc_eos.a $(PROJECT_DIR)
+	cp $(EOSDRIVER_DIR)/nuc_eos.a $(DATA_DIR)
 	cp $(EOSDRIVER_DIR)/eosmodule.mod $(PROJECT_DIR)/$(PROJECT_NAME)
+	cp $(EOSDRIVER_DIR)/eosmodule.mod $(DATA_DIR)
 	@echo "=== Compiled EOS Tables ==="
 
 $(OBJECTS): %.o: %.F90 $(EXTRADEPS)
@@ -121,5 +123,7 @@ clean:
 	rm -rf $(EOSDRIVER_DIR)/*.o $(EOSDRIVER_DIR)/*.mod $(EOSDRIVER_DIR)/*.a
 	rm -rf $(PROJECT_DIR)/*.a $(PROJECT_DIR)/$(PROJECT_NAME)/*.mod
 	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/fort.* $(PROJECT_DIR)/$(PROJECT_NAME)/$(PROJECT_NAME)
+	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/*.so $(EXAMPLES_DIR)/*/*.so
+	rm -rf $(EXAMPLES_DIR)/*/*.pt
 
 

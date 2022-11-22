@@ -68,6 +68,23 @@ Here is a description of each line:
 | 7 | 1. # of cells in the grid *(hint: copy it from `./a.out` output's last line)* <br/> 2. delp (not default) <br/> 3. nups - number of steps per luminosity output <br/> 4. damping term <br/> 5. damping zones below this number |
 | 8 | 1. iflxlm - flux limiter option <br/> 2. capture rate option <br/> 3. changing the nuclear potential energy - shouldn't be altered <br/> 4. yefact - not used|
 
+## Converting f77 to f90
+
+Both source code (`f77_to_f90.f90`) and the executable (`f77_to_f90`) are available in `legacy/`. Run the following and follow instructions:
+
+```
+./f77_to_f90 input.f output.f90
+```
+where
+
+* `input.f` is the input FORTRAN77 file
+* `output.f90` is the output file, which has been converted.
+
+!!! Warning
+    If you encounter errors during conversion, check the `TAB` consistency throughout your F77 script
+
+For more information follow the original author, [Michael Metcalfe](https://people.math.sc.edu/Burkardt/f_src/f77_to_f90/f77_to_f90.html).
+
 ## Additional Notes
 
 Notes on ML subgrid turbulence model implementation within this code can be found on [Overleaf](https://www.overleaf.com/read/pgsnmxgdjkrq).

@@ -111,6 +111,7 @@ nav:
       - setup.md
       - eosdriver.md
       - units.md
+      - api.md
     - Legacy:
       - legacy/legacy.md
       - legacy/data_prep.md
