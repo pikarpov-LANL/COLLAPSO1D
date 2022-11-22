@@ -9,6 +9,7 @@ import numpy as np
 import os
 import sys
 import shutil
+import time
 from subprocess import Popen, PIPE
 from mpi4py import MPI
 
@@ -18,24 +19,25 @@ def main():
     size = comm.Get_size()
     rank = comm.Get_rank()    
     
-    suffix = '_g2k_c1k_p0.3k'
-    masses = [#11.0,
+    suffix = '_g9k_c8.4k_p_0.3k'
+    masses = [#11.0,]
               12.0,13.0,14.0,15.0,
-              16.0,17.0,18.0,19.0,20.0]
+              16.0,17.0,18.0]#,19.0,20.0]
     #enclosed_mass_cutoff = [1.5 for i in range(len(masses))]
     #enclosed_mass_cutoff = [1.31,1.31,1.33,1.35,1.35,1.37,1.37,1.35,1.37,1.39]
     #enclosed_mass_cutoff = [1.4,1.42,1.46,1.46,1.46,1.46,1.47,1.48,1.49,1.5]
     enclosed_mass_cutoff = [#1.48,
                             1.49,1.61,1.61,1.52,
-                            1.55,1.57,1.55,1.63,1.8]
+                            1.55,1.57,1.55]#,1.63,1.8]
     # failed: 15,16,17,18,19,20
     #enclosed_mass_cutoff = [1.3,1.3] # for 9.0 and 10.0
-    pns_cutoff     = [i-0.15 for i in enclosed_mass_cutoff]     
-    pns_cutoff[-1] = enclosed_mass_cutoff[-1]-0.25
+    #pns_cutoff     = [i-0.15 for i in enclosed_mass_cutoff]     
+    #pns_cutoff[-1]-= 0.10
+    pns_cutoff     = [1.25 for i in enclosed_mass_cutoff]
     pns_grid_goal  = 300
-    conv_grid_goal = 500
-    grid_goal      = 1500
-    maxrad         = 5e9 # 1e9 for 9.0 and 10.0
+    conv_grid_goal = 8400
+    grid_goal      = 9000
+    maxrad         = 1.5e9 # 1e9 for 9.0 and 10.0
     dataset        = 'sukhbold2016'
     base_path      = '/home/pkarpov/runs'
     output_path    = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned'
@@ -69,7 +71,7 @@ class multirun:
                  dataset,base_path, output_path, eos_table_path, 
                  pns_grid_goal, conv_grid_goal, grid_goal,
                  maxrad=5e9, mlmodel='None',
-                 read_dump=0, dump_interval=1e-3,data_names=None,):
+                 read_dump=0, dump_interval=1e-3,data_names=None,maxtime=0.5):
         
         self.suffix         = suffix
         self.masses         = masses
@@ -80,7 +82,7 @@ class multirun:
         self.output_path    = output_path
         self.data_names     = data_names
         self.template_path  = f'{self.base_path}/template'
-        self.data_path      = f'{self.base_path}/produce_data'
+        self.data_path      = self.template_path#f'{self.base_path}/template'#produce_data'
         self.eos_table_path = eos_table_path
         self.maxrad         = maxrad
         self.mlmodel        = mlmodel
@@ -89,9 +91,12 @@ class multirun:
         self.grid_goal      = grid_goal
         self.read_dump      = read_dump
         self.dump_interval  = dump_interval
+        self.maxtime        = maxtime
         
     def run(self, rank):
         
+        if rank == 0: print('Compiling...')        
+                    
         # run 'make project'
         os.chdir(f'{self.run_path}')
 
@@ -101,8 +106,7 @@ class multirun:
         
         p = Popen('make project', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output = p.stdout.read()
-        p.stdout.close()
-        print(f'rank {rank} compiled project {self.run_name}; running...')
+        p.stdout.close()        
                 
         # run the simulation
         os.chdir(self.sim_path)
@@ -112,6 +116,13 @@ class multirun:
         stdout = '/dev/null'
         stderr = f'{self.full_output_path}/stderr'
         if os.path.exists(stderr): os.remove(stderr)
+                
+        counter = 0
+        while not os.path.isfile('1dmlmix'):
+            time.sleep(1)
+            counter += 1
+            if counter == 120: sys.exit("ERROR: executable '1dmlmix' not found (waited 2 mins).")
+        print(f'rank {rank} compiled project {self.run_name}; running...')
         
         p = Popen(f'time ./1dmlmix > {stdout} 2> {stderr}', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output = p.stdout.read()
@@ -140,7 +151,7 @@ class multirun:
             print(f'Enclosed Conv Cutoff:   {self.enclmass_conv}')            
                                 
             # check if run_folder exists; create and copy template if not
-            self.copy_template()
+            self.edit_copy_template()
             
             # prep data and copy it to the run folder
             self.prep_data()
@@ -154,9 +165,21 @@ class multirun:
         print('--------- Initialization Completed ---------')                                       
 
 
-    def copy_template(self):    
+    def edit_copy_template(self):   
+        # Edit Makefile
+        run_project_dir = f'PROJECT_DIR:={self.run_path}/project\n'
+        filepath = f'{self.data_path}/Makefile' 
+        with open(filepath, 'r') as file:    
+            data = file.readlines()            
+            for i, line in enumerate(data):                
+                if 'PROJECT_DIR:=' in line:
+                    data[i] = run_project_dir
+                
+        self.write_data(filepath, data)  
         if not os.path.exists(self.run_path): 
-            shutil.copytree(self.template_path, self.run_path)
+            shutil.copytree(self.template_path, self.run_path, ignore = shutil.ignore_patterns("*presn*", '.git', 'docs', 
+                                                                                               'mkdocs', 'examples', 'legacy',
+                                                                                               'papers'))
             
     def check_path(self, path):
         if not os.path.exists(path):
@@ -192,21 +215,15 @@ class multirun:
                 elif 'EOS Table Path' in line: 
                     data[i+1] = f'{self.eos_table_path}\n'                                                
                                                            
-        self.write_data(filepath, data)
-                    
-        # Edit Makefile
-        run_project_dir = f'PROJECT_DIR:={self.run_path}/project\n'
-        filepath = f'{self.data_path}/Makefile' 
-        with open(filepath, 'r') as file:    
-            data = file.readlines()            
-            for i, line in enumerate(data):                
-                if 'PROJECT_DIR:=' in line:
-                    data[i] = run_project_dir
-                
-        self.write_data(filepath, data)        
+        self.write_data(filepath, data)       
         
         # run 'make data'
         os.chdir(self.data_path)
+        
+        if not os.path.exists(f'{self.data_path}/prep_data/eosmodule.mod'):
+            p = Popen('make eos', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            output = p.stdout.read()
+            p.stdout.close()            
         
         p = Popen('make data', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output = p.stdout.read()
@@ -229,7 +246,9 @@ class multirun:
                 elif 'Dump # to read' in line: 
                     data[i+1] = f'{self.read_dump}\n' 
                 elif 'Dump time intervals' in line: 
-                    data[i+1] = f'{self.dump_interval}\n'                                                             
+                    data[i+1] = f'{self.dump_interval}\n'  
+                elif 'Max time' in line: 
+                    data[i+1] = f'{self.maxtime}\n'                                                           
                 elif 'EOS Table Path' in line: 
                     data[i+1] = f'{self.eos_table_path}\n'                                                       
                     
