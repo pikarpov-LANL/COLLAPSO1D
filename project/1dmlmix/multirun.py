@@ -45,11 +45,12 @@ def main():
     mlmodel        = 'None'
     read_dump      = 0
     dump_interval  = 5e-4
+    restart        = False
     
     mr = multirun(suffix,masses,enclosed_mass_cutoff,pns_cutoff,
                   dataset,base_path,output_path,eos_table_path,
                   pns_grid_goal, conv_grid_goal, grid_goal,maxrad, 
-                  mlmodel, read_dump, dump_interval)
+                  mlmodel, read_dump, dump_interval, restart)
     
     if rank == 0:        
         if len(mr.masses) != size:
@@ -71,7 +72,8 @@ class multirun:
                  dataset,base_path, output_path, eos_table_path, 
                  pns_grid_goal, conv_grid_goal, grid_goal,
                  maxrad=5e9, mlmodel='None',
-                 read_dump=0, dump_interval=1e-3,data_names=None,maxtime=0.5):
+                 read_dump=0, dump_interval=1e-3, restart=False,
+                 data_names=None, maxtime=0.5):
         
         self.suffix         = suffix
         self.masses         = masses
@@ -92,6 +94,7 @@ class multirun:
         self.read_dump      = read_dump
         self.dump_interval  = dump_interval
         self.maxtime        = maxtime
+        self.restart        = restart
         
     def run(self, rank):
         
@@ -100,13 +103,14 @@ class multirun:
         # run 'make project'
         os.chdir(f'{self.run_path}')
 
-        p = Popen('make eos', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        output = p.stdout.read()
-        p.stdout.close()
-        
-        p = Popen('make project', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        output = p.stdout.read()
-        p.stdout.close()        
+        if not self.restart:
+            p = Popen('make eos', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            output = p.stdout.read()
+            p.stdout.close()
+            
+            p = Popen('make project', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            output = p.stdout.read()
+            p.stdout.close()        
                 
         # run the simulation
         os.chdir(self.sim_path)
@@ -138,7 +142,7 @@ class multirun:
             self.enclmass_conv = self.enclmass_conv_cutoff[i]
             self.enclmass_pns  = self.pns_cutoff[i]
             
-            if self.data_names != None: self.data_name = self.data_names[i]
+            if self.data_names != None: self.data_in = self.data_names[i]
             
             self.run_name         = f's{self.mass}{self.suffix}'
             self.run_path         = f'{self.base_path}/{self.run_name}'
@@ -152,9 +156,15 @@ class multirun:
                                 
             # check if run_folder exists; create and copy template if not
             self.edit_copy_template()
-            
-            # prep data and copy it to the run folder
-            self.prep_data()
+                        
+            if self.restart: 
+                self.find_last_dump()
+                print(f'Restart from dump:      {self.read_dump}')
+            else:
+                # prep data and copy it to the run folder
+                if self.data_names==None: self.data_in = 'Data'
+                self.prep_data()                
+                self.data_out = f'{self.full_output_path}/DataOut'
             
             # edit 'setup' to include unique output path
             self.setup()
@@ -165,18 +175,19 @@ class multirun:
         print('--------- Initialization Completed ---------')                                       
 
 
-    def edit_copy_template(self):   
-        # Edit Makefile
-        run_project_dir = f'PROJECT_DIR:={self.run_path}/project\n'
-        filepath = f'{self.data_path}/Makefile' 
-        with open(filepath, 'r') as file:    
-            data = file.readlines()            
-            for i, line in enumerate(data):                
-                if 'PROJECT_DIR:=' in line:
-                    data[i] = run_project_dir
-                
-        self.write_data(filepath, data)  
+    def edit_copy_template(self):     
         if not os.path.exists(self.run_path): 
+            # Edit Makefile
+            run_project_dir = f'PROJECT_DIR:={self.run_path}/project\n'
+            filepath = f'{self.data_path}/Makefile' 
+            with open(filepath, 'r') as file:    
+                data = file.readlines()            
+                for i, line in enumerate(data):                
+                    if 'PROJECT_DIR:=' in line:
+                        data[i] = run_project_dir
+                    
+            self.write_data(filepath, data)
+            
             shutil.copytree(self.template_path, self.run_path, ignore = shutil.ignore_patterns("*presn*", '.git', 'docs', 
                                                                                                'mkdocs', 'examples', 'legacy',
                                                                                                'papers'))
@@ -187,7 +198,27 @@ class multirun:
             
     def write_data(self, filepath, data):
         with open(filepath, 'w') as file:   
-            file.writelines(data)         
+            file.writelines(data)     
+            
+    def find_last_dump(self):
+        outfiles = [filename for filename in os.listdir(f'{self.full_output_path}') if "restart" in filename]
+        if any("restart" in file for file in outfiles):             
+            last_num   = max([int(filename.split('_')[-1]) for filename in outfiles])            
+            input_name = f"DataOut_restart_{last_num}" 
+        else:
+            last_num   = 0
+            input_name = "DataOut"             
+            
+        next_num  = last_num + 1
+                
+        read      = Readout(self.full_output_path, base_file = 'DataOut_read', outfile=input_name)
+        last_dump = read.run_readable()
+        
+        self.data_in   = f'{self.full_output_path}/{input_name}'
+        self.data_out  = f'{self.full_output_path}/DataOut_restart_{next_num}'
+        self.read_dump = last_dump
+                
+        return 
             
     def prep_data(self):
         
@@ -198,8 +229,8 @@ class multirun:
             for i, line in enumerate(data):                
                 if 'Input File' in line:
                     data[i+1] = f'{self.dataset}/s{self.mass}_presn\n'
-                elif 'Output File' in line and self.data_names!=None: 
-                    data[i+1] = f'{self.data_name}\n'  
+                elif 'Output File' in line: 
+                    data[i+1] = f'{self.data_in}\n'  
                 elif 'Goal Size of the PNS' in line: 
                     data[i+1] = f'{self.pns_grid_goal}\n'
                 elif 'Goal Size of Convective Grid' in line: 
@@ -237,10 +268,10 @@ class multirun:
         with open(filepath, 'r') as file:    
             data = file.readlines()            
             for i, line in enumerate(data):    
-                if 'Input File' in line and self.data_names!=None: 
-                    data[i+1] = f'{self.data_name}\n'                            
+                if 'Input File' in line: 
+                    data[i+1] = f'{self.data_in}\n'                            
                 elif 'Output File' in line: 
-                    data[i+1] = f'{self.full_output_path}/DataOut\n'  
+                    data[i+1] = f'{self.data_out}\n'  
                 elif 'Input PyTorch Model' in line: 
                     data[i+1] = f'{self.mlmodel}\n'    
                 elif 'Dump # to read' in line: 
@@ -272,7 +303,49 @@ class multirun:
         self.write_data(filepath, data)            
             
         # check output if output folder exists
-        self.check_path(self.full_output_path)           
+        self.check_path(self.full_output_path)     
+        
+        
+class Readout:
+    def __init__(self, full_output_path, base_file, outfile):
+        self.base_file        = base_file
+        self.outfile          = outfile
+        self.full_output_path = full_output_path
+
+    def run_readable(self):
+        
+        self.setup_readout()
+        
+        p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        output = p.stdout.read()
+        p.stdout.close()
+         
+        return self.get_lastdump()
+    
+    def get_lastdump(self):
+        alldumps = [filename for filename in os.listdir(f'{self.full_output_path}') if self.base_file in filename]
+        alldumps = [int(filename.split('.')[-1]) for filename in alldumps]
+
+        return max(alldumps)
+        
+    def setup_readout(self):                    
+        # Edit setup
+        filepath = f'setup_readout' 
+        with open(filepath, 'r') as file:    
+            data = file.readlines()            
+            for i, line in enumerate(data):                
+                if 'Data File Name' in line: 
+                    data[i+1] = f'{self.full_output_path}/{self.outfile}\n' 
+                if 'Output Basename' in line:                     
+                    data[i+1] = f'{self.full_output_path}/{self.base_file}\n'     
+                if 'Number of dumps' in line:                     
+                    data[i+1] = f'10000\n'                                      
+                    
+        self.write_data(filepath, data)               
+    
+    def write_data(self, filepath, data):
+        with open(filepath, 'w') as file:   
+            file.writelines(data)                  
         
 if __name__ == '__main__':
     main()

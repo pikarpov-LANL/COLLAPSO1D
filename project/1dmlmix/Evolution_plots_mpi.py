@@ -29,23 +29,25 @@ def main():
     
     # --- Datasets and values to plot ---        
     vals             = [
-                        #'rho', 
-                        # 'v',
-                        #'P',
-                        #'T',
-                        #'encm',
-                        #'vsound',
-                        #'ye',
+                        'rho', 
+                        'v',
+                        'P',
+                        'T',
+                        'encm',
+                        'vsound',
+                        'ye',
                         'mach',
-                        #'entropy',
+                        'entropy',
                        ]        
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
-    masses           = [11.0]#[11.0,12.0,13.0,14.0,15.0,
-                        #16.0,17.0,18.0,19.0,20.0]        
+    masses           = [12.0]#[11.0,12.0,13.0,14.0,15.0,
+                       #16.0,17.0,18.0,19.0,20.0]        
     #masses           = [9.0,10.0,11.0,12.0,13.0,19.0,20.0]
 
     # --- Paths & Names ---
-    datasets         = [f's{m}_g2k_c1k_p0.3k' for m in masses]
+    #datasets         = [f's{m}_g6k_c5k_p0.3k' for m in masses]
+    datasets         = [f's{m}_test' for m in masses]
+    #datasets         = [f's{m}_g10k_c9.4k_p0.3k' for m in masses]
     #datasets         = [f's{m}_4k' for m in masses]
     base_path        = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/'#test_extrema/'
     #base_path        = '/home/pkarpov/scratch/1dccsn/sleos/funiek/'
@@ -54,17 +56,17 @@ def main():
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = False#True    # convert binary to readable (really only needed to be done once) 
-    only_post_bounce = True   # only produce plots after the bounce    
+    convert2read     = True    # convert binary to readable (really only needed to be done once) 
+    only_post_bounce = False#True   # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
-    compute          = False#True
+    compute          = True
     rho_threshold    = 1e13    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
 
     # --- Plots & Movie Parameters ---
     dpi              = 60      # increase for production plots
     make_movies      = True 
-    fps              = 10   
+    fps              = 1   
     save_plot        = True
     
     # === No need to go beyond this point ===========================
@@ -219,16 +221,22 @@ class Readout:
     def run_readable(self):
         print( '---- Converting Binary ----')           
         
-        self.setup_readout()
-        
-        p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        output = p.stdout.read()
-        p.stdout.close()
+        for outfile in self.get_all_outfiles():
+            self.setup_readout(outfile)
+            
+            p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            output = p.stdout.read()
+            p.stdout.close()
+            
         print(f'Files are now readable for {self.dataset}!')
                 
         return get_numfiles(self.base_path, self.dataset, self.base_file)
+    
+    def get_all_outfiles(self):
+        outfiles = [filename for filename in os.listdir(f'{self.base_path}{self.dataset}') if ("restart" in filename or filename=='DataOut')]
+        return outfiles
         
-    def setup_readout(self):            
+    def setup_readout(self, outfile):            
         
         # Edit setup
         filepath = f'setup_readout' 
@@ -236,7 +244,7 @@ class Readout:
             data = file.readlines()            
             for i, line in enumerate(data):                
                 if 'Data File Name' in line: 
-                    data[i+1] = f'{self.full_output_path}/DataOut\n' 
+                    data[i+1] = f'{self.full_output_path}/{outfile}\n' 
                 if 'Output Basename' in line:                     
                     data[i+1] = f'{self.full_output_path}/{self.base_file}\n'     
                 if 'Number of dumps' in line:                     
@@ -544,7 +552,7 @@ class Profiles:
             elif val == 'v':
                 y      = v
                 ylabel = r'Velocity $[cm/s]$'
-                ylim   = (-1.2e10, 1e9)
+                ylim   = (-1.5e10, 1e9)
                 loc    = 4
                 if versus == 'r': plot_type = 'semilogx'
                 elif versus == 'encm': plot_type = 'plot'                
