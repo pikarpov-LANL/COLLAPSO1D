@@ -45,7 +45,7 @@ def main():
     mlmodel        = 'None'
     read_dump      = 0
     dump_interval  = 5e-4
-    restart        = False
+    restart        = True
     
     mr = multirun(suffix,masses,enclosed_mass_cutoff,pns_cutoff,
                   dataset,base_path,output_path,eos_table_path,
