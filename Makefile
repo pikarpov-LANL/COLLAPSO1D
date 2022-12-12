@@ -2,12 +2,17 @@
 CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
 #CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
 
-HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
-HDF5INCS=-I/usr/include/hdf5/serial
+# if using default gfortran
+# HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
+# HDF5INCS=-I/usr/include/hdf5/serial
+
+HDF5PATH=/home/pkarpov/Downloads/hdf5-1.12.2/hdf5/lib
+HDF5INCS=-I/home/pkarpov/Downloads/hdf5-1.12.2/hdf5/include
 
 CONFIG:=Debug
 OPENACC:=0
-COMPILER:= gfortran
+COMPILER:=ifort
+# COMPILER:=gfortran
 
 # List CUDA compute capabilities
 # TORCH_CUDA_ARCH_LIST:=7.0
