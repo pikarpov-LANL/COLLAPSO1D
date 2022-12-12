@@ -71,7 +71,6 @@
       ntstep = 1 
           
       do while (time.lt.tmax) 
-!42   continue
         !--idump is a counter for dump files         
         idump = idump + 1              
 !                                                                    
@@ -89,18 +88,10 @@
         print*,' savetime (s) = ', time*utime
         print*,'****************' 
         print*,' ' 
-!      if (time.gt.4.0) dtime = .0001                                   
-!                                                                       
-!--check if simulation is finished                                      
-!                                                                       
-        !print *,time,tmax                                              
-        !if(time.gt.tmax) go to 90                                      
-!                                                                       
-        !go to 42                                                              
+!      if (time.gt.4.0) dtime = .0001                                                                                                       
       end do 
 !                                                                       
-      !90 call printout(lu)                                             
-      !call printout(lu) 
+      call printout(lu) 
       stop "DONE: reached the maximum time"
       END                                           
 !
@@ -108,7 +99,7 @@
 !      
       subroutine hydro(time,ncell,x,v,                                  &
                        u,rho,ye,f,du,dye,q,                             &
-                       ! fmix,                              &
+!                        fmix,                                           &
                        ynue,ynueb,ynux,dynue,dynueb,dynux,              &
                        unue,unueb,unux,dunue,dunueb,dunux,              &
                        print_nuloss,ntstep)                                          
@@ -200,6 +191,11 @@
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /interp/ mlin_grid_size
       common /mlout/ pr_turb(idim1)
+      logical profile 
+      
+      ! set to .true. to print function cpu processing time
+      profile = .false.      
+
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !
@@ -216,30 +212,37 @@
 !                                        
 !--compute density                                                      
 ! ---------------------------------------------------------             
-!    
-      call density(ncell,x,rho)       
-!                                                                      
+!     
+      call cpu_time(startT)
+      call density(ncell,x,rho) 
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'Density: ', (endT - startT)                                                                       
 !                                                                       
 !--compute thermodynamical properties                                   
 !  ----------------------------------                                   
 !  this allows the use of simple eos                                  
 !  ieos=3 or 4 calls for the Swesty-Lattimer EOS above rhoswe
 !  ieos=5 or 6 calls SFHo Tables EOS 
-!                                                                   
+!       
+      call cpu_time(startT)                                                            
       if(ieos.eq.1)call eospg(ncell,rho,u) 
       if(ieos.eq.2)call eospgr(ncell,rho,u) 
       if(ieos.eq.3.or.ieos.eq.4)call eos3(ncell,rho,u,ye) 
-      if(ieos.eq.5.or.ieos.eq.6)call eos5(ncell,rho,u,ye) 
-      !call exit
+      if(ieos.eq.5.or.ieos.eq.6)call eos5(ncell,rho,u,ye)
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'EOS: ', (endT - startT) 
 !                                                                       
 !--do gravity                                                           
 !  --------------------------------------------------------             
-!                                                                       
-      call gravity(ncell,deltam,x,f) 
-!                                                                       
+!              
+      call cpu_time(startT)                                                         
+      call gravity(ncell,deltam,x,f)
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'Gravity: ', (endT - startT)                                                             
 !                                                                       
 !--neutrino physics                                                     
-!  ----------------                                                     
+!  ---------------- 
+      call cpu_time(startT)                                                    
       yemn    = 1e20 
       yemx    =-1e20 
       ynuemx  =-1e20 
@@ -261,32 +264,49 @@
       enddo 
                   
   200 format(A33,4(1x,1pe10.3)) 
+        call cpu_time(endT)   
+        if (profile) write(*,*) 'ye init: ', (endT - startT)
 !                                                                       
 !-- initialize                                                          
 !--skip neutrino physics                                                
 !      goto 90                                                          
-!                                                                       
+!     
+        call cpu_time(startT)                                                                  
       call nuinit(ncell,rho,x,ye,dye,                                   &
                   ynue,ynueb,ynux,dynue,dynueb,dynux,                   &
-                  unue,unueb,unux,dunue,dunueb,dunux)                   
+                  unue,unueb,unux,dunue,dunueb,dunux) 
+    call cpu_time(endT)   
+    if (profile) write(*,*) 'nuinit: ', (endT - startT)
 !                                                                                                           
 !-- nu contribution to pressure                                         
-!                                                                       
-      call nupress(ncell,rho,unue,unueb,unux) 
+!             
+    call cpu_time(startT)                                                          
+      call nupress(ncell,rho,unue,unueb,unux)
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'nupress: ', (endT - startT) 
 !                                                                       
 !--e+/e- capture                                                        
-!                                                                       
-      call nuecap(ncell,rho,ye,dye,dynue,dynueb,dunue,dunueb) 
+!                
+      call cpu_time(startT)                                                       
+      call nuecap(ncell,rho,ye,dye,dynue,dynueb,dunue,dunueb)
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'nuecap: ', (endT - startT) 
 !                                                                       
 !--plasma/pair neutrino emission processes                              
-!                                                                       
+!               
+      call cpu_time(startT)                                                        
       call nupp(ncell,rho,ye,dynue,dynueb,dynux,                        &
-                dunue,dunueb,dunux)                                     
+                dunue,dunueb,dunux)
+    call cpu_time(endT)   
+    if (profile) write(*,*) 'nupp: ', (endT - startT)
 !                                                                       
 !--neutrino/anti neutrino conversion                                    
-!                                                                       
+!               
+    call cpu_time(startT)                                                        
       call nuconv(ncell,x,rho,ynue,ynueb,ynux,                          &
-                  dynue,dynueb,dynux,dunue,dunueb,dunux)                       
+                  dynue,dynueb,dynux,dunue,dunueb,dunux)
+                  call cpu_time(endT)   
+                  if (profile) write(*,*) 'nuconv: ', (endT - startT)                                         
 !                                                                       
 !--neutrino/anti-neutrino annihilation                                  
 !                                                                       
@@ -294,31 +314,46 @@
 !     $          dynue,dynueb,dynux,dunue,dunueb,dunux)                 
 !                                                                       
 !--neutrino depletion from thin regions                                 
-!                                                                       
+!            
+    call cpu_time(startT)                                                           
       call nusphere(ncell,x,                                            &
                     ynue,ynueb,ynux,dynue,dynueb,dynux,                 &
-                    unue,unueb,unux,dunue,dunueb,dunux)                   
+                    unue,unueb,unux,dunue,dunueb,dunux)
+                    call cpu_time(endT)   
+                    if (profile) write(*,*) 'nusphere: ', (endT - startT)                                       
 !                                                                       
 !                                                                       
 !--fold-in neutrino background luminosity from the core                 
 !--and normalize energy sums                                            
-!                                                                       
+!            
+    call cpu_time(startT)                                                           
       call nulum(print_nuloss) 
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'nulum: ', (endT - startT)
 !                                                                       
 !--neutrino absorption                                                  
-!                                                                       
+!  
+      call cpu_time(startT)                                                                     
       call nuabs(ncell,rho,x,dye,ynue,ynueb,                            &
-                 dynue,dynueb,dunue,dunueb)                              
+                 dynue,dynueb,dunue,dunueb)
+    call cpu_time(endT)   
+    if (profile) write(*,*) 'nuabs: ', (endT - startT)                              
 !                                                                       
 !--neutrino/electron scattering                                         
-!                                                                       
+!  
+    call cpu_time(startT)                                                                     
       call nuscat(ncell,rho,x,ynue,ynueb,ynux,                          &
-                  dunue,dunueb,dunux)                                   
+                  dunue,dunueb,dunux)  
+                  call cpu_time(endT)   
+                  if (profile) write(*,*) 'nuscat: ', (endT - startT)                                                   
 !                                                                       
 !--do the beta equilibrium cases                                        
-!                                                                       
+!      
+                  call cpu_time(startT)                                                                 
       call nubeta(ncell,x,rho,ye,dye,ynue,ynueb,unue,unueb,             &
-                  dynue,dynueb,dunue,dunueb)                            
+                  dynue,dynueb,dunue,dunueb)
+                  call cpu_time(endT)   
+                  if (profile) write(*,*) 'nubeta: ', (endT - startT)
 !                                                                       
    90 continue 
 !                                                                       
@@ -327,12 +362,14 @@
       !call turbulence(ncell,x,f,q,v,rho,fmix) 
 !                                                                       
 !--compute q values                                                     
-!              
-      !print*, 'Artvis old q', maxval(q), maxloc(q), minval(q), minloc(q)                                                         
-      call artvis(ncell,x,rho,v,q)                                                                     
-      !print*, 'Artvis new q', maxval(q), maxloc(q), minval(q), minloc(q)
+!         
+   call cpu_time(startT)     
+      call artvis(ncell,x,rho,v,q)
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'artvis: ', (endT - startT)                                                                     
 !     
       !post_bounce = .true.
+    call cpu_time(startT)
       if (post_bounce.eqv..true.) then
         !--calculate PNS & shock radii, only in post-bounce stage
         call shock_radius(ncell,x,v,vsound,print_nuloss)
@@ -348,26 +385,41 @@
           !--check if bounced
           call bounce(ntstep,rho)
       endif
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'shock pos: ', (endT - startT) 
 !
-!--compute forces on the particles                                      
-      call forces(ncell,x,f,q,v,rho) 
+!--compute forces on the particles  
+      call cpu_time(startT)                                    
+      call forces(ncell,x,f,q,v,rho)
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'forces: ', (endT - startT) 
 !                                                                       
 !--flux limited diffusion                                               
-!--skip neutrino                                                        
+!--skip neutrino 
+    call cpu_time(startT)                                                       
       call nudiff(ncell,x,rho,time,ye,                                  &
                   ynue,ynueb,ynux,dynue,dynueb,dynux,                   &
-                  dunue,dunueb,dunux)                                           
+                  dunue,dunueb,dunux)
+    call cpu_time(endT)   
+    if (profile) write(*,*) 'nudiff: ', (endT - startT)                                           
 !                                                                       
 !--compute energy derivative                                            
-!                                                          
-      call energ(ncell,x,v,dye,du,rho) 
+!        
+    call cpu_time(startT)                                                  
+      call energ(ncell,x,v,dye,du,rho)
+      call cpu_time(endT)   
+      if (profile) write(*,*) 'energ: ', (endT - startT) 
 !                                                                       
 !--compute neutrino pressure work and change of <E>s                    
 !                                                                       
-!--skip neutrino                                                        
+!--skip neutrino 
+    call cpu_time(startT)                                                       
       call nuwork(ncell,x,v,rho,                                        &
-                  unue,unueb,unux,dunue,dunueb,dunux)                   
-!                                                                            
+                  unue,unueb,unux,dunue,dunueb,dunux)
+                  call cpu_time(endT)   
+                  if (profile) write(*,*) 'nuwork: ', (endT - startT)
+!                         
+                  if (profile) print*,'-------'
    99 return    
       END                                           
 !
@@ -750,7 +802,7 @@
                             25.*f(4)**2   + 11.*f(3)*f(5) -      &
                             19.*f(4)*f(5) + 4. *f(5)**2))        
         
-        eps        = 1.e-100
+        eps        = 1.e-16
     
         alpha(:)   = w_ideal(:)/(eps+beta(:))**2    
  
@@ -1026,10 +1078,6 @@
             q(kp05) = q(kp05) - alphal*gradv 
          end if 
          dq(kp05) =-q(kp05)*gradv/deltam(kp05) 
-
-        !  if (kp05.lt.8) then
-        !     print*, 'artvis', q(kp05), alpha, gradv, v(kp05) 
-        !  endif
       enddo 
 !                                                                       
       return 
@@ -1270,7 +1318,6 @@
 !--entropy conversion factor                                            
       sfac=avokb*utemp/uergg 
 !           
-      print*, 'I am eosglf!'                                                            
       do k=1,ncell 
          tempk=temp(k) 
          rhok=rho(k)*udens 
@@ -1518,7 +1565,6 @@
          vsound(k) = dsqrt(1.66666666*real(pgas)/rho(k)) 
          vsmax     = dmax1(vsound(k),vsmax) 
       enddo 
-      print*,'eospgr:max,min temp(K)',tempmx*1e9,tempmn*1e9 
 !                                                                       
       return 
       END        
@@ -1685,7 +1731,7 @@
         !                                                                       
         !************************************************************           
         !                                            
-              use eosmodule                           
+              use eosmodule, clight_eos => clight                           
               implicit double precision (a-h,o-z) 
         !                                                                       
               parameter (idim=10000) 
@@ -5758,13 +5804,13 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
-      logical from_dump, post_bounce, first_bounce
+      real    ycc,yccave 
+      logical from_dump, post_bounce, first_bounce      
+      logical trapnue, trapnueb, trapnux 
 !                                                                       
       parameter (idim=10000) 
       parameter (idim1 = idim+1) 
       parameter (iqn=17) 
-!                                                                       
-      real ycc,yccave 
 !                                                                       
       common /cc   / ycc(idim,iqn), yccave(iqn) 
       common /ener1/ dq(idim), dunu(idim) 
@@ -5785,8 +5831,7 @@
       common /cgas / gamma 
       common /timej / time, dt 
       common /rshock/ shock_ind, shock_x
-      common /pns/ pns_ind, pns_x
-      logical trapnue, trapnueb, trapnux 
+      common /pns/ pns_ind, pns_x      
       common /trap/ trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /ftrap/ ftrape,ftrapb,ftrapx 
       common /jtrap/ jtrape,jtrapb,jtrapx 
@@ -5847,10 +5892,10 @@
 !--an error as occured while writting                                   
 !                                                                       
    10  print *,'an error has occured while writing' 
-!                                                                       
-                                                                        
+!                                                                                                                                               
       return 
-      END                                           
+      END    
+
       subroutine integrals(eta,f0,f1,f2,f3,f4,f5,ider,df2,df3) 
 !************************************************************           
 !                                                           *           
@@ -5860,9 +5905,7 @@
 !                                                           *           
 !************************************************************           
 !                                                                       
-      implicit double precision (a-h,o-z) 
-!                                                                       
-!                                                                       
+      implicit double precision (a-h,o-z)                                                                   
 !                                                                       
 !--case where eta > 1e-3                                                
 !                                                                       
@@ -6125,13 +6168,7 @@
       e1  = 1./512. 
 !                                                                       
 !--first time set time step to default                                  
-!
-      !print*, steps
-      !if ( ANY( steps>(dt0/1.d8) ) ) then
-      !    from_dump=.true.
-      !    print*, '-----------> From Dump is True!', steps(1)
-      !endif            
-
+!      
       if(ifirst) then
          ifirst=.false. 
          dumx(0)=x(0) 
@@ -6156,10 +6193,7 @@
                     ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,              &
                     unue,unueb,unux,f1unue,f1unueb,f1unux,              &
                     print_nuloss,ntstep)                                          
-      end if 
-      !do i=30,40
-      !    print*, i, ye(i)
-      !enddo      
+      end if  
 !                                                                       
 !--set step counter                                                     
 !                                                                       
@@ -6220,11 +6254,6 @@
 !                                                                       
 !--advance all the gas particles                                        
 !        
-         !do i=30,40
-         !    print*, i, dtf21*f1ye(i), dtf22*f2ye(i) 
-          !print*, i, dumye(i), ye(i),dtf21*f1ye(i), dtf22*f2ye(i) 
-          !print*, i, ye(i)+dtf21*f1ye(i)+dtf22*f2ye(i) 
-         !enddo
          do i=1,ncell 
             dtf21   = f21*steps(i) 
             dtf22   = f22*steps(i) 
@@ -6243,10 +6272,7 @@
             if (dumye(i).lt.0.02) then 
                dumye(i)=.02 
             end if 
-         enddo 
-         !do i=30,40
-         !    print*, i, dft21, dft22, steps(i)
-         !enddo         
+         enddo        
 !                                                                       
 !     set saturation const=0                                            
          satc = 0 
@@ -6256,78 +6282,13 @@
          tfull        = time + steps(1) 
          print_nuloss = .false. 
          !call write_data(ntstep*2+1,ncell,x,v)
-         !print*, '.......................'
-         !do i=30,40
-         ! print*, i, dumye(i)
-         !enddo         
-         !print*, '-----------------------'
-
-
-         !print*, 'ebetaeq', maxval(ebetaeq)
-         !print*, 'pbetaeq', maxval(pbetaeq)
-        !  print*, 'deltam', maxval(deltam), maxloc(deltam)
-        !  print*, 'abar', maxval(abar), maxloc(abar)
-        !  print*, 'u', maxval(u)
-        !  print*, 'rho', maxval(rho), maxloc(rho), minval(rho), minloc(rho)
-        !  print*, 'ye', maxval(ye)
-        !  print*, '--> q', maxval(q), maxloc(q), minval(q), minloc(q)
-        !  print*, q(:10)
-        !  print*, 'x', maxval(x)
-        !  print*, 'v', maxval(v)
-        !  print*, 'f', maxval(f)
-        !  print*, 'pr', maxval(pr)
-        !  print*, 'vsound', maxval(vsound), maxloc(vsound)
-        !  print*, 'u2', maxval(u2), maxloc(u2)
-        !  print*, 'etanue', maxval(etanue), maxloc(etanue)
-        !  print*, 'etanueb', maxval(etanueb)
-        !  print*, 'etanux', maxval(etanux)
-        !  print*, 'ynue', maxval(ynue)
-        !  print*, 'ynueb', maxval(ynueb)
-        !  print*, 'ynux', maxval(ynux)
-        !  print*, 'unue', maxval(unue)
-        !  print*, 'unueb', maxval(unueb)
-        !  print*, 'unux', maxval(unux)
-        !  print*, 'xn', maxval(xn)
-        !  print*, 'xp', maxval(xp)
-        !  print*, 'eta', maxval(eta)
-        !  print*, '-----'
-        !  print*, ''
 
          call hydro(tfull,ncell,dumx,dumv,                                   &
                     dumu,rho,dumye,f2v,f2u,f2ye,q,                           &
                     !fmix2,                     &
                     dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
                     dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
-                    print_nuloss,ntstep)  
-                    
-        !print*, 'ebetaeq', maxval(ebetaeq)
-        !print*, 'pbetaeq', maxval(pbetaeq)
-        ! print*, 'deltam', maxval(deltam)
-        ! print*, 'abar', maxval(abar)
-        ! print*, 'u', maxval(u)
-        ! print*, 'rho', maxval(rho), maxloc(rho), minval(rho), minloc(rho)
-        ! print*, 'ye', maxval(ye)
-        ! print*, '--> q', maxval(q), maxloc(q), minval(q), minloc(q)
-        ! print*, q(:10)
-        ! print*, 'x', maxval(x)
-        ! print*, 'v', maxval(v)
-        ! print*, 'f', maxval(f)
-        ! print*, 'pr', maxval(pr)
-        ! print*, 'vsound', maxval(vsound), maxloc(vsound)
-        ! print*, 'u2', maxval(u2), maxloc(u2)
-        ! print*, 'etanue', maxval(etanue), maxloc(etanue)
-        ! print*, 'etanueb', maxval(etanueb)
-        ! print*, 'etanux', maxval(etanux)
-        ! print*, 'ynue', maxval(ynue)
-        ! print*, 'ynueb', maxval(ynueb)
-        ! print*, 'ynux', maxval(ynux)
-        ! print*, 'unue', maxval(unue)
-        ! print*, 'unueb', maxval(unueb)
-        ! print*, 'unux', maxval(unux)
-        ! print*, 'xn', maxval(xn)
-        ! print*, 'xp', maxval(xp)
-        ! print*, 'eta', maxval(eta)  
-
+                    print_nuloss,ntstep)                  
 !                                                                       
 !--estimate integration error and set time step. If reduction           
 !  the maximum time step is set to dtime.                               
@@ -6587,7 +6548,7 @@
   120    format((1pe12.5),6(1x,1pe10.2))
 !                                                                       
 !--start new time step                                                  
-!                         
+!                
          if(time.lt.tnext)then 
             !print *, '****time*****',time                              
   520       format(A,I12,A) 
@@ -6608,7 +6569,6 @@
                call printout(lu) 
                close (lu) 
             end if 
-            !if (ntstep.eq.93) stop
             ntstep=ntstep+1 
             go to 99 
          end if 
@@ -6804,11 +6764,7 @@
       uotemp1 = 1.d0/uotemp 
       uopr    = 1.d24/dble(uergcc) 
       uorho1  = ud1/1.d7 
-      uou1    = dble(uergg)/1.d17 
-                                                                        
-                                                                        
-                                                                        
-                                                                        
+      uou1    = dble(uergg)/1.d17                                                                        
 !                                                                       
 !--3b) Conversion to the Swesty-Lattimer units from code units:         
 !                                                                       
@@ -6824,7 +6780,6 @@
          uslu  = dble(uergg)/dble(utemp)/(dble(avo)*dble(boltzk)) 
          u2slu = dble(ergmev)*dble(uergg)/dble(avo) 
       endif 
-      print *,'ieos,uslu',ieos,uslu 
 !                                                                       
 !--4) common unit2 stuff                                                
 !                                                                       

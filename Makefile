@@ -2,12 +2,17 @@
 CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
 #CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
 
-HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
-HDF5INCS=-I/usr/include/hdf5/serial
+HDF5PATH=/home/pkarpov/Downloads/hdf5-1.12.2/hdf5/lib
+HDF5INCS=-I/home/pkarpov/Downloads/hdf5-1.12.2/hdf5/include
+
+# if using default gfortran
+# HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
+# HDF5INCS=-I/usr/include/hdf5/serial
 
 CONFIG:=Debug
 OPENACC:=0
-COMPILER:= gfortran
+COMPILER:=ifort
+# COMPILER:=gfortran
 
 # List CUDA compute capabilities
 # TORCH_CUDA_ARCH_LIST:=7.0
@@ -35,10 +40,11 @@ F90FLAGS= -O3 -g
 LDFLAGS= -O3 -g
 # --- end eos table ---
 
-.PHONY: all project examples data eos clean_eos clean
+.PHONY: all project examples data eos test clean_eos clean
 
 all:
-	mkdir -p build/proxy build/fortproxy build/projectproxy
+	@echo "in all" $(COMPILER)
+	make create_build_dirs
 	make eos
 	make cpp_wrappers
 	make fort_bindings
@@ -46,6 +52,9 @@ all:
 	make data
 	make readout
 	@echo "=== Compilation Successful ==="
+
+create_build_dirs:
+	mkdir -p build/proxy build/fortproxy build/projectproxy
 
 cpp_wrappers:	
 	@echo INST $(INST)
@@ -91,14 +100,14 @@ examples:
 data:
 	@echo "=== Using prep_data/setup ==="
 	cd prep_data && \
-	gfortran -std=legacy prep_data.f90 nuc_eos.a -L$(HDF5PATH) -lhdf5_fortran -lhdf5 -lz -o prep_data && \
+	$(COMPILER) -std=legacy prep_data.f90 nuc_eos.a -L$(HDF5PATH) -lhdf5_fortran -lhdf5 -o prep_data && \
 	./prep_data
 	mv $(DATA_DIR)/$(DATA_FILE) $(PROJECT_DIR)/$(PROJECT_NAME)
 	@echo "=== Moved $(DATA_FILE) to Project $(PROJECT_NAME) ==="
 
 readout:
 	cd ${PROJECT_DIR}/${PROJECT_NAME} && \
-        gfortran readout.f90 -o readout
+        $(COMPILER) readout.f90 -o readout
 
 eos: $(OBJECTS) $(FOBJECTS) 
 	ar r $(EOSDRIVER_DIR)/nuc_eos.a $(EOSDRIVER_DIR)/*.o 	
@@ -113,7 +122,13 @@ $(OBJECTS): %.o: %.F90 $(EXTRADEPS)
 	$(COMPILER) $(F90FLAGS) $(HDF5INCS) -c $< -o $@
 
 $(FOBJECTS): %.o: %.f $(EXTRADEPS)
-	$(COMPILER) $(F90FLAGS) $(HDF5INCS) -c $< -o $@			
+	$(COMPILER) $(F90FLAGS) $(HDF5INCS) -c $< -o $@		
+
+# To run the compilation test on GitHub (do not touch!)
+test: HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
+test: HDF5INCS=-I/usr/include/hdf5/serial
+test: COMPILER=gfortran
+test: create_build_dirs eos cpp_wrappers fort_bindings fort_project data readout
 
 clean_eos:
 	rm -rf $(EOSDRIVER_DIR)/*.o $(EOSDRIVER_DIR)/*.mod $(EOSDRIVER_DIR)/*.a

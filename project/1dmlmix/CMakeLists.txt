@@ -21,8 +21,8 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-#message(STATUS "----------> printing: ${CMAKE_SOURCE_DIR}")
+#message(STATUS "Printing from CMakeLists: ${CMAKE_SOURCE_DIR}")
 
 add_executable(1dmlmix 1dmlmix.f90 ocean.f90 sleos.f90 nse4c.f90 pytorch.f90 linear_interpolation_module.f90 data_functions.f90)
-target_link_libraries(1dmlmix pytorch_fort_proxy pytorch_proxy ${CMAKE_SOURCE_DIR}/nuc_eos.a -L${HDF5PATH} hdf5_fortran hdf5 z)
+target_link_libraries(1dmlmix pytorch_fort_proxy pytorch_proxy ${CMAKE_SOURCE_DIR}/nuc_eos.a -L${HDF5PATH} hdf5_fortran hdf5)
 install(TARGETS 1dmlmix)

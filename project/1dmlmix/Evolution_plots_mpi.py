@@ -29,23 +29,28 @@ def main():
     
     # --- Datasets and values to plot ---        
     vals             = [
-                        #'rho', 
-                        # 'v',
-                        #'P',
-                        #'T',
-                        #'encm',
-                        #'vsound',
-                        #'ye',
+                        'rho', 
+                        'v',
+                        'P',
+                        'T',
+                        'encm',
+                        'vsound',
+                        'ye',
                         'mach',
-                        #'entropy',
+                        'entropy',
                        ]        
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
-    masses           = [11.0]#[11.0,12.0,13.0,14.0,15.0,
-                        #16.0,17.0,18.0,19.0,20.0]        
+    masses           = [18.0]#[12.0,13.0,14.0,15.0,16.0,17.0,18.0]
+                        #[12.0]#[11.0,12.0,13.0,14.0,15.0,
+                       #16.0,17.0,18.0,19.0,20.0]        
     #masses           = [9.0,10.0,11.0,12.0,13.0,19.0,20.0]
 
     # --- Paths & Names ---
-    datasets         = [f's{m}_g2k_c1k_p0.3k' for m in masses]
+    # datasets         = [f's{m}_g6k_c5k_p0.3k' for m in masses]
+    datasets         = [f's{m}_g9k_c8.4k_p_0.3k' for m in masses]
+    # datasets         = [f's{m}_g10k_c9.4k_p0.3k' for m in masses]
+    # datasets         = [f's{m}_g2k_c1k_p0.3k' for m in masses]
+    # datasets         = [f's{m}_g1.5k_c0.5k_p0.3k' for m in masses]
     #datasets         = [f's{m}_4k' for m in masses]
     base_path        = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/'#test_extrema/'
     #base_path        = '/home/pkarpov/scratch/1dccsn/sleos/funiek/'
@@ -58,12 +63,12 @@ def main():
     only_post_bounce = True   # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
-    compute          = False#True
+    compute          = True
     rho_threshold    = 1e13    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
 
     # --- Plots & Movie Parameters ---
     dpi              = 60      # increase for production plots
-    make_movies      = True 
+    make_movies      = False#True 
     fps              = 10   
     save_plot        = True
     
@@ -95,21 +100,21 @@ def main():
             pf = Profiles(rank = rank, numfiles = numfiles, 
                           base_path = base_path, base_file = base_file, dataset = dataset,
                           save_name_amend=save_name_amend, only_post_bounce = only_post_bounce)
-
-            #bounce_shift = 0
+            
             #shift = 8361-1000
             #shift = 8000
-            #numfiles = numfiles-shift
-                                    
-            bounce_files = pf.check_bounce(compute=compute)
-            bounce_shift = pf.bounce_ind
-            if only_post_bounce: numfiles = bounce_files
+            #numfiles = numfiles-shift   
+                     
+            if only_post_bounce:                     
+                bounce_files = pf.check_bounce(compute=compute)
+                bounce_shift = pf.bounce_ind
+                numfiles     = bounce_files
             
-            print(f'Bounce at file:         {bounce_shift+1}')
-            print(f'Post bounce files:      {bounce_files}')
+                print(f'Bounce at file:         {bounce_shift+1}')
+                print(f'Post bounce files:      {bounce_files}')
             
             interval_size = int(numfiles/size)
-            leftover = numfiles%size
+            leftover      = numfiles%size
             
             print(f'Average interval size:  {interval_size}')
             print(f'Leftover to distribute: {leftover}')
@@ -167,12 +172,13 @@ def main():
         gather_shock_x    = comm.gather(pf.shock_x_ar,    root=0)
         gather_shock_encm = comm.gather(pf.shock_encm_ar, root=0)
         gather_lumnue     = comm.gather(pf.lumnue,        root=0)
+        gather_shell      = comm.gather(pf.shell_ar,      root=0)
+        gather_time       = comm.gather(pf.time_ar,       root=0)        
         
         # --- Back to Rank 0 to produce Summary Plots & Movies ---
         if rank == 0: 
-            if save_plot:
-                print( '\n--------- Plot Path --------', flush=True)
-                print(pf.base_save_path) 
+            print( '\n--------- Plot Path --------', flush=True)
+            print(f'{pf.base_save_path}\n') 
                     
             pf.pns_ind_ar    = sum(gather_pns_ind)
             pf.pns_x_ar      = sum(gather_pns_x)
@@ -180,15 +186,21 @@ def main():
             pf.shock_ind_ar  = sum(gather_shock_ind)
             pf.shock_x_ar    = sum(gather_shock_x)
             pf.shock_encm_ar = sum(gather_shock_encm)
-            pf.lumnue        = sum(gather_lumnue)            
+            pf.lumnue        = sum(gather_lumnue)  
+            pf.shell_ar      = sum(gather_shell)
+            pf.time_ar       = sum(gather_time)          
             pf.bounce_ind    = bounce_shift
+            
+            pf.save_evolution()
             
             ax = pf.plot_convection()
             ax = pf.plot_lumnue()
             ax = pf.plot_pns_shock()
+            ax = pf.plot_shells()
                     
             if make_movies:
                 print( '\n---------- Movies ----------')
+                print(f'{pf.movie_save_path}\n')                
                 for val in vals: pf.movie(val,versus=versus,fps=fps)
                  
             print(f'<<<<<<<<<<< Done >>>>>>>>>>>\n')                
@@ -219,16 +231,22 @@ class Readout:
     def run_readable(self):
         print( '---- Converting Binary ----')           
         
-        self.setup_readout()
-        
-        p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        output = p.stdout.read()
-        p.stdout.close()
+        for outfile in self.get_all_outfiles():
+            self.setup_readout(outfile)
+            
+            p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            output = p.stdout.read()
+            p.stdout.close()
+            
         print(f'Files are now readable for {self.dataset}!')
                 
         return get_numfiles(self.base_path, self.dataset, self.base_file)
+    
+    def get_all_outfiles(self):
+        outfiles = [filename for filename in os.listdir(f'{self.base_path}{self.dataset}') if ("restart" in filename or filename=='DataOut')]
+        return outfiles
         
-    def setup_readout(self):            
+    def setup_readout(self, outfile):            
         
         # Edit setup
         filepath = f'setup_readout' 
@@ -236,7 +254,7 @@ class Readout:
             data = file.readlines()            
             for i, line in enumerate(data):                
                 if 'Data File Name' in line: 
-                    data[i+1] = f'{self.full_output_path}/DataOut\n' 
+                    data[i+1] = f'{self.full_output_path}/{outfile}\n' 
                 if 'Output Basename' in line:                     
                     data[i+1] = f'{self.full_output_path}/{self.base_file}\n'     
                 if 'Number of dumps' in line:                     
@@ -254,20 +272,42 @@ class ComputeRoutines:
     # Routines to calculate PNS radius and shock position
     #
     def __init__(self, x, rho, v, vsound=None):
-        self.x          = x
-        self.rho        = rho
-        self.v          = v  
-        self.vsound     = vsound      
-        self.shock_ind  = 0
-        self.shock_x    = 0
-        self.pns_ind    = 0
-        self.pns_x      = 0        
+        self.x             = x
+        self.rho           = rho
+        self.v             = v  
+        self.vsound        = vsound              
+        self.shock_ind     = 0
+        self.shock_x       = 0
+        self.pns_ind       = 0
+        self.pns_x         = 0                
         
-    def shock_radius(self):                        
-
-        self.shock_ind = np.argmin(self.v)
-        self.shock_x   = self.x[self.shock_ind]
+    def shock_radius(self, old_shock_ind=-1):                        
+                
+        # for i in range(len(self.v)-1,4,-1):
+        #     if i == len(self.v)-1: 
+        #         dv_old = (self.v[i]-self.v[i-5])
+        #         continue
+            
+        #     dv = (self.v[i]-self.v[i-5])                   
+        #     if abs(dv) > abs(10*dv_old):
+        #         self.shock_ind = i-4
+        #         self.shock_x   = self.x[self.shock_ind]
+        #         break
+            
+        #     dv_old = dv
         
+        interval = 100
+        
+        if old_shock_ind == -1:                        
+            self.shock_ind = np.argmin(self.v)
+            self.shock_x   = self.x[self.shock_ind]
+        else:
+            self.shock_ind = np.argmin(self.v[old_shock_ind-interval:old_shock_ind+interval])+(old_shock_ind-interval)
+            self.shock_x   = self.x[self.shock_ind]
+        
+        # self.shock_ind = np.argmin(self.v)
+        # self.shock_x   = self.x[self.shock_ind]
+                
         # mach = abs(self.v/self.vsound)
         # mach_threshold = np.amax(mach)/2
         
@@ -294,7 +334,8 @@ class Profiles:
     # All things plotting related (+ bounce check)
     #
     def __init__(self, rank, numfiles, base_path, base_file, dataset, 
-                 save_name_amend='', only_post_bounce = False, interval=[0,0], dpi=60):
+                 save_name_amend='', only_post_bounce = False, interval=[0,0], 
+                 dpi=60, delta_shell = 0.01):
         self.numfiles         = numfiles
         self.lumnue           = np.zeros((self.numfiles))
         self.times            = np.zeros((self.numfiles))
@@ -307,6 +348,8 @@ class Profiles:
         self.interval         = interval
         self.dpi              = dpi
         self.cm2km            = 1e-5
+        self.s2ms             = 1e3
+        self.delta_shell      = delta_shell
         #self.progress_bar(0)
         
         self.pns_ind_ar       = np.zeros(self.numfiles)
@@ -316,7 +359,10 @@ class Profiles:
         self.shock_x_ar       = np.zeros(self.numfiles)
         self.shock_encm_ar    = np.zeros(self.numfiles)
         self.time_ar          = np.zeros(self.numfiles)
+        self.shell_ar         = np.array([])
+        self.shell_index      = np.array([])
         self.ind_ar           = np.arange(1, self.numfiles+1)
+        self.old_shock_ind    = -1
         self.bounce_ind       = 0
         self.rank             = rank
         self.base_file        = base_file 
@@ -377,27 +423,55 @@ class Profiles:
                 return self.numfiles - self.bounce_ind
                                                                                 
         print("WARNING: Bounce has not been found :(")
-        return -1        
+        return -1
+    
+    def save_evolution(self):
+        evolution_path = f'{self.base_save_path}{self.save_name_amend}evolution.txt'        
+        header         = ('Time [s] \t PNS Index \t PNS Radius [cm] \t PNS Encm [Msol] \t' +
+                                    'Shock Index \t Shock Radius [cm] \t Shock Encm [Msol]')
+        evolution      = np.array([                                            
+                                   self.time_ar,
+                                   self.pns_ind_ar,self.pns_x_ar,self.pns_encm_ar,
+                                   self.shock_ind_ar, self.shock_x_ar, self.shock_encm_ar,
+                                   self.lumnue                                                                                                
+                                  ])
+        evolution      = np.moveaxis(evolution, -1, 0)
+                         
+        np.savetxt(evolution_path, evolution, header = header)
+        
+        # Mass Shells
+        evolution_path = f'{self.base_save_path}{self.save_name_amend}evolution_mass_shells.txt'
+        header         = ('Time [s] \t Mass Shells Position [cm]')
+        evolution      = [self.time_ar]
+        
+        for s in range(np.shape(self.shell_ar)[-1]):
+            evolution.append(self.shell_ar[:,s])            
+        
+        evolution = np.moveaxis(np.array(evolution), -1, 0)
+                                 
+        np.savetxt(evolution_path, evolution, header = header)
+        
         
     def plot_format(self, series, xlabel, ylabel, title, save_path, 
-                          show_plot, plot_style = 'plot',
-                          bounce_lim=False, label=None):                       
+                          show_plot, plot_style = 'plot', bounce_lim=False,
+                          label=None, ax=None, marker='.', linewidth=1.5):                       
         
         style = 'tableau-colorblind10'
         mpl.style.use(style)
         mpl.rcParams.update(plot_params())  
         
         if not label: label = [f'None' for i in range(len(series))]
-                    
-        fig = plt.figure(figsize=(10,6), dpi=self.dpi)
-        ax  = fig.add_subplot(111)        
+        
+        if ax==None:            
+            fig = plt.figure(figsize=(10,6), dpi=self.dpi)
+            ax  = fig.add_subplot(111)        
         for idx, data in enumerate(series): 
             if   plot_style == 'plot'    : plot_func = ax.plot
             elif plot_style == 'semilogx': plot_func = ax.semilogx
             elif plot_style == 'semilogy': plot_func = ax.semilogy
             elif plot_style == 'loglog'  : plot_func = ax.loglog  
                       
-            plot_func(data[0], data[1], linewidth=1.5, marker='.', label=label[idx])
+            plot_func(data[0], data[1], linewidth=linewidth, marker=marker, label=label[idx])
         
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -412,12 +486,11 @@ class Profiles:
         
         plt.savefig(save_path)        
         if not show_plot: plt.close()        
-        print(save_path, flush=True)
+        #print(save_path, flush=True)
          
         return ax            
         
     def plot_convection(self, show_plot=False):        
-        print( '\n-------- Convection --------')  
                  
         save_path = f'{self.base_save_path}{self.save_name_amend}convgrid.png'
         
@@ -427,11 +500,13 @@ class Profiles:
                               title      = f'Bounce index = {self.bounce_ind+1}', 
                               save_path  = save_path, 
                               show_plot  = show_plot,
-                              bounce_lim = True)                        
+                              bounce_lim = True)    
+        
+        print(f'Convection : {self.save_name_amend}convgrid.png')
+                            
         return ax
     
     def plot_lumnue(self, show_plot=False):                  
-        print( '\n---------- lumnue ----------')                   
         
         if self.only_post_bounce: name_amend = '_bounce'            
         else: name_amend = ''
@@ -445,11 +520,13 @@ class Profiles:
                               save_path  = save_path, 
                               show_plot  = show_plot,
                               plot_style = 'semilogy',
-                              bounce_lim = True)          
+                              bounce_lim = True) 
+        
+        print(f'lumnue     : {self.save_name_amend}lumnue{name_amend}.png')
+                 
         return ax   
     
     def plot_pns_shock(self, show_plot=False):                  
-        print( '\n--------- pns_shock --------')  
                 
         plot_data = [[self.pns_x_ar[self.bounce_ind:]*self.cm2km,
                       self.pns_encm_ar[self.bounce_ind:]         ],
@@ -466,8 +543,52 @@ class Profiles:
                               title     = f'Bounce index = {self.bounce_ind+1}',
                               save_path = save_path, 
                               show_plot = show_plot,
-                              label     = labels)                             
-        return ax        
+                              label     = labels)  
+        
+        print(f'pns_shock  : {self.save_name_amend}pns_shock.png')    
+                               
+        return ax  
+    
+    
+    def plot_shells(self, show_plot=False):                  
+
+        save_path = f'{self.base_save_path}{self.save_name_amend}mass_shells.png'
+        
+        plot_data = []
+        
+        for s in range(np.shape(self.shell_ar)[-1]):
+            plot_data.append([(self.time_ar[self.bounce_ind:]-self.time_ar[self.bounce_ind])*self.s2ms, 
+                              np.log10(self.shell_ar[self.bounce_ind:,s]*self.cm2km)])
+                    
+        fig = plt.figure(figsize=(10,6), dpi=self.dpi)
+        ax  = fig.add_subplot(111)                    
+        for idx, data in enumerate(plot_data): 
+            ax.plot(data[0], data[1], linewidth=1.5, color='tab:gray')        
+        
+        plot_data = [[(self.time_ar[self.bounce_ind:]-self.time_ar[self.bounce_ind])*self.s2ms, 
+                      np.log10(self.pns_x_ar[self.bounce_ind:]*self.cm2km)],
+                     [(self.time_ar[self.bounce_ind:]-self.time_ar[self.bounce_ind])*self.s2ms, 
+                      np.log10(self.shock_x_ar[self.bounce_ind:]*self.cm2km)]]
+        
+        labels    = ['PNS', 'Shock'] 
+        
+        ax.set_ylim(1,3)
+        
+        ax = self.plot_format(series    = plot_data,
+                              xlabel    = r'$t-t_{bounce}$ [s]', 
+                              ylabel    = r'log(R) [km]', 
+                              title     = f'Bounce index = {self.bounce_ind+1}',
+                              save_path = save_path, 
+                              show_plot = show_plot,
+                              label     = labels,
+                              ax        = ax,
+                              marker    = '',
+                              linewidth = 2.5)                 
+        
+        print(f'mass_shells: {self.save_name_amend}mass_shells.png')    
+                                    
+        return ax
+              
                     
     def plot_profile(self, i, vals, versus,
                      show_plot=False, save_plot=False, 
@@ -506,7 +627,7 @@ class Profiles:
         try: vsound  = ps[8]
         except: vsound = np.ones(v.shape)
         s       = ps[9] #entropy
-        
+                
         # Print out enclosed mass at 200km without plotting anything
         # if i == self.numfiles-1:         
         #     for j in range(len(cell)):
@@ -544,7 +665,7 @@ class Profiles:
             elif val == 'v':
                 y      = v
                 ylabel = r'Velocity $[cm/s]$'
-                ylim   = (-1.2e10, 1e9)
+                ylim   = (-1.5e10, 3e9)
                 loc    = 4
                 if versus == 'r': plot_type = 'semilogx'
                 elif versus == 'encm': plot_type = 'plot'                
@@ -610,11 +731,9 @@ class Profiles:
                 
                 if compute and vals.index(val)==0:
                     rt = ComputeRoutines(x, rho=rho, v=v, vsound=vsound)
-                    shock_ind, shock_x = rt.shock_radius()
+                    shock_ind, shock_x = rt.shock_radius(old_shock_ind = self.old_shock_ind)
                     pns_ind,   pns_x   = rt.pns_radius(rho_threshold = rho_threshold)   
-                    
-                #print(f'shock {ps[2,int(shock_ind)]:.3e}, {shock_x:.3e}')
-                
+                                    
                 pns_edge    = x[int(pns_ind)]*unit
                 shock_front = x[int(shock_ind)]*unit
                 if versus == 'r'   : line_label = '%.2e km'          
@@ -639,6 +758,7 @@ class Profiles:
                 
             if not show_plot: plt.close()
             
+            # Get time evolution metrics
             if vals.index(val)==0:
                 self.pns_ind_ar[i]    = pns_ind
                 self.pns_x_ar[i]      = pns_x
@@ -646,7 +766,33 @@ class Profiles:
                 self.shock_ind_ar[i]  = shock_ind
                 self.shock_x_ar[i]    = shock_x
                 self.shock_encm_ar[i] = encm[shock_ind]
-                self.time_ar[i]       = time1d 
+                self.time_ar[i]       = time1d   
+                
+                self.old_shock_ind    = shock_ind                                                              
+                
+                # Find mass shell indexes (initializes only once)
+                if self.shell_ar.size == 0: 
+                    shell_old        = 0
+                    shell_counter    = 0 
+                    shells_after     = 1.1 #M_sol                                                          
+                    shell_counts     = int((encm[-1]-shells_after)//self.delta_shell)
+                    self.shell_ar    = np.zeros((self.numfiles,shell_counts))
+                    self.shell_index = np.zeros(shell_counts, dtype=int)
+                                        
+                    for shell_i in range(len(encm)):
+                        shell = encm[shell_i]                    
+                        if shell >= shells_after and (shell-shell_old) >= self.delta_shell:
+                            self.shell_index[shell_counter] = shell_i
+                            shell_counter += 1
+                            shell_old      = shell
+                    
+                    while shell_counter < self.shell_ar.shape[-1]:
+                        self.shell_ar    = np.delete(self.shell_ar,    -1, axis=1)
+                        self.shell_index = np.delete(self.shell_index, -1, axis=0)               
+
+                # Track mass shell positions at time index i
+                for j,shell_i in enumerate(self.shell_index):     
+                    self.shell_ar[i,j] = r[shell_i]
             
             done=True if (i==self.numfiles and vals.index(val)==(len(vals)-1)) else False
             if self.rank == 0: self.progress_bar(i+1, val, done = done)          
@@ -666,7 +812,7 @@ class Profiles:
         movie_name = f'{self.movie_save_path}{val}{self.versus_name}{self.save_name_amend}'
         if not os.path.exists(self.movie_save_path): os.makedirs(self.movie_save_path)
             
-        print(f'{val}{padding_val}: {movie_name}{name_amend}.mp4')
+        print(f'{val}{padding_val}: {val}{self.versus_name}{self.save_name_amend}{name_amend}.mp4')
         
         result = Popen(['ffmpeg', '-r', f'{fps}', '-start_number', f'{start}',
                         '-i', f'{name}_%d.png', 

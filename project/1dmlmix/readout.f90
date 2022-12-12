@@ -10,6 +10,7 @@
 !                                                                       
       parameter (idim=10000) 
       parameter (idim1=idim+1) 
+      parameter (avokb=6.02e23*1.381e-16) 
 !                                                                       
       dimension encm(0:idim1) 
       dimension x(0:idim1), v(0:idim1),a(0:idim1) 
@@ -36,8 +37,13 @@
       integer iskip, ndump, idump
       logical from_dump
 !                                                                       
-      double precision dm,press,enue,enueb,ks,ka,ksb,kab,               &
-     &     ksx                                                          
+      double precision dm,press,enue,enueb,ks,ka,ksb,kab,ksx 
+      
+      utemp=1e9
+      udist=1e9
+      utime=1.d1       
+      uergg=dble(udist)**2/dble(utime)**2 
+      sfrac= avokb*utemp/uergg                                                         
 !   
        if (command_argument_count() == 1) then
            print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
@@ -76,7 +82,7 @@
       ibasenamelen = index(basename,' ')-1 
       nqn=17
 
-      do k=1,ndump         
+      do k=1,ndump   
          read(42) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
                pns_ind,pns_x,shock_ind,shock_x,                          &
                bounce_time,from_dump,rlumnue,rlumnueb,rlumnux,           &
@@ -150,7 +156,7 @@
             write(69,*) 'Time [s]  Bounce_Time [s] R_PNS [index] R_PNS [cm] R_shock [index]  R_shock [cm] nu_e_flux [foe/s]'
             write(69,108)10.d0*t, 10.d0*bounce_time, int(pns_ind), 1.d9*pns_x, int(shock_ind), 1.d9*shock_x, 2.d-3*rlumnue            
             write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
-                        & Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s] '            
+                        & Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s]  Entropy [kb/baryon]'            
             do i=1,nc 
 !               write(69,103)i,encm(i),x(i),rho(i),v(i),ye(i),          
 !     $           vsound(i)                                             
@@ -222,7 +228,7 @@
                      write(69,103)i,encm(i),1.d9*x(i),2.d6*rho(i),      &
 !                         1.d8*v(i),ye(i),1.d16*pr(i)!,                  &
                          1.d8*v(i), ye(i),2.d22*pr(i),                  &
-                         1.d9*temp(i), 1.d8*vsound(i)                                     
+                         1.d9*temp(i), 1.d8*vsound(i), u2(i)/sfrac                                     
 !                  if (i.gt.1) then                                     
                      if (ufreez(i).lt.1.d-10) then 
                        dene2=dene2+                                     &
