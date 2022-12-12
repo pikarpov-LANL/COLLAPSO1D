@@ -107,7 +107,7 @@ data:
 
 readout:
 	cd ${PROJECT_DIR}/${PROJECT_NAME} && \
-        $(COMPILER) readout.f90 -o readout
+        gfortran -O readout.f90 -o readout
 
 eos: $(OBJECTS) $(FOBJECTS) 
 	ar r $(EOSDRIVER_DIR)/nuc_eos.a $(EOSDRIVER_DIR)/*.o 	
