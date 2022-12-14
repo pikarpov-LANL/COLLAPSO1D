@@ -51,13 +51,11 @@ EOS tables (SFHo by default) require an hdf5 installation. If missing, get it vi
 ```
 sudo apt-get install libhdf5-dev
 ```
-Then you need to provide paths to the hdf5 libraries in the `Makefile`. If yours differ from default, edit the following variables:
+Then you need to provide paths to the hdf5 libraries in the `Makefile`. If yours differ from default, edit:
 ```
 HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
 HDF5INCS=-I/usr/include/hdf5/serial
 ```
-
-### ~/.bashrc
 Add the following to you `~/.bashrc` and then `source ~/.bashrc`:
 ```bash
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
