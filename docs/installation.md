@@ -5,9 +5,8 @@ COLLAPSO1D supports `gfortran` and Intel's Classic Fortran `ifort`. The latter r
 ## Defendencies
 
 ### PyTorch
-!!! Warning
-    PyTorch 2.X has <ins>not</ins> been tested.
-
+!!! Warning "PyTorch 2.X has <ins>not</ins> been tested."
+    
 To install the latest PyTorch 1.X for <ins>CPU</ins>, follow the official [instructions](https://pytorch.org/get-started/locally/). I would highly recommend installing it in a dedicated conda environemnt. As an example, here is how to create one and install PyTorch:
 ```
 conda create -n py310 python=3.10
@@ -55,11 +54,11 @@ COMPILER=gfortran
 ```
 
 ### HDF5
-EOS tables (SFHo by default) require an hdf5 installation. If missing, get it via:
+EOS tables (SFHo by default) require an `hdf5` installation. If missing, get it via:
 ```
 sudo apt-get install libhdf5-dev
 ```
-Then you need to provide paths to the hdf5 libraries in the `Makefile`. If yours differ from default, edit:
+Then you need to provide paths to the `hdf5` libraries in the `Makefile`. If yours differ from default, edit:
 ```
 HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
 HDF5INCS=-I/usr/include/hdf5/serial
@@ -144,7 +143,7 @@ sudo apt-get update && sudo apt-get install build-essential
 
 If you are having trouble getting the dependencies and COLLAPSO1D to work, please check the GitHub compilation test. The script sets up a clean Linux environment with explicitely defined package versions. It checks if COLLAPSO1D compiles correctly with `gfortran` on every push to the repo.
 
-???+ Quote "compilation_test.yml"
-    ```html
+??? Quote "compilation_test.yml"
+    ```yml
     --8<-- ".github/workflows/compilation_test.yml"
     ```
