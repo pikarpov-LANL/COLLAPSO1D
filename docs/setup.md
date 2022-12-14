@@ -11,21 +11,21 @@ Parameters in the `project/1dmlmix/setup`
 
 ### Extra options
 #### [Input PyTorch Model](#__codelineno-0-6)
-|Name|Description|
-|:---|:---|
-|`None` | sets turbulent pressure to 0 and doesn't use any ML subroutines
-| `ModelName.pt` | uses ML subroutines (model name can be anything)
+| Name           | Description                                                     |
+| :------------- | :-------------------------------------------------------------- |
+| `None`         | sets turbulent pressure to 0 and doesn't use any ML subroutines |
+| `ModelName.pt` | uses ML subroutines (model name can be anything)                |
 
 #### [EOS options](#__codelineno-0-22)
 
-|EOS|Subroutine|Description|
-|:---|:---|:---|
-| `1` | eospg | perfect gas equation of state
-| `2` | eospgr | equation of state that includes gas and radiation pressure
-| `3` | eos3 | Ocean eos assuming NSE for low density and Swesty-Lattimer eos for high density above `rhoswe`. Uses *energy* as the primary variable.
-| `4` | eos3 | Ocean eos assuming NSE for low density and Swesty-Lattimer eos for high density above `rhoswe`. Uses *entropy* as the primary variable.
-| `5` | eos5 | SFHo EOS Tables with *entropy* is primary variable.
-| `6` | eos5 | SFHo EOS Tables with *energy* is primary variable.
+| EOS  | Subroutine | Description                                                                                                                             |
+| :--- | :--------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
+| `1`  | eospg      | perfect gas equation of state                                                                                                           |
+| `2`  | eospgr     | equation of state that includes gas and radiation pressure                                                                              |
+| `3`  | eos3       | Ocean eos assuming NSE for low density and Swesty-Lattimer eos for high density above `rhoswe`. Uses *energy* as the primary variable.  |
+| `4`  | eos3       | Ocean eos assuming NSE for low density and Swesty-Lattimer eos for high density above `rhoswe`. Uses *entropy* as the primary variable. |
+| `5`  | eos5       | SFHo EOS Tables with *entropy* is primary variable.                                                                                     |
+| `6`  | eos5       | SFHo EOS Tables with *energy* is primary variable.                                                                                      |
 
 ## Data Preparation
 
@@ -35,6 +35,32 @@ Edit `prep_data/setup_prep` for initial parameters, then run `make data` from ro
     ```html
     --8<-- "prep_data/setup_prep"
     ```
+
+The grid in COLLAPSO1D is static and non-uniform, set by mass in each cell (`deltam`). It is split into 3 different regions:
+
+| Region     | Resolution | Behavior                   |
+| ---------- | ---------- | -------------------------- |
+| PNS        | Medium     | linearly decreasing deltam |
+| Convection | High       | constant                   |
+| Outer      | Low        | exponentially growing      |
+
+For the PNS and Outer regions, growth rates are determined automatically within the code, based on the target grid cells.
+
+The parameters of most importance are as follows:
+
+| Parameter                                         |
+| ------------------------------------------------- |
+| Goal Size of the PNS                              |
+| Goal Size of Convective Grid                      |
+| Goal Total Resolution                             |
+| Enclosed Mass Cutoff for the PNS (Msol)           |
+| Enclosed Mass Cutoff for Convective Region (Msol) |
+| Maximum Radius of the Grid (cm)                   |
+
+!!! Note
+    Even though though convection region is quite thin, a lot of mass will be infalling. Since the grid is static, the high-resolution convective region has to account for all of the mass that will eventually pass through it, e.g. 0.15-0.3 $M_{\odot}$.
+
+### Outdated
 
 After setting the target grid size and the convection region resolution, the last thing we need to actually vary is the enclosed mass of the convection region, since this is a Lagrangian code. We wanted target a convective region resolution of ~1000 to cover the region between 20 and 200 km, so here are the ecnlosed masses:
 
@@ -77,7 +103,6 @@ pns_cutoff = Enclosed Mass-0.16 for the 4k grid above. Maxrad was 5e9 cm for tho
 
 Note: all of the above checkout ~200km radius ~10ms after bounce
 
-### Outdated
 Parameters for near ~4k resolution based on Sukhbold 2016 data. Maximum radius is 1e10 cm, i.e. 1e10 in code units.
 
 ??? Abstract "OUTDATED: maxrad=1e1"
