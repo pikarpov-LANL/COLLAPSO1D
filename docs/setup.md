@@ -44,7 +44,8 @@ The grid in COLLAPSO1D is static and non-uniform, set by mass in each cell (`del
 | Convection | High       | constant                   |
 | Outer      | Low        | exponentially growing      |
 
-For the PNS and Outer regions, growth rates are determined automatically within the code, based on the target grid cells.
+For the PNS and Outer regions, growth rates are determined automatically within the code, based on the target grid cells. Convection region is defined as enclosed mass cutoff for (Convective Region - PNS)
+
 
 The parameters of most importance are as follows:
 
@@ -57,8 +58,8 @@ The parameters of most importance are as follows:
 | Enclosed Mass Cutoff for Convective Region (Msol) |
 | Maximum Radius of the Grid (cm)                   |
 
-!!! Note
-    Even though though convection region is quite thin, a lot of mass will be infalling. Since the grid is static, the high-resolution convective region has to account for all of the mass that will eventually pass through it, e.g. 0.15-0.3 $M_{\odot}$.
+!!! Tip "Convective Region"
+    Mass in the Convective Region is defined as Convective Region cutoff minus PNS cutoff, i.e., lines 5 - 4 from the table above. Even though it is quite thin at any given moment, a lot of mass will be infalling. Since the grid is static Lagrangian, the high-resolution convective region has to account for all of the mass that will eventually pass through it, e.g. 0.15-0.3 $M_{\odot}$. This way, the region and the shock will be spatially resolved throughout the simulation runtime.
 
 ### Outdated
 
