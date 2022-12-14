@@ -1,11 +1,14 @@
 # Installation
 
-COLLAPSO1D supports `gfortran` and Intel's Classic Fortran `ifort`. The latter runs ~40% faster, but requires a more involved installation.
+COLLAPSO1D supports `gfortran` and Intel's Classic Fortran `ifort`. The latter runs ~70% faster, but requires a more involved installation.
 
 ## Defendencies
 
 ### PyTorch
-To install the latest PyTorch for <ins>CPU</ins>, follow the official [instructions](https://pytorch.org/). I would highly recommend installing it in a dedicated conda environemnt. As an example, here is how to create one and install PyTorch:
+!!! Warning
+    PyTorch 2.X has <ins>not</ins> been tested.
+
+To install the latest PyTorch 1.X for <ins>CPU</ins>, follow the official [instructions](https://pytorch.org/get-started/locally/). I would highly recommend installing it in a dedicated conda environemnt. As an example, here is how to create one and install PyTorch:
 ```
 conda create -n py310 python=3.10
 conda activate py310
@@ -46,6 +49,11 @@ Both the main CCSN code and the PyTorch wrapper can be compiled with `gfortran >
 sudo apt install gfortran
 ```
 
+In the `Makefile`, set
+```
+COMPILER=gfortran
+```
+
 ### HDF5
 EOS tables (SFHo by default) require an hdf5 installation. If missing, get it via:
 ```
@@ -82,6 +90,14 @@ Next you will need to add executables to PATH. The easiest way is to run:
 source /opt/intel/oneapi/setvars.sh
 ```
 Add this line to your `~/.bashrc` to avoid re-running the above initialization on every start-up.
+
+In the `Makefile`, set
+```
+COMPILER=ifort
+```
+
+!!! Warning
+    The `readout.f90` to convert unformatted binary output to readable text will still be compiled with `gfortran` (hardcoded in the `Makefile`), since `ifort` is ~x20 slower at parsing unformatted binary files for some reason. These slow downs have no effect of the actual CCSN calculation, hence `ifort` remains vastly superior for the main code.
 
 ### HDF5 with `ifort`
 
@@ -123,3 +139,12 @@ CMake can't find your C compiler. Either check your GCC path or if you are on Ub
 ```bash
 sudo apt-get update && sudo apt-get install build-essential
 ```
+
+### Version Compatibility Issues
+
+If you are having trouble getting the dependencies and COLLAPSO1D to work, please check the GitHub compilation test. The script sets up a clean Linux environment with explicitely defined package versions. It checks if COLLAPSO1D compiles correctly with `gfortran` on every push to the repo.
+
+???+ Quote "compilation_test.yml"
+    ```html
+    --8<-- ".github/workflows/compilation_test.yml"
+    ```
