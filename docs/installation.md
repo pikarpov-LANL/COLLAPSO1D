@@ -26,7 +26,7 @@ pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl
     Then set `CMAKE_PREFIX_PATH={Locaton}/torch/share/cmake` in `Makefile`.
 
 ### CMake
-Make sure you have cmake or install it by (tested on cmake==3.22.1)
+Make sure you have `cmake` or install it by (tested on `cmake==3.22.1`)
 ```bash
 sudo apt install cmake
 ```
@@ -84,7 +84,7 @@ Please follow [APT Installation Guide](https://www.intel.com/content/www/us/en/d
 ```bash
 sudo apt install intel-hpckit
 ```
-Next you will need to add executables to PATH. The easiest way is to run:
+Next you will need to add executables to `PATH`. The easiest way is to run:
 ```bash
 source /opt/intel/oneapi/setvars.sh
 ```
@@ -144,6 +144,6 @@ sudo apt-get update && sudo apt-get install build-essential
 If you are having trouble getting the dependencies and COLLAPSO1D to work, please check the GitHub compilation test. The script sets up a clean Linux environment with explicitely defined package versions. It checks if COLLAPSO1D compiles correctly with `gfortran` on every push to the repo.
 
 ??? Quote "compilation_test.yml"
-    ```yml
+    ```yaml
     --8<-- ".github/workflows/compilation_test.yml"
     ```

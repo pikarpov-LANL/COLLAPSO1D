@@ -1,12 +1,14 @@
 program read 
-    !*********************************************************              
-    !                                                        *              
-    !  This program reads data from models constructed by    *              
-    !  Stan Woosley of Supernova precursors.                 *              
-    !  It then sets up a file that can be read by our        *              
-    !  1d supernova model.                                   *              
-    !                                                        *              
-    !*********************************************************              
+    !*************************************************************              
+    !                                                            *              
+    !  This program reads data from models constructed by        *              
+    !  Heger & Woosley, 2000 (https://2sn.org/stellarevolution/) *
+    !  and Sukhbold et al, 2016 (http://doi.org/10.17617/1.b)    * 
+    !  of Supernova pregenitors.                                 *              
+    !  It then sets up a binary file that can be read by         *
+    !  COLLAPSO1D, our 1d supernova model.                       *              
+    !                                                            *              
+    !*************************************************************              
     !                                                                             
           implicit double precision (a-h, o-z) 
     !                                                                       
