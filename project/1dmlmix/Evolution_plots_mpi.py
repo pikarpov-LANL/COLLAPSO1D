@@ -40,15 +40,17 @@ def main():
                         'entropy',
                        ]        
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
-    masses           = [18.0]#[12.0,13.0,14.0,15.0,16.0,17.0,18.0]
+    masses           = [19.0]#[12.0,16.0]#[12.0,13.0,14.0,15.0,16.0,17.0,18.0]
                         #[12.0]#[11.0,12.0,13.0,14.0,15.0,
-                       #16.0,17.0,18.0,19.0,20.0]        
+                       #16.0,17.0,18.0,19.0,20.0]       
+    # masses           = [12.0]#[11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] 
     #masses           = [9.0,10.0,11.0,12.0,13.0,19.0,20.0]
 
     # --- Paths & Names ---
     # datasets         = [f's{m}_g6k_c5k_p0.3k' for m in masses]
-    datasets         = [f's{m}_g9k_c8.4k_p_0.3k' for m in masses]
-    # datasets         = [f's{m}_g10k_c9.4k_p0.3k' for m in masses]
+    # datasets         = [f's{m}_g9k_c8.4k_p_0.3k' for m in masses]
+    datasets         = [f's{m}_g10k_c9.4k_p0.3k' for m in masses]
+    # datasets         = [f's{m}_g4k_c3k_p0.3k' for m in masses]    
     # datasets         = [f's{m}_g2k_c1k_p0.3k' for m in masses]
     # datasets         = [f's{m}_g1.5k_c0.5k_p0.3k' for m in masses]
     #datasets         = [f's{m}_4k' for m in masses]
@@ -59,7 +61,8 @@ def main():
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = False#True    # convert binary to readable (really only needed to be done once) 
+    convert2read     = True   # convert binary to readable (really only needed to be done once) 
+    only_last        = False   # only convert from the latest binary file (e.g., latest *_restart_*)
     only_post_bounce = True   # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
@@ -67,8 +70,8 @@ def main():
     rho_threshold    = 1e13    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
 
     # --- Plots & Movie Parameters ---
-    dpi              = 60      # increase for production plots
-    make_movies      = False#True 
+    dpi              = 80      # increase for production plots
+    make_movies      = True 
     fps              = 10   
     save_plot        = True
     
@@ -77,7 +80,7 @@ def main():
     # --- MPI setup ---
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
-    rank = comm.Get_rank()
+    rank = comm.Get_rank()        
     
     for dataset in datasets:
         
@@ -87,7 +90,7 @@ def main():
             
             numfiles = get_numfiles(base_path, dataset, base_file)
             
-            if convert2read: numfiles = Readout(base_path, dataset, base_file).run_readable()
+            if convert2read: numfiles = Readout(base_path, dataset, base_file, only_last).run_readable()
             elif numfiles==0: print('ERROR: no readable files found; try setting convert2read = True'); comm.Abort()
 
             #numfiles = 8941            
@@ -109,6 +112,7 @@ def main():
                 bounce_files = pf.check_bounce(compute=compute)
                 bounce_shift = pf.bounce_ind
                 numfiles     = bounce_files
+                #shift        = bounce_shift + bounce_files-numfiles
             
                 print(f'Bounce at file:         {bounce_shift+1}')
                 print(f'Post bounce files:      {bounce_files}')
@@ -222,28 +226,38 @@ def get_numfiles(base_path, dataset, base_file):
     return numfiles
 
 class Readout:
-    def __init__(self, base_path, dataset, base_file):
+    def __init__(self, base_path, dataset, base_file, only_last=False):
         self.base_path        = base_path
         self.dataset          = dataset
         self.base_file        = base_file
+        self.only_last        = only_last
         self.full_output_path = f'{self.base_path}{self.dataset}'
 
     def run_readable(self):
-        print( '---- Converting Binary ----')           
+        print( '---- Converting Binary ----')
         
         for outfile in self.get_all_outfiles():
+    
+            self.status(outfile, done=False)                                
             self.setup_readout(outfile)
             
             p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
             output = p.stdout.read()
             p.stdout.close()
             
-        print(f'Files are now readable for {self.dataset}!')
-                
+            self.status(outfile, done=True)
+            
+        print(f'\nFiles are now readable for {self.dataset}!')
+                        
         return get_numfiles(self.base_path, self.dataset, self.base_file)
     
     def get_all_outfiles(self):
         outfiles = [filename for filename in os.listdir(f'{self.base_path}{self.dataset}') if ("restart" in filename or filename=='DataOut')]
+        if self.only_last:
+            if any("restart" in file for file in outfiles):     
+                outfiles.remove('DataOut')       
+                last_num   = max([int(filename.split('_')[-1]) for filename in outfiles])            
+                return [f"DataOut_restart_{last_num}"]
         return outfiles
         
     def setup_readout(self, outfile):            
@@ -264,8 +278,19 @@ class Readout:
     
     def write_data(self, filepath, data):
         with open(filepath, 'w') as file:   
-            file.writelines(data)                  
+            file.writelines(data)    
+            
+    def status(self, outfile, done):
         
+        if self.only_last and not done: print(f'Only Last: {self.only_last}')
+        
+        padding_val = int(20-len(outfile)) * ' '
+        msg         = f'Converting {outfile}...{padding_val}'
+        ending      = '\n' if done == True else '\r'
+        
+        if done: print(f'{msg} done', end=ending)
+        else: print(f'{msg}', end=ending) 
+                
    
 class ComputeRoutines:
     #
@@ -281,7 +306,7 @@ class ComputeRoutines:
         self.pns_ind       = 0
         self.pns_x         = 0                
         
-    def shock_radius(self, old_shock_ind=-1):                        
+    def shock_radius(self, bump=0, old_shock_ind=-1):                        
                 
         # for i in range(len(self.v)-1,4,-1):
         #     if i == len(self.v)-1: 
@@ -296,17 +321,17 @@ class ComputeRoutines:
             
         #     dv_old = dv
         
-        interval = 100
+        # interval = 3
         
-        if old_shock_ind == -1:                        
-            self.shock_ind = np.argmin(self.v)
-            self.shock_x   = self.x[self.shock_ind]
-        else:
-            self.shock_ind = np.argmin(self.v[old_shock_ind-interval:old_shock_ind+interval])+(old_shock_ind-interval)
-            self.shock_x   = self.x[self.shock_ind]
+        # if old_shock_ind == -1:                        
+        #     self.shock_ind = np.argmin(self.v)
+        #     self.shock_x   = self.x[self.shock_ind]
+        # else:
+        #     self.shock_ind = np.argmin(self.v[old_shock_ind-interval:old_shock_ind+interval])+(old_shock_ind-interval)
+        #     self.shock_x   = self.x[self.shock_ind]        
         
-        # self.shock_ind = np.argmin(self.v)
-        # self.shock_x   = self.x[self.shock_ind]
+        self.shock_ind = bump+np.argmin(self.v[bump:])
+        self.shock_x   = self.x[self.shock_ind]
                 
         # mach = abs(self.v/self.vsound)
         # mach_threshold = np.amax(mach)/2
@@ -366,6 +391,20 @@ class Profiles:
         self.bounce_ind       = 0
         self.rank             = rank
         self.base_file        = base_file 
+        
+        # Region constraints to find the correct shock position
+        # dict = {checkpoint_index:grid_index}
+        if 's16.0_g9k_c8.4k_p_0.3k' in self.dataset:
+            self.shock_region = {711:5400, 712:5400, 713:5400, 714:5400,
+                                 715:5400, 716:5420, 717:5440, 718:5460,
+                                 719:5463}    
+        elif 's17.0_g9k_c8.4k_p_0.3k' in self.dataset:
+            self.shock_region = {734:5900, 735:5850, 736:5850, 737:5900,
+                                 738:5900, 739:5950, 740:5950, 741:5970,
+                                 742:5980}   
+        elif 's18.0_g9k_c8.4k_p_0.3k' in self.dataset:
+            self.shock_region = {663:5350, 664:5350, 665:5350, 666:5370}                                                 
+        else: self.shock_region = {}
         
     def progress_bar(self, current, val='', done = False, bar_length=20):
         current -= self.interval[0]
@@ -475,8 +514,10 @@ class Profiles:
         
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        ax.set_title(title)        
         ax.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+        
+        self.sim_label(ax, x = 0.993)
         
         if bounce_lim:
             if self.only_post_bounce: ax.set_xlim(self.bounce_ind,self.numfiles)
@@ -488,7 +529,13 @@ class Profiles:
         if not show_plot: plt.close()        
         #print(save_path, flush=True)
          
-        return ax            
+        return ax       
+    
+    def sim_label(self, ax, x = 0.992, y = 1.024):
+        m,res = self.dataset.split('_')[:2]
+        ax.text(x, y, f'{m} | {res}', 
+                horizontalalignment='right',transform=ax.transAxes,
+                bbox=dict(boxstyle='square', facecolor='white',linewidth=1))     
         
     def plot_convection(self, show_plot=False):        
                  
@@ -614,6 +661,8 @@ class Profiles:
         ps = np.genfromtxt(file1d, skip_header=3)
         ps = np.moveaxis(ps,0,1)    
         
+        #print('rank, shape', self.rank, i, ps.shape)
+        
         # Columns in the readable files:
         # Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s]  Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s] 
         ncell   = ps[0]
@@ -731,7 +780,10 @@ class Profiles:
                 
                 if compute and vals.index(val)==0:
                     rt = ComputeRoutines(x, rho=rho, v=v, vsound=vsound)
-                    shock_ind, shock_x = rt.shock_radius(old_shock_ind = self.old_shock_ind)
+                                     
+                    if self.dataset=='s12.0_g1.5k_c0.5k_p0.3k' and i<=650: self.old_shock_ind = -1
+                    shock_ind, shock_x = rt.shock_radius(bump          = self.shock_region.get(i+1,0), 
+                                                         old_shock_ind = self.old_shock_ind)
                     pns_ind,   pns_x   = rt.pns_radius(rho_threshold = rho_threshold)   
                                     
                 pns_edge    = x[int(pns_ind)]*unit
@@ -743,12 +795,16 @@ class Profiles:
                            label=f'PNS    {line_label%pns_edge}')
                 ax.axvline(x=shock_front,linestyle='--',color='r',linewidth=1,
                            label=f'shock {line_label%shock_front}')
+                ax.set_title('$t-t_{bounce}$ = %.2f ms'%((float(time1d)-float(bounce_time))*1e3))
+                
+            else: ax.set_title('$t$ = %.2f ms'%(float(time1d)*1e3))
                 
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
             ax.set_xlim(xlim)
-            ax.set_ylim(ylim)
-            ax.set_title('$t_{1d}=$%.2f ms'%(float(time1d)*1e3))
+            ax.set_ylim(ylim)              
+            
+            self.sim_label(ax)
 
             plt.legend(loc=loc)
             plt.tight_layout()

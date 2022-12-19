@@ -19,37 +19,42 @@ def main():
     size = comm.Get_size()
     rank = comm.Get_rank()    
     
-    suffix = '_g9k_c8.4k_p_0.3k'
+    suffixs = ['_g9k_c8.4k_p0.3k_1.3P','_g9k_c8.4k_p0.3k_1.3P','_g10k_c9.4k_p0.3k_1.3P']
     masses = [#11.0,]
               12.0,#13.0,14.0,15.0,
-              16.0,]#17.0,18.0]#,19.0,20.0]
+              16.0,
+              19.0]#17.0,18.0]#,19.0,20.0]
     #enclosed_mass_cutoff = [1.5 for i in range(len(masses))]
     #enclosed_mass_cutoff = [1.31,1.31,1.33,1.35,1.35,1.37,1.37,1.35,1.37,1.39]
     #enclosed_mass_cutoff = [1.4,1.42,1.46,1.46,1.46,1.46,1.47,1.48,1.49,1.5]
     enclosed_mass_cutoff = [#1.48,
                             1.49,#1.61,1.61,1.52,
-                            1.55,]#1.57,1.55]#,1.63,1.8]
+                            1.55,
+                            1.63
+                            ]#1.57,1.55]#,1.63,1.8]
     # failed: 15,16,17,18,19,20
     #enclosed_mass_cutoff = [1.3,1.3] # for 9.0 and 10.0
     #pns_cutoff     = [i-0.15 for i in enclosed_mass_cutoff]     
     #pns_cutoff[-1]-= 0.10
     pns_cutoff     = [1.25 for i in enclosed_mass_cutoff]
+    pns_cutoff[-1] = 1.345
+    
     pns_grid_goal  = 300
-    conv_grid_goal = 8400
-    grid_goal      = 9000
-    maxrad         = 1.5e9 # 1e9 for 9.0 and 10.0
+    conv_grid_goals = [8400,8400,9400]
+    grid_goals      = [9000,9000,10000]
+    maxrads         = [1.5e9,1.5e9,2e9] # 1e9 for 9.0 and 10.0 #2e9 for 19.0
     dataset        = 'sukhbold2016'
     base_path      = '/home/pkarpov/runs'
-    output_path    = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned'
+    output_path    = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/boost_1.3P'
     eos_table_path = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5'
     mlmodel        = 'None'
     read_dump      = 0
     dump_interval  = 5e-4
-    restart        = True
+    restart        = False#True
     
-    mr = multirun(suffix,masses,enclosed_mass_cutoff,pns_cutoff,
+    mr = multirun(suffixs,masses,enclosed_mass_cutoff,pns_cutoff,
                   dataset,base_path,output_path,eos_table_path,
-                  pns_grid_goal, conv_grid_goal, grid_goal,maxrad, 
+                  pns_grid_goal, conv_grid_goals, grid_goals,maxrads, 
                   mlmodel, read_dump, dump_interval, restart)
     
     if rank == 0:        
@@ -60,7 +65,7 @@ def main():
     
     comm.Barrier()
     
-    mr.run_name = f's{mr.masses[rank]}{mr.suffix}'
+    mr.run_name = f's{mr.masses[rank]}{mr.suffixs[rank]}'
     mr.run_path = f'{mr.base_path}/{mr.run_name}'
     mr.sim_path = f'{mr.run_path}/project/1dmlmix'
     mr.full_output_path = f'{mr.output_path}/{mr.run_name}'
@@ -68,14 +73,14 @@ def main():
     mr.run(rank)
     
 class multirun:
-    def __init__(self, suffix, masses, enclmass_conv_cutoff,pns_cutoff,
+    def __init__(self, suffixs, masses, enclmass_conv_cutoff,pns_cutoff,
                  dataset,base_path, output_path, eos_table_path, 
-                 pns_grid_goal, conv_grid_goal, grid_goal,
-                 maxrad=5e9, mlmodel='None',
+                 pns_grid_goal, conv_grid_goals, grid_goals,
+                 maxrads, mlmodel='None',
                  read_dump=0, dump_interval=1e-3, restart=False,
                  data_names=None, maxtime=0.5):
         
-        self.suffix         = suffix
+        self.suffixs         = suffixs
         self.masses         = masses
         self.enclmass_conv_cutoff = enclmass_conv_cutoff
         self.pns_cutoff     = pns_cutoff
@@ -83,14 +88,14 @@ class multirun:
         self.base_path      = base_path
         self.output_path    = output_path
         self.data_names     = data_names
-        self.template_path  = f'{self.base_path}/template'
+        self.template_path  = f'{self.base_path}/template_boost_P'
         self.data_path      = self.template_path#f'{self.base_path}/template'#produce_data'
         self.eos_table_path = eos_table_path
-        self.maxrad         = maxrad
+        self.maxrads         = maxrads
         self.mlmodel        = mlmodel
         self.pns_grid_goal  = pns_grid_goal
-        self.conv_grid_goal = conv_grid_goal
-        self.grid_goal      = grid_goal
+        self.conv_grid_goals = conv_grid_goals
+        self.grid_goals      = grid_goals
         self.read_dump      = read_dump
         self.dump_interval  = dump_interval
         self.maxtime        = maxtime
@@ -142,6 +147,11 @@ class multirun:
             self.mass          = self.masses[i]
             self.enclmass_conv = self.enclmass_conv_cutoff[i]
             self.enclmass_pns  = self.pns_cutoff[i]
+                                        
+            self.conv_grid_goal = self.conv_grid_goals[i]
+            self.grid_goal      = self.grid_goals[i]
+            self.maxrad         = self.maxrads[i]
+            self.suffix         = self.suffixs[i]
             
             if self.data_names != None: self.data_in = self.data_names[i]
             
