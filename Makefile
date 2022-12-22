@@ -1,43 +1,43 @@
 #If 'cmake' is not found automatically, enter its location manually below
-CMAKE_PREFIX_PATH:=$(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
-#CMAKE_PREFIX_PATH:=/home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
+CMAKE_PREFIX_PATH := $(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
+# CMAKE_PREFIX_PATH := /home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
 
-HDF5PATH=/home/pkarpov/Downloads/hdf5-1.12.2/hdf5/lib
-HDF5INCS=-I/home/pkarpov/Downloads/hdf5-1.12.2/hdf5/include
+HDF5PATH = /home/pkarpov/Downloads/hdf5-1.12.2/hdf5/lib
+HDF5INCS = -I/home/pkarpov/Downloads/hdf5-1.12.2/hdf5/include
 
 # if using default gfortran
-# HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
-# HDF5INCS=-I/usr/include/hdf5/serial
+# HDF5PATH = /usr/lib/x86_64-linux-gnu/hdf5/serial
+# HDF5INCS = -I/usr/include/hdf5/serial
 
-CONFIG:=Debug
-OPENACC:=0
-COMPILER:=ifort
-# COMPILER:=gfortran
+CONFIG	 := Debug
+OPENACC	 := 0
+COMPILER := ifort
+# COMPILER := gfortran
 
 # List CUDA compute capabilities
-# TORCH_CUDA_ARCH_LIST:=7.0
+# TORCH_CUDA_ARCH_LIST := 7.0
 
-WORKDIR:=$(shell pwd -P)
-INST:=$(WORKDIR)/install
-PROJECT_NAME:=1dmlmix
-PROJECT_DIR:=$(WORKDIR)/project
-EXAMPLES_DIR:=$(WORKDIR)/examples
-DATA_DIR:=$(WORKDIR)/prep_data
-DATA_FILE:=$(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup_prep)
-EOSDRIVER_DIR:=EOSdriver
+WORKDIR		  := $(shell pwd -P)
+INST		  := $(WORKDIR)/install
+PROJECT_NAME  := 1dmlmix
+PROJECT_DIR	  := $(WORKDIR)/project
+EXAMPLES_DIR  := $(WORKDIR)/examples
+DATA_DIR	  := $(WORKDIR)/prep_data
+DATA_FILE	  := $(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup_prep)
+EOSDRIVER_DIR := EOSdriver
 
 # --- for eos tables ---
-F90_FILES=eosmodule.F90 readtable.F90 nuc_eos.F90 bisection.F90 findtemp.F90 findrho.F90 linterp_many.F90
-F_FILES=linterp.f
+F90_FILES = eosmodule.F90 readtable.F90 nuc_eos.F90 bisection.F90 findtemp.F90 findrho.F90 linterp_many.F90
+F_FILES   = linterp.f
 
-SOURCES=$(foreach F90_FILES,$(F90_FILES),$(EOSDRIVER_DIR)/$(F90_FILES))
-FSOURCES=$(foreach F_FILES,$(F_FILES),$(EOSDRIVER_DIR)/$(F_FILES))
+SOURCES   = $(foreach F90_FILES,$(F90_FILES),$(EOSDRIVER_DIR)/$(F90_FILES))
+FSOURCES  = $(foreach F_FILES,$(F_FILES),$(EOSDRIVER_DIR)/$(F_FILES))
 
-OBJECTS=$(SOURCES:.F90=.o)
-FOBJECTS=$(FSOURCES:.f=.o)
+OBJECTS   = $(SOURCES:.F90=.o)
+FOBJECTS  = $(FSOURCES:.f=.o)
 
-F90FLAGS= -O3 -g
-LDFLAGS= -O3 -g
+F90FLAGS  = -O3 -g
+LDFLAGS   = -O3 -g
 # --- end eos table ---
 
 .PHONY: all project examples data eos test clean_eos clean
@@ -125,9 +125,9 @@ $(FOBJECTS): %.o: %.f $(EXTRADEPS)
 	$(COMPILER) $(F90FLAGS) $(HDF5INCS) -c $< -o $@		
 
 # To run the compilation test on GitHub (do not touch!)
-test: HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
-test: HDF5INCS=-I/usr/include/hdf5/serial
-test: COMPILER=gfortran
+test: HDF5PATH = /usr/lib/x86_64-linux-gnu/hdf5/serial
+test: HDF5INCS = -I/usr/include/hdf5/serial
+test: COMPILER = gfortran
 test: create_build_dirs eos cpp_wrappers fort_bindings fort_project data readout
 
 clean_eos:
