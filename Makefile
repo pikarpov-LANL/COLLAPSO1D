@@ -2,29 +2,30 @@
 CMAKE_PREFIX_PATH := $(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
 # CMAKE_PREFIX_PATH := /home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
 
-HDF5PATH = /home/pkarpov/Downloads/hdf5-1.12.2/hdf5/lib
-HDF5INCS = -I/home/pkarpov/Downloads/hdf5-1.12.2/hdf5/include
-
-# if using default gfortran
-# HDF5PATH = /usr/lib/x86_64-linux-gnu/hdf5/serial
+# if using default `gfortran`
+# HDF5PATH =   /usr/lib/x86_64-linux-gnu/hdf5/serial
 # HDF5INCS = -I/usr/include/hdf5/serial
+# COMPILER = gfortran
 
-CONFIG	 := Debug
-OPENACC	 := 0
-COMPILER := ifort
-# COMPILER := gfortran
+# if using 'ifort'
+HDF5PATH =   /home/$(USER)/Downloads/hdf5-1.12.2/hdf5/lib
+HDF5INCS = -I/home/$(USER)/Downloads/hdf5-1.12.2/hdf5/include
+COMPILER = ifort
 
 # List CUDA compute capabilities
 # TORCH_CUDA_ARCH_LIST := 7.0
 
-WORKDIR		  := $(shell pwd -P)
-INST		  := $(WORKDIR)/install
-PROJECT_NAME  := 1dmlmix
-PROJECT_DIR	  := $(WORKDIR)/project
-EXAMPLES_DIR  := $(WORKDIR)/examples
-DATA_DIR	  := $(WORKDIR)/prep_data
-DATA_FILE	  := $(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup_prep)
-EOSDRIVER_DIR := EOSdriver
+CONFIG	 	  = Debug
+OPENACC	 	  = 0
+
+PROJECT_NAME  = 1dmlmix
+WORKDIR		  = $(shell pwd -P)
+PROJECT_DIR	  = $(WORKDIR)/project
+INST		  = $(WORKDIR)/install
+EXAMPLES_DIR  = $(WORKDIR)/examples
+EOSDRIVER_DIR = $(WORKDIR)/EOSdriver
+DATA_DIR	  = $(WORKDIR)/prep_data
+DATA_FILE	  = $(shell awk '/Output File/{getline; print}' $(DATA_DIR)/setup_prep)
 
 # --- for eos tables ---
 F90_FILES = eosmodule.F90 readtable.F90 nuc_eos.F90 bisection.F90 findtemp.F90 findrho.F90 linterp_many.F90
@@ -43,7 +44,6 @@ LDFLAGS   = -O3 -g
 .PHONY: all project examples data eos test clean_eos clean
 
 all:
-	@echo "in all" $(COMPILER)
 	make create_build_dirs
 	make eos
 	make cpp_wrappers
@@ -57,7 +57,6 @@ create_build_dirs:
 	mkdir -p build/proxy build/fortproxy build/projectproxy
 
 cpp_wrappers:	
-	@echo INST $(INST)
 	cd build/proxy && \
 	pwd && \
 	cmake -DCMAKE_INSTALL_PREFIX=$(INST) -DCMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) $(WORKDIR)/src/proxy_lib && \
