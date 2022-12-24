@@ -17,6 +17,7 @@
 import os
 import sys
 import time
+import shutil
 from subprocess import Popen, PIPE
 from mpi4py import MPI
 
@@ -33,20 +34,20 @@ def main():
     vals             = [
                         'rho', 
                         'v',
-                        'P',
-                        'T',
-                        'encm',
-                        'vsound',
-                        'ye',
-                        'mach',
+                        # 'P',
+                        # 'T',
+                        # 'encm',
+                        # 'vsound',
+                        # 'ye',
+                        # 'mach',
                         'entropy',
                        ]        
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
     # masses           = [11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] # for 1.5k and 2k 
     # masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0] # for g9k
-    # masses           = [13.0,15.0] # for ye
-    masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
+    masses           = [13.0,15.0] # for ye
+    # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
 
     # --- Paths & Names ---        
     base            = 'g9k_c8.4k_p0.3k'    
@@ -56,8 +57,8 @@ def main():
     # base            = 'g4k_c3k_p0.3k'        
     
     # end             = ''
-    # end             = 'ye'
-    end             = '1.3P'
+    end             = 'ye'
+    # end             = '1.3P'
 
     datasets        = [f's{m}_{base}_{end}' for m in masses]
            
@@ -73,7 +74,7 @@ def main():
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = True   # convert binary to readable (really only needed to be done once) 
+    convert2read     = False#True   # convert binary to readable (really only needed to be done once) 
     only_last        = True   # only convert from the latest binary file (e.g., latest *_restart_*)
     only_post_bounce = True   # only produce plots after the bounce    
     
@@ -95,24 +96,49 @@ def main():
     # --- MPI setup ---
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
-    rank = comm.Get_rank()        
-    
+    rank = comm.Get_rank()    
+        
+    # convert datasets in parallel
+    if convert2read and len(datasets)>1:
+        if rank == 0:
+            colored.head('<<< Converting Binary to Readable >>>')
+            if only_last: print(f'Only Last: {only_last}')
+            interval = get_interval(size, len(datasets))
+                        
+            for i in range(size): 
+                rd = Readout(i, base_path, None, base_file, readout_path, only_last)    
+                rd.copy_readout()
+                
+        else: interval = 0   
+        
+        interval = comm.scatter(interval, root=0)
+        if rank < len(datasets): print(f'Rank',f'{rank}'.ljust(2, ' '),f'got {datasets[interval[0]:interval[1]]}')
+        if rank == 0: time.sleep(0.1); print()
+        
+        for i in range(interval[0], interval[1]):  
+            dataset  = datasets[i]                                                            
+            rd       = Readout(rank, base_path, dataset, base_file, readout_path, only_last)
+            numfiles = rd.run_readable()
+            
+        comm.Barrier()
+        time.sleep(0.1)
+        
+        if rank == 0: rd.clean(); print()
+                          
+    # calculate metrics and produce plots
     for dataset in datasets:
         
         # --- Create initial assignment ---
         if rank == 0:                              
-            print(f'<<<<<<<<< {dataset} >>>>>>>>>')
+            colored.head(f'<<<<<<<<< {dataset} >>>>>>>>>')
             
             numfiles = get_numfiles(base_path, dataset, base_file)
             
-            if convert2read: 
-                rd       = Readout(base_path, dataset, base_file, readout_path, only_last)
-                numfiles = rd.run_readable()
-            elif numfiles==0: print('ERROR: no readable files found; try setting convert2read = True'); comm.Abort()
+            if numfiles==0: colored.error('ERROR: no readable files found; try setting convert2read = True'); comm.Abort()
 
             #numfiles = 8941            
 
-            print( '\n--------- Summary ---------')
+            colored.subhead('--------- Summary ---------')
             print(f'Total number of files:  {numfiles}') 
             
             last_file = numfiles 
@@ -125,27 +151,18 @@ def main():
             #shift = 8000
             #numfiles = numfiles-shift   
                      
-            if only_post_bounce:                     
-                bounce_files = pf.check_bounce(compute=compute)
+            if only_post_bounce:       
+                bounce_files = pf.check_bounce(compute=False)                
                 bounce_shift = pf.bounce_ind
                 numfiles     = bounce_files
-                #shift        = bounce_shift + bounce_files-numfiles
+                # shift        = bounce_shift + bounce_files-numfiles
             
                 print(f'Bounce at file:         {bounce_shift+1}')
                 print(f'Post bounce files:      {bounce_files}')
-            
-            interval_size = int(numfiles/size)
-            leftover      = numfiles%size
-            
-            print(f'Average interval size:  {interval_size}')
-            print(f'Leftover to distribute: {leftover}')
-            print( '\n-------- Intervals --------')
-
-            interval = np.array([[i*interval_size,i*interval_size+interval_size] for i in range(size)])
-            
-            if leftover != 0: interval = spread_leftovers(interval, leftover, size)
-            
-            
+                        
+            colored.subhead( '\n-------- Intervals --------')
+            interval = get_interval(size, numfiles)                                  
+                        
             if only_post_bounce: interval+=bounce_shift
             #interval+=shift
             
@@ -167,11 +184,11 @@ def main():
         
         pf.bounce_ind = comm.bcast(bounce_shift, root=0)
 
-        print(f'rank {rank}, interval {interval}')
+        print('rank',f'{rank}'.ljust(2, ' '),f': interval {interval}')
 
         comm.Barrier()
         time.sleep(0.1)
-        if rank == 0: print( '\n-------- Progress ---------', flush=True)
+        if rank == 0: colored.subhead( '\n-------- Progress ---------')
 
         # --- Main Parallel Loop ---
         for i in range(interval[0], interval[1]):  
@@ -184,7 +201,7 @@ def main():
                             rho_threshold = rho_threshold
                            )     
 
-        pf.progress_bar(i+1, 'Done!', done = True)   
+        pf.progress_bar(i+1, 'Done!', done = True)           
 
         gather_pns_ind    = comm.gather(pf.pns_ind_ar,    root=0)
         gather_pns_x      = comm.gather(pf.pns_x_ar,      root=0)
@@ -196,9 +213,9 @@ def main():
         gather_shell      = comm.gather(pf.shell_ar,      root=0)
         gather_time       = comm.gather(pf.time_ar,       root=0)        
         
-        # --- Back to Rank 0 to produce Summary Plots & Movies ---
+        # --- Back to Rank 0 to produce Summary Plots ---
         if rank == 0: 
-            print( '\n--------- Plot Path --------', flush=True)
+            colored.subhead( '\n----------- Plots ----------')
             print(f'{pf.base_save_path}\n') 
                     
             pf.pns_ind_ar    = sum(gather_pns_ind)
@@ -217,16 +234,53 @@ def main():
             ax = pf.plot_convection()
             ax = pf.plot_lumnue()
             ax = pf.plot_pns_shock()
-            ax = pf.plot_shells()
-                    
-            if make_movies:
-                print( '\n---------- Movies ----------')
-                print(f'{pf.movie_save_path}\n')                
-                for val in vals: pf.movie(val,versus=versus,fps=fps)
-                 
-            print(f'<<<<<<<<<<< Done >>>>>>>>>>>\n')                
+            ax = pf.plot_shells()            
+        
+        # --- Movies are produced in parallel ---            
+        if make_movies:            
+            if rank == 0: 
+                colored.subhead('\n---------- Movies ----------')
+                print(f'{pf.movie_save_path}\n')     
+                interval = get_interval(size, len(vals), printout=False)
+            else: interval = 0
+            
+            interval = comm.scatter(interval, root=0)
+                           
+            for i in range(interval[0], interval[1]):                 
+                val = vals[i]
+                pf.movie(val,versus=versus,fps=fps)
+
+        comm.Barrier()
+        time.sleep(0.1)
+                        
+        if rank == 0: colored.head(f'<<<<<<<<<<< Done >>>>>>>>>>>\n')                
 
 # === Backend ===============================================
+
+def get_interval(size, numfiles, printout=True):
+    
+    idle = 0
+    if size > numfiles:
+        idle = size - numfiles
+        if printout: colored.warn(f'not enough work for all ranks - {idle} will idle during conversion\n')
+        size = numfiles
+    
+    interval_size = int(numfiles/size)
+    leftover      = numfiles%size
+    
+    if printout:
+        print(f'Average interval size:  {interval_size}')
+        print(f'Leftover to distribute: {leftover}\n')    
+    
+    interval = np.array([[i*interval_size,i*interval_size+interval_size] for i in range(size)])
+    
+    if leftover != 0: interval = spread_leftovers(interval, leftover, size)
+    
+    if idle != 0:
+        while len(interval)<(size+idle):
+            interval = np.concatenate((interval, np.array([[0,0]])))
+    
+    return interval
                         
 def spread_leftovers(interval, leftover, size):    
     shift = 0
@@ -242,35 +296,59 @@ def get_numfiles(base_path, dataset, base_file):
     numfiles = len([filename for filename in os.listdir(f'{base_path}{dataset}') if base_file in filename])
     return numfiles
 
+class colored:
+    RED    = '\033[31m'
+    GREEN  = '\033[32m'
+    YELLOW = '\033[33m'
+    ORANGE = '\033[34m'
+    PURPLE = '\033[35m' 
+    CYAN   = "\033[36m"
+    RESET  = "\033[0m"
+    
+    @classmethod
+    def head(cls, message): print(cls.CYAN+f"{message}"+cls.RESET) 
+    
+    @classmethod
+    def subhead(cls, message): print(cls.PURPLE+f"{message}"+cls.RESET)   
+    
+    @classmethod
+    def warn(cls, message): print(cls.YELLOW+f"WARNING: {message}"+cls.RESET)
+
+    @classmethod        
+    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+cls.RESET)
+
 class Readout:
-    def __init__(self, base_path, dataset, base_file, readout_path, only_last=False):
+    def __init__(self, rank, base_path, dataset, base_file, readout_path, only_last=False):
+        self.rank             = rank
         self.base_path        = base_path
         self.dataset          = dataset
-        self.readout_path     = readout_path
+        self.readout_path     = readout_path                
         self.base_file        = base_file
         self.only_last        = only_last
-        self.full_output_path = f'{self.base_path}{self.dataset}'
+        self.cwd              = os.getcwd()
+        self.tmp_path         = f'{self.cwd}/tmp/{self.rank}'        
+        self.full_output_path = f'{self.base_path}{self.dataset}'        
 
     def run_readable(self):
-        print( '---- Converting Binary ----')
+        # print( '---- Converting Binary ----')
         
         for outfile in self.get_all_outfiles():
     
-            self.status(outfile, done=False)                                
+            # self.status(outfile, done=False)                                
+                        
             self.setup_readout(outfile)
-            
-            cwd = os.getcwd()
-            os.chdir(self.readout_path)
+                        
+            os.chdir(self.tmp_path)
             
             p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
             output = p.stdout.read()
             p.stdout.close()
             
-            os.chdir(cwd)
+            os.chdir(self.cwd)
             
-            self.status(outfile, done=True)
+            # self.status(outfile, done=True)
             
-        print(f'\nFiles are now readable for {self.dataset}!')
+        print(f'Rank',f'{self.rank}'.ljust(2, ' '),f'converted {self.dataset}: {outfile}')
                         
         return get_numfiles(self.base_path, self.dataset, self.base_file)
     
@@ -282,10 +360,15 @@ class Readout:
                 last_num   = max([int(filename.split('_')[-1]) for filename in outfiles])            
                 return [f"DataOut_restart_{last_num}"]
         return outfiles
+
+    def copy_readout(self):
+        if not os.path.exists(self.tmp_path): os.makedirs(self.tmp_path)
+        shutil.copy(f'{self.readout_path}/readout', f'{self.tmp_path}/readout')
+        shutil.copy(f'{self.readout_path}/setup_readout', f'{self.tmp_path}/setup_readout')            
         
-    def setup_readout(self, outfile):    
-                        
-        filepath = f'{self.readout_path}/setup_readout'
+    def setup_readout(self, outfile):                          
+                     
+        filepath = f'{self.tmp_path}/setup_readout'
         
         # Edit setup         
         with open(filepath, 'r') as file:    
@@ -314,6 +397,9 @@ class Readout:
         
         if done: print(f'{msg} done', end=ending)
         else: print(f'{msg}', end=ending) 
+        
+    def clean(self):
+        shutil.rmtree(f'{self.cwd}/tmp/')
                 
    
 class ComputeRoutines:
@@ -441,7 +527,9 @@ class Profiles:
 
         ending = '\n' if done == True else '\r'
 
-        print(f'rank {self.rank}: [{arrow}{padding}] {current}/{lastfile}, val: {val}{padding_val}', end=ending) 
+        print('rank',f'{self.rank}'.ljust(2, ' '),
+              f': [{arrow}{padding}] {current}/{lastfile}, val: {val}{padding_val}', 
+              end=ending) 
 
     def set_paths(self, val, versus, check_path=False):
         self.plot_path = f'{self.base_save_path}{val}'
@@ -456,37 +544,67 @@ class Profiles:
 
     def check_bounce(self, compute=False):     
         self.bounce_ind = -1
-        bounced = 0           
-        for i in range(self.numfiles):
-            file   = f'{self.base_file}.{i+1}'
-            file1d = f'{self.base_path}{self.dataset}/{file}' 
-                      
-            with open(file1d, "r") as file:
-                line        = file.readline()        
-                header_vals = file.readline()
-                vals_strip  = header_vals[:-1].split(' ')        
-                try: time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
-                except: time1d, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']
+        bounced         = 0
+        bounce_delay    = 2e-3 # [ms]
+        
+        # if compute, then the bounce time is unknown: 
+        # need to go through each file from the beginning
+        if compute:                                     
+            for i in range(self.numfiles):
                 
-            pns_ind = int(pns_ind)-1              
-            
-            if compute: 
-
-                ps = np.genfromtxt(file1d, skip_header=3)                
-                ps = np.moveaxis(ps,0,1) 
+                ps, time1d, bounce_time = self.open_checkpoint(i, fullout=False)
+                                 
                 rho = ps[3]
+                
+                # check for nuclear density
                 if np.amax(rho) > 2e14:
                     if bounced==0: bounced = time1d 
-                    if (time1d-bounced) > 2e-3:
+                    if (time1d-bounced) > bounce_delay:
                         self.bounce_ind = i
                         return self.numfiles - self.bounce_ind 
-                     
-            elif shock_ind > 0: 
-                self.bounce_ind = i
-                return self.numfiles - self.bounce_ind
-                                                                                
-        print("WARNING: Bounce has not been found :(")
+                        
+                if bounce_time > 0: 
+                    self.bounce_ind = i
+                    return self.numfiles - self.bounce_ind
+        
+        # otherwise grab the bounce time from the last checkpoint 
+        # and calculate bounce index from nearby
+        else:                        
+            ps, time1d_last, bounce_time = self.open_checkpoint(self.numfiles-1, fullout=False)                        
+            if bounce_time == 0.0: colored.warn('Bounce has not occured yet'); return -1            
+            ps, time1d, dummy = self.open_checkpoint(self.numfiles-2, fullout=False)
+            
+            dt              = time1d_last-time1d
+            anchor_index    = int(bounce_time/dt)+1
+            self.bounce_ind = anchor_index             
+            
+            for i in range(anchor_index,0,-1):
+                ps, time1d, bounce_time = self.open_checkpoint(i, fullout=False)
+                if bounce_time != 0.0: self.bounce_ind = i
+                else: return self.numfiles - self.bounce_ind                                 
+                                                                                    
+        colored.warn('Bounce has not been found :(')
         return -1
+    
+    def open_checkpoint(self, i, fullout=True):
+        file   = f'{self.base_file}.{i+1}'
+        file1d = f'{self.base_path}{self.dataset}/{file}' 
+            
+        with open(file1d, "r") as file:
+            line = file.readline()        
+            header_vals = file.readline()
+            vals_strip  = header_vals[:-1].split(' ')        
+            try: time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
+            except: time1d, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']            
+
+        pns_ind   = int(pns_ind)-1
+        shock_ind = int(shock_ind)-1
+                    
+        ps = np.genfromtxt(file1d, skip_header=3)
+        ps = np.moveaxis(ps,0,1)
+                
+        if fullout: return ps,time1d,bounce_time,pns_ind,pns_x,shock_ind,shock_x,rlumnue
+        else: return ps,time1d,bounce_time
     
     def save_evolution(self):
         evolution_path = f'{self.base_save_path}{self.save_name_amend}evolution.txt'        
@@ -573,7 +691,7 @@ class Profiles:
                               show_plot  = show_plot,
                               bounce_lim = True)    
         
-        print(f'Convection : {self.save_name_amend}convgrid.png')
+        print(f'Convection  : {self.save_name_amend}convgrid.png')
                             
         return ax
     
@@ -593,7 +711,7 @@ class Profiles:
                               plot_style = 'semilogy',
                               bounce_lim = True) 
         
-        print(f'lumnue     : {self.save_name_amend}lumnue{name_amend}.png')
+        print(f'lumnue      : {self.save_name_amend}lumnue{name_amend}.png')
                  
         return ax   
     
@@ -616,7 +734,7 @@ class Profiles:
                               show_plot = show_plot,
                               label     = labels)  
         
-        print(f'pns_shock  : {self.save_name_amend}pns_shock.png')    
+        print(f'pns_shock   : {self.save_name_amend}pns_shock.png')    
                                
         return ax  
     
@@ -656,7 +774,7 @@ class Profiles:
                               marker    = '',
                               linewidth = 2.5)                 
         
-        print(f'mass_shells: {self.save_name_amend}mass_shells.png')    
+        print(f'mass_shells : {self.save_name_amend}mass_shells.png')    
                                     
         return ax
               
@@ -664,28 +782,13 @@ class Profiles:
     def plot_profile(self, i, vals, versus,
                      show_plot=False, save_plot=False, 
                      compute=False, rho_threshold = 2e11):
-        file = f'{self.base_file}.{i+1}'
-        file1d = f'{self.base_path}{self.dataset}/{file}'                        
-
-        with open(file1d, "r") as file:
-            line = file.readline()        
-            header_vals = file.readline()
-            vals_strip  = header_vals[:-1].split(' ')        
-            try: time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
-            except: time1d, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']        
-            self.lumnue[i] = rlumnue
-            self.times[i]  = time1d    
-            #print(file.readline())
-            
-        pns_ind   = int(pns_ind)-1
-        shock_ind = int(shock_ind)-1
-                        
-        #print('Time %.2f ms'%(float(time1d)*1e3))
-
-        ps = np.genfromtxt(file1d, skip_header=3)
-        ps = np.moveaxis(ps,0,1)    
         
-        #print('rank, shape', self.rank, i, ps.shape)
+        ps,time1d,bounce_time,pns_ind,pns_x,shock_ind,shock_x,rlumnue = self.open_checkpoint(i)
+
+        self.lumnue[i] = rlumnue
+        self.times[i]  = time1d    
+                        
+        #print('Time %.2f ms'%(float(time1d)*1e3)) 
         
         # Columns in the readable files:
         # Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s]  Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s] 
@@ -700,6 +803,8 @@ class Profiles:
         try: vsound  = ps[8]
         except: vsound = np.ones(v.shape)
         s       = ps[9] #entropy
+        try: pturb  = ps[10]
+        except: pturb = np.zeros(v.shape)
                 
         # Print out enclosed mass at 200km without plotting anything
         # if i == self.numfiles-1:         
@@ -728,7 +833,7 @@ class Profiles:
                 xlim      = None
                 plot_type = 'plot'
                 unit      = 1
-            else: print("ERROR: unknown 'versus' {versus}, trying to exit"); sys.exit()
+            else: colored.error("unknown 'versus' {versus}, trying to exit")
             
             if val == 'rho': 
                 y      = rho
@@ -785,7 +890,7 @@ class Profiles:
                 ylabel = r'Entropy $[k_b/baryon]$'
                 ylim   = None
                 loc    = 4                            
-            else: sys.exit(f"ERROR: unknown val {val}, trying to exit")            
+            else: colored.error(f"unknown val {val}, trying to exit")            
 
             ax = line_plot([[x*unit, y],],
                             #[ps[2,:504]*1e0, ps[ps_ind,:504]],
@@ -887,9 +992,7 @@ class Profiles:
         name = f'{self.plot_file}{self.save_name_amend}'
         
         movie_name = f'{self.movie_save_path}{val}{self.versus_name}{self.save_name_amend}'
-        if not os.path.exists(self.movie_save_path): os.makedirs(self.movie_save_path)
-            
-        print(f'{val}{padding_val}: {val}{self.versus_name}{self.save_name_amend}{name_amend}.mp4')
+        if not os.path.exists(self.movie_save_path): os.makedirs(self.movie_save_path)                    
         
         result = Popen(['ffmpeg', '-r', f'{fps}', '-start_number', f'{start}',
                         '-i', f'{name}_%d.png', 
@@ -898,6 +1001,9 @@ class Profiles:
         
         output, error = result.communicate()
         if printout: print(output, error)  
+        
+        print(f'{val}{padding_val}: {val}{self.versus_name}{self.save_name_amend}{name_amend}.mp4')
+        
         return    
     
 if __name__=='__main__':
