@@ -41,8 +41,26 @@ class multirun:
         self.maxtime         = maxtime
         self.restart         = restart
         
+    def setup_pars(self, i):
+        self.mass          = self.masses[i]
+        self.enclmass_conv = self.enclmass_conv_cutoff[i]
+        self.enclmass_pns  = self.pns_cutoff[i]
+
+        self.pns_grid_goal  = self.pns_grid_goals[i]                                        
+        self.conv_grid_goal = self.conv_grid_goals[i]
+        self.grid_goal      = self.grid_goals[i]
+        self.maxrad         = self.maxrads[i]
+        self.suffix         = self.suffixs[i]
+        
+        if self.data_names != None: self.data_in = self.data_names[i]
+        
+        self.run_name         = f's{self.mass}{self.suffix}'
+        self.run_path         = f'{self.base_path}/{self.run_name}'
+        self.full_output_path = f'{self.output_path}/{self.run_name}'   
+             
     def run(self, rank):                     
-                    
+        
+        if rank == 0: colored.head('\n<<<<<<<< Running Simulations >>>>>>>>')   
         # run 'make project'
         os.chdir(f'{self.run_path}')
 
@@ -71,58 +89,65 @@ class multirun:
         while not os.path.isfile('1dmlmix'):
             time.sleep(1)
             counter += 1
-            if counter == 120: sys.exit("ERROR: executable '1dmlmix' not found (waited 2 mins).")
-        print(f'rank {rank} compiled project {self.run_name}; running...')
+            if counter == 120: colored.error("executable '1dmlmix' not found (waited 2 mins)")
+        print(f'rank {rank} prepared {self.run_name}; running...')
         
         p = Popen(f'time ./1dmlmix > {stdout} 2> {stderr}', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output = p.stdout.read()
         p.stdout.close()
-        print('--------------------------------------------')
-        print(f'rank {rank} finished running {self.run_name}')
-        print('--------------------------------------------')
+        
+        colored.subhead('--------------------------------------------')
+        colored.subhead(f'rank {rank} finished running {self.run_name}')
+        colored.subhead('--------------------------------------------')
         
             
-    def initialize(self):
-        for i in range(len(self.masses)):
-            self.mass          = self.masses[i]
-            self.enclmass_conv = self.enclmass_conv_cutoff[i]
-            self.enclmass_pns  = self.pns_cutoff[i]
-
-            self.pns_grid_goal  = self.pns_grid_goals[i]                                        
-            self.conv_grid_goal = self.conv_grid_goals[i]
-            self.grid_goal      = self.grid_goals[i]
-            self.maxrad         = self.maxrads[i]
-            self.suffix         = self.suffixs[i]
-            
-            if self.data_names != None: self.data_in = self.data_names[i]
-            
-            self.run_name         = f's{self.mass}{self.suffix}'
-            self.run_path         = f'{self.base_path}/{self.run_name}'
-            self.full_output_path = f'{self.output_path}/{self.run_name}'
-                                
-            print(f'---------------- {self.run_name} ---------------')
-            
-            print(f'Mass:                   {self.mass}')
-            print(f'Enclosed PNS  Cutoff:   {self.enclmass_pns}')
-            print(f'Enclosed Conv Cutoff:   {self.enclmass_conv}')                                                    
+    def initialize(self, rank):
+        
+        if self.restart:
+            # Restarts in parallel utilizing all given ranks
+            if rank == 0: colored.head('<<< Converting Binary to Readable >>>') 
+            self.setup_pars(rank)            
+            self.find_last_dump()
+            self.setup()
+            self.setup_readout()
+            print(f'Rank',f'{rank}'.ljust(2, ' '),
+                  f'{self.run_name} restarts from dump: {self.read_dump}')
+        else:
+            # Initializes all fresh runs in serial
+            for i in range(len(self.masses)):
+                self.setup_pars(i)
+                                    
+                colored.subhead(f'--- {self.run_name} ---')
+                
+                if os.path.exists(self.full_output_path): 
+                    valid_input = False
+                    yes, no     = ['y', 'yes'], ['n', 'no']
+                    while not valid_input:
+                        overwrite = input("Output exists. Overwrite? [Y/N]")
+                        if overwrite.lower() in yes+no: valid_input = True
+                        else: print(f"Invalid input: '{overwrite}'")
                         
-            if self.restart: 
-                self.find_last_dump()
-                print(f'Restart from dump:      {self.read_dump}')
-            else:
+                    if overwrite.lower() in no: 
+                        colored.warn(f'Aborted: {self.run_name}')
+                        continue
+                
+                print(f'Mass:                   {self.mass}')
+                print(f'Enclosed PNS  Cutoff:   {self.enclmass_pns}')
+                print(f'Enclosed Conv Cutoff:   {self.enclmass_conv}')                                                    
+                            
                 # check if run_folder exists; create and copy template if not            
                 # also prep data and copy it to the run folder
                 if self.data_names==None: self.data_in = 'Data'
                 self.prep_data()                
                 self.data_out = f'{self.full_output_path}/DataOut'
-            
-            # edit 'setup' to include unique output path
-            self.setup()
-            
-            # edit 'setup_readout' to include unique output path
-            self.setup_readout()     
-            
-        print('--------- Initialization Completed ---------')                                       
+                
+                # edit 'setup' to include unique output path
+                self.setup()
+                
+                # edit 'setup_readout' to include unique output path
+                self.setup_readout()     
+                                                
+            colored.head('<<<< Initialization Completed >>>>')                           
 
     def prep_data(self):
         
@@ -208,7 +233,7 @@ class multirun:
             input_name = "DataOut"             
             
         next_num  = last_num + 1
-                
+                        
         read      = Readout(self.run_path, self.full_output_path,
                             base_file = 'DataOut_read', outfile=input_name)
         last_dump = read.run_readable()
@@ -277,7 +302,9 @@ class Readout:
         self.setup_readout()
         
         os.chdir(f'{self.sim_path}')
-                
+        
+        if not os.path.isfile('readout'): colored.error("readout executable doesn't exist")
+        
         p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output = p.stdout.read()
         p.stdout.close()
@@ -308,3 +335,24 @@ class Readout:
     def write_data(self, filepath, data):
         with open(filepath, 'w') as file:   
             file.writelines(data)
+            
+class colored:
+    RED    = '\033[31m'
+    GREEN  = '\033[32m'
+    YELLOW = '\033[33m'
+    ORANGE = '\033[34m'
+    PURPLE = '\033[35m' 
+    CYAN   = "\033[36m"
+    RESET  = "\033[0m"
+    
+    @classmethod
+    def head(cls, message): print(cls.CYAN+f"{message}"+cls.RESET) 
+    
+    @classmethod
+    def subhead(cls, message): print(cls.PURPLE+f"{message}"+cls.RESET)   
+    
+    @classmethod
+    def warn(cls, message): print(cls.YELLOW+f"WARNING: {message}"+cls.RESET)
+
+    @classmethod        
+    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+cls.RESET)            

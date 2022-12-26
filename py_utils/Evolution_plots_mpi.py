@@ -34,36 +34,37 @@ def main():
     vals             = [
                         'rho', 
                         'v',
-                        # 'P',
-                        # 'T',
-                        # 'encm',
-                        # 'vsound',
-                        # 'ye',
-                        # 'mach',
+                        'P',
+                        'T',
+                        'encm',
+                        'vsound',
+                        'ye',
+                        'mach',
                         'entropy',
                        ]        
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
     # masses           = [11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] # for 1.5k and 2k 
-    # masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0] # for g9k
-    masses           = [13.0,15.0] # for ye
+    masses           = [12.0]#,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k
+    # masses           = [13.0,15.0] # for ye
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
 
     # --- Paths & Names ---        
-    base            = 'g9k_c8.4k_p0.3k'    
+    base            = 'g9k_c8.4k_p_0.3k'
+    # base            = 'g9k_c8.4k_p0.3k'
     # base            = 'g1.5k_c0.5k_p0.3k'
     # base            = 'g2k_c1k_p0.3k'    
     # base            = 'g6k_c5k_p0.3k'
     # base            = 'g4k_c3k_p0.3k'        
     
-    # end             = ''
-    end             = 'ye'
-    # end             = '1.3P'
+    end             = ''
+    # end             = '_ye'
+    # end             = '_1.3P'
 
-    datasets        = [f's{m}_{base}_{end}' for m in masses]
+    datasets        = [f's{m}_{base}{end}' for m in masses]
            
     if 19.0 in masses and 'g9k' in base:
-        datasets[masses.index(19.0)] = f's19.0_g10k_c9.4k_p0.3k_{end}'
+        datasets[masses.index(19.0)] = f's19.0_g10k_c9.4k_p0.3k{end}'
         
     if   end == ''    : base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/'#test_extrema/'
     elif end == '1.3P': base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/boost_1.3P/'
@@ -296,27 +297,6 @@ def get_numfiles(base_path, dataset, base_file):
     numfiles = len([filename for filename in os.listdir(f'{base_path}{dataset}') if base_file in filename])
     return numfiles
 
-class colored:
-    RED    = '\033[31m'
-    GREEN  = '\033[32m'
-    YELLOW = '\033[33m'
-    ORANGE = '\033[34m'
-    PURPLE = '\033[35m' 
-    CYAN   = "\033[36m"
-    RESET  = "\033[0m"
-    
-    @classmethod
-    def head(cls, message): print(cls.CYAN+f"{message}"+cls.RESET) 
-    
-    @classmethod
-    def subhead(cls, message): print(cls.PURPLE+f"{message}"+cls.RESET)   
-    
-    @classmethod
-    def warn(cls, message): print(cls.YELLOW+f"WARNING: {message}"+cls.RESET)
-
-    @classmethod        
-    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+cls.RESET)
-
 class Readout:
     def __init__(self, rank, base_path, dataset, base_file, readout_path, only_last=False):
         self.rank             = rank
@@ -348,7 +328,7 @@ class Readout:
             
             # self.status(outfile, done=True)
             
-        print(f'Rank',f'{self.rank}'.ljust(2, ' '),f'converted {self.dataset}: {outfile}')
+            print(f'Rank',f'{self.rank}'.ljust(2, ' '),f'converted {self.dataset}: {outfile}')
                         
         return get_numfiles(self.base_path, self.dataset, self.base_file)
     
@@ -431,17 +411,17 @@ class ComputeRoutines:
             
         #     dv_old = dv
         
-        # interval = 3
+        interval = 100
         
-        # if old_shock_ind == -1:                        
-        #     self.shock_ind = np.argmin(self.v)
-        #     self.shock_x   = self.x[self.shock_ind]
-        # else:
-        #     self.shock_ind = np.argmin(self.v[old_shock_ind-interval:old_shock_ind+interval])+(old_shock_ind-interval)
-        #     self.shock_x   = self.x[self.shock_ind]        
+        if old_shock_ind == -1:                        
+            self.shock_ind = np.argmin(self.v)
+            self.shock_x   = self.x[self.shock_ind]
+        else:
+            self.shock_ind = np.argmin(self.v[old_shock_ind-interval:old_shock_ind+interval])+(old_shock_ind-interval)
+            self.shock_x   = self.x[self.shock_ind]        
         
-        self.shock_ind = bump+np.argmin(self.v[bump:])
-        self.shock_x   = self.x[self.shock_ind]
+        # self.shock_ind = bump+np.argmin(self.v[bump:])
+        # self.shock_x   = self.x[self.shock_ind]
                 
         # mach = abs(self.v/self.vsound)
         # mach_threshold = np.amax(mach)/2
@@ -908,6 +888,7 @@ class Profiles:
                     rt = ComputeRoutines(x, rho=rho, v=v, vsound=vsound)
                                      
                     if self.dataset=='s12.0_g1.5k_c0.5k_p0.3k' and i<=650: self.old_shock_ind = -1
+                    elif self.dataset=='s12.0_g9k_c8.4k_p_0.3k' and i<=670: self.old_shock_ind = -1
                     shock_ind, shock_x = rt.shock_radius(bump          = self.shock_region.get(i+1,0), 
                                                          old_shock_ind = self.old_shock_ind)
                     pns_ind,   pns_x   = rt.pns_radius(rho_threshold = rho_threshold)   
@@ -1005,6 +986,27 @@ class Profiles:
         print(f'{val}{padding_val}: {val}{self.versus_name}{self.save_name_amend}{name_amend}.mp4')
         
         return    
+    
+class colored:
+    RED    = '\033[31m'
+    GREEN  = '\033[32m'
+    YELLOW = '\033[33m'
+    ORANGE = '\033[34m'
+    PURPLE = '\033[35m' 
+    CYAN   = "\033[36m"
+    RESET  = "\033[0m"
+    
+    @classmethod
+    def head(cls, message): print(cls.CYAN+f"{message}"+cls.RESET) 
+    
+    @classmethod
+    def subhead(cls, message): print(cls.PURPLE+f"{message}"+cls.RESET)   
+    
+    @classmethod
+    def warn(cls, message): print(cls.YELLOW+f"WARNING: {message}"+cls.RESET)
+
+    @classmethod        
+    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+cls.RESET)    
     
 if __name__=='__main__':
     main()

@@ -15,37 +15,20 @@ def main():
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
     rank = comm.Get_rank()    
-        
-    masses = [#11.0,]
-              12.0,13.0,14.0,15.0,
-              16.0,17.0,18.0,19.0]#,20.0]
-    #enclosed_mass_cutoff = [1.5 for i in range(len(masses))]
-    #enclosed_mass_cutoff = [1.31,1.31,1.33,1.35,1.35,1.37,1.37,1.35,1.37,1.39]
-    #enclosed_mass_cutoff = [1.4,1.42,1.46,1.46,1.46,1.46,1.47,1.48,1.49,1.5]
-    enclosed_mass_cutoff = [#1.48,
-                            1.49,1.61,1.61,1.52,
-                            1.55,1.57,1.55,1.63]#,1.8]
-    # failed: 15,16,17,18,19,20
-    #enclosed_mass_cutoff = [1.3,1.3] # for 9.0 and 10.0
-    #pns_cutoff     = [i-0.15 for i in enclosed_mass_cutoff]     
-    #pns_cutoff[-1]-= 0.10
-    pns_cutoff      = [1.25 for i in masses]
-    pns_grid_goals  = [300 for i in masses]
-    conv_grid_goals = [8400 for i in masses]
-    grid_goals      = [9000 for i in masses]
-    maxrads         = [1.5e9 for i in masses] # 1e9 for 9.0 and 10.0
-    suffixs         = ['_g9k_c8.4k_p_0.3k' for i in masses]
     
-    # for 19.0 at 10k
-    conv_grid_goals[-1] = 9400
-    grid_goals[-1]      = 10000
-    maxrads[-1]         = 2.0e9
-    suffixs[-1]         = '_g10k_c9.4k_p0.3k'
+    suffixs              = ['_g9k_c8.4k_p0.3k_ye','_g9k_c8.4k_p0.3k_ye']#,'_g10k_c9.4k_p0.3k_1.3P']
+    masses               = [13.0,15.0]
+    enclosed_mass_cutoff = [1.61,1.52]
     
+    pns_cutoff      = [1.25 for i in masses]    
+    pns_grid_goal   = [300 for i in masses]
+    conv_grid_goals = [8400,8400,9000]
+    grid_goals      = [9000,9000,10000]
+    maxrads         = [1.5e9,1.5e9,2e9] # 1e9 for 9.0 and 10.0 #2e9 for 19.0
     dataset         = 'sukhbold2016'
-    base_path       = '/home/pkarpov/runs'
-    template_path   = f'{base_path}/template'
-    output_path     = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned'
+    base_path       = '/home/pkarpov/runs/ye'
+    template_path   = f'{base_path}/template_Ye'
+    output_path     = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/ye'
     eos_table_path  = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5'
     mlmodel         = 'None'
     read_dump       = 0
@@ -54,7 +37,7 @@ def main():
     
     mr = multirun(suffixs,masses,enclosed_mass_cutoff,pns_cutoff,
                   dataset,base_path,template_path,output_path,eos_table_path,
-                  pns_grid_goals, conv_grid_goals, grid_goals,maxrads, 
+                  pns_grid_goal, conv_grid_goals, grid_goals,maxrads, 
                   mlmodel, read_dump, dump_interval, restart)
     
     if rank == 0:        
@@ -73,7 +56,7 @@ def main():
     mr.sim_path         = f'{mr.run_path}/project/1dmlmix'
     mr.full_output_path = f'{mr.output_path}/{mr.run_name}'
 
-    mr.run(rank)               
+    mr.run(rank)              
         
 if __name__ == '__main__':
     main()
