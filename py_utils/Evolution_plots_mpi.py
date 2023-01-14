@@ -32,33 +32,34 @@ def main():
     
     # --- Datasets and values to plot ---        
     vals             = [
-                        'rho', 
+                        # 'rho', 
                         'v',
-                        'P',
-                        'T',
-                        'encm',
-                        'vsound',
                         'ye',
-                        'mach',
-                        'entropy',
+                        # 'P',
+                        # 'T',
+                        # 'encm',
+                        # 'vsound',
+                        # 'mach',
+                        # 'entropy',
                        ]        
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
     # masses           = [11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] # for 1.5k and 2k 
-    masses           = [12.0]#,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k
+    masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k
     # masses           = [13.0,15.0] # for ye
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
 
     # --- Paths & Names ---        
-    base            = 'g9k_c8.4k_p_0.3k'
+    # base            = 'g9k_c8.4k_p_0.3k'
     # base            = 'g9k_c8.4k_p0.3k'
     # base            = 'g1.5k_c0.5k_p0.3k'
-    # base            = 'g2k_c1k_p0.3k'    
+    base            = 'g2k_c1k_p0.3k'    
     # base            = 'g6k_c5k_p0.3k'
     # base            = 'g4k_c3k_p0.3k'        
     
     end             = ''
     # end             = '_ye'
+    # end             = '_ye_rcrit'
     # end             = '_1.3P'
 
     datasets        = [f's{m}_{base}{end}' for m in masses]
@@ -66,21 +67,23 @@ def main():
     if 19.0 in masses and 'g9k' in base:
         datasets[masses.index(19.0)] = f's19.0_g10k_c9.4k_p0.3k{end}'
         
-    if   end == ''    : base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/'#test_extrema/'
-    elif end == '1.3P': base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/boost_1.3P/'
-    elif end == 'ye'  : base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/ye/'
+    if   end == ''     : base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit/'#test_extrema/'
+    elif end == '_1.3P': 
+        # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/boost_1.3P/'
+        base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit/'#test_extrema/'
+    elif '_ye' in end  : base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/ye/'
     #base_path        = '/home/pkarpov/scratch/1dccsn/sleos/funiek/'
     #base_path        = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
     base_file        = f'DataOut_read'
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = False#True   # convert binary to readable (really only needed to be done once) 
+    convert2read     = True   # convert binary to readable (really only needed to be done once) 
     only_last        = True   # only convert from the latest binary file (e.g., latest *_restart_*)
     only_post_bounce = True   # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
-    compute          = True
+    compute          = False#True
     rho_threshold    = 1e13    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
 
     # --- Plots & Movie Parameters ---
@@ -135,7 +138,7 @@ def main():
             
             numfiles = get_numfiles(base_path, dataset, base_file)
             
-            if numfiles==0: colored.error('ERROR: no readable files found; try setting convert2read = True'); comm.Abort()
+            if numfiles==0: colored.error('No readable files found; try setting convert2read = True'); comm.Abort()
 
             #numfiles = 8941            
 
@@ -153,37 +156,42 @@ def main():
             #numfiles = numfiles-shift   
                      
             if only_post_bounce:       
-                bounce_files = pf.check_bounce(compute=False)                
-                bounce_shift = pf.bounce_ind
+                bounce_files = pf.check_bounce(compute=False)         
+                shift        = pf.bounce_ind
                 numfiles     = bounce_files
                 # shift        = bounce_shift + bounce_files-numfiles
             
-                print(f'Bounce at file:         {bounce_shift+1}')
+                print(f'Bounce at file:         {shift+1}')
                 print(f'Post bounce files:      {bounce_files}')
+            else:
+                shift = get_first_dump(base_path, dataset, base_file)
+                numfiles -=1
                         
             colored.subhead( '\n-------- Intervals --------')
             interval = get_interval(size, numfiles)                                  
                         
-            if only_post_bounce: interval+=bounce_shift
-            #interval+=shift
+            interval+=shift
             
             # creates (if needed) directories to store all plots
             if save_plot: [pf.set_paths(val, versus, check_path=True) for val in vals]
             
+            # TODO: this needs to be nicer
+            numfiles += shift
+            last_file = numfiles
         else:
             last_file    = 0
             interval     = 0   
-            bounce_shift = 0   
+            shift        = 0   
         #continue
         numfiles = comm.bcast(last_file, root=0)
         interval = comm.scatter(interval, root=0)                
 
         pf = Profiles(rank = rank, numfiles = numfiles, 
                       base_path = base_path, base_file = base_file, dataset = dataset,
-                      save_name_amend=save_name_amend, only_post_bounce = only_post_bounce,                    
+                      save_name_amend=save_name_amend, only_post_bounce = only_post_bounce, 
                       interval = interval, dpi = dpi)
         
-        pf.bounce_ind = comm.bcast(bounce_shift, root=0)
+        pf.bounce_ind = comm.bcast(shift, root=0)
 
         print('rank',f'{rank}'.ljust(2, ' '),f': interval {interval}')
 
@@ -228,7 +236,7 @@ def main():
             pf.lumnue        = sum(gather_lumnue)  
             pf.shell_ar      = sum(gather_shell)
             pf.time_ar       = sum(gather_time)          
-            pf.bounce_ind    = bounce_shift
+            pf.bounce_ind    = shift
             
             pf.save_evolution()
             
@@ -241,6 +249,7 @@ def main():
         if make_movies:            
             if rank == 0: 
                 colored.subhead('\n---------- Movies ----------')
+                if not os.path.exists(pf.movie_save_path): os.makedirs(pf.movie_save_path)
                 print(f'{pf.movie_save_path}\n')     
                 interval = get_interval(size, len(vals), printout=False)
             else: interval = 0
@@ -249,7 +258,10 @@ def main():
                            
             for i in range(interval[0], interval[1]):                 
                 val = vals[i]
-                pf.movie(val,versus=versus,fps=fps)
+                if val == 'encm' and versus == 'encm': continue
+                if shift != 0: start=shift
+                else: start = 1
+                pf.movie(val,versus=versus,fps=fps,start=start)
 
         comm.Barrier()
         time.sleep(0.1)
@@ -297,6 +309,12 @@ def get_numfiles(base_path, dataset, base_file):
     numfiles = len([filename for filename in os.listdir(f'{base_path}{dataset}') if base_file in filename])
     return numfiles
 
+def get_first_dump(base_path, dataset, base_file):
+    alldumps = [filename for filename in os.listdir(f'{base_path}{dataset}') if base_file in filename]
+    alldumps = [int(filename.split('.')[-1]) for filename in alldumps]
+
+    return min(alldumps) 
+
 class Readout:
     def __init__(self, rank, base_path, dataset, base_file, readout_path, only_last=False):
         self.rank             = rank
@@ -335,8 +353,10 @@ class Readout:
     def get_all_outfiles(self):
         outfiles = [filename for filename in os.listdir(f'{self.base_path}{self.dataset}') if ("restart" in filename or filename=='DataOut')]
         if self.only_last:
-            if any("restart" in file for file in outfiles):     
-                outfiles.remove('DataOut')       
+            if any("restart" in file for file in outfiles):   
+                to_remove = 'DataOut'  
+                try: outfiles.remove(f'{to_remove}')       
+                except: colored.warn(f"No '{to_remove}', only '_restart_'")
                 last_num   = max([int(filename.split('_')[-1]) for filename in outfiles])            
                 return [f"DataOut_restart_{last_num}"]
         return outfiles
@@ -411,17 +431,17 @@ class ComputeRoutines:
             
         #     dv_old = dv
         
-        interval = 100
+        # interval = 100
         
-        if old_shock_ind == -1:                        
-            self.shock_ind = np.argmin(self.v)
-            self.shock_x   = self.x[self.shock_ind]
-        else:
-            self.shock_ind = np.argmin(self.v[old_shock_ind-interval:old_shock_ind+interval])+(old_shock_ind-interval)
-            self.shock_x   = self.x[self.shock_ind]        
+        # if old_shock_ind == -1:                        
+        #     self.shock_ind = np.argmin(self.v)
+        #     self.shock_x   = self.x[self.shock_ind]
+        # else:
+        #     self.shock_ind = np.argmin(self.v[old_shock_ind-interval:old_shock_ind+interval])+(old_shock_ind-interval)
+        #     self.shock_x   = self.x[self.shock_ind]        
         
-        # self.shock_ind = bump+np.argmin(self.v[bump:])
-        # self.shock_x   = self.x[self.shock_ind]
+        self.shock_ind = bump+np.argmin(self.v[bump:])
+        self.shock_x   = self.x[self.shock_ind]
                 
         # mach = abs(self.v/self.vsound)
         # mach_threshold = np.amax(mach)/2
@@ -782,7 +802,7 @@ class Profiles:
         T       = ps[7]
         try: vsound  = ps[8]
         except: vsound = np.ones(v.shape)
-        s       = ps[9] #entropy
+        s       = ps[9] #entropy        
         try: pturb  = ps[10]
         except: pturb = np.zeros(v.shape)
                 
@@ -796,6 +816,7 @@ class Profiles:
                     
         for val in vals:
             if versus=='encm':
+                if val == 'encm': continue
                 x         = encm
                 xlabel    = r'$M_{enc} \; [M_{\odot}]$'
                 xlim      = (0,3) #or (0,4)
@@ -961,7 +982,7 @@ class Profiles:
             if self.rank == 0: self.progress_bar(i+1, val, done = done)          
         return
     
-    def movie(self, val, versus='r', fps=15, start=0, printout=False):      
+    def movie(self, val, versus='r', fps=15, start=1, printout=False):      
         self.set_paths(val,versus)
         padding_val = int(8-len(val)) * ' '
         
@@ -972,13 +993,11 @@ class Profiles:
             
         name = f'{self.plot_file}{self.save_name_amend}'
         
-        movie_name = f'{self.movie_save_path}{val}{self.versus_name}{self.save_name_amend}'
-        if not os.path.exists(self.movie_save_path): os.makedirs(self.movie_save_path)                    
-        
-        result = Popen(['ffmpeg', '-r', f'{fps}', '-start_number', f'{start}',
-                        '-i', f'{name}_%d.png', 
-                        '-vcodec', 'libx264', f'{movie_name}{name_amend}.mp4', '-y'],
-                        stdin=PIPE, stdout=PIPE, stderr=PIPE)   
+        movie_name = f'{self.movie_save_path}{val}{self.versus_name}{self.save_name_amend}'                        
+
+        result = Popen((f'ffmpeg -r {fps} -start_number {start} -i {name}_%d.png'+
+                        f' -vcodec libx264 {movie_name}{name_amend}.mp4 -y'),
+                        shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)           
         
         output, error = result.communicate()
         if printout: print(output, error)  

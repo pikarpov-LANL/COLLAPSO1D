@@ -56,25 +56,20 @@ class multirun:
         
         self.run_name         = f's{self.mass}{self.suffix}'
         self.run_path         = f'{self.base_path}/{self.run_name}'
-        self.full_output_path = f'{self.output_path}/{self.run_name}'   
+        self.full_output_path = f'{self.output_path}/{self.run_name}'  
              
     def run(self, rank):                     
         
         if rank == 0: colored.head('\n<<<<<<<< Running Simulations >>>>>>>>')   
-        # run 'make project'
         os.chdir(f'{self.run_path}')
 
         if not self.restart:
             
             print(f'Rank {rank}: Compiling...')   
             
-            p = Popen('make eos', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            output = p.stdout.read()
-            p.stdout.close()
-            
-            p = Popen('make project', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            output = p.stdout.read()
-            p.stdout.close()        
+            cmd.popen('make clean')    
+            cmd.popen('make eos')            
+            cmd.popen('make project')      
                 
         # run the simulation
         os.chdir(self.sim_path)
@@ -92,9 +87,7 @@ class multirun:
             if counter == 120: colored.error("executable '1dmlmix' not found (waited 2 mins)")
         print(f'rank {rank} prepared {self.run_name}; running...')
         
-        p = Popen(f'time ./1dmlmix > {stdout} 2> {stderr}', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        output = p.stdout.read()
-        p.stdout.close()
+        cmd.popen(f'time ./1dmlmix > {stdout} 2> {stderr}')        
         
         colored.subhead('--------------------------------------------')
         colored.subhead(f'rank {rank} finished running {self.run_name}')
@@ -119,7 +112,7 @@ class multirun:
                                     
                 colored.subhead(f'--- {self.run_name} ---')
                 
-                if os.path.exists(self.full_output_path): 
+                if len(os.listdir(self.full_output_path)) != 0:
                     valid_input = False
                     yes, no     = ['y', 'yes'], ['n', 'no']
                     while not valid_input:
@@ -184,36 +177,36 @@ class multirun:
         os.chdir(self.data_path)
         
         if not os.path.exists(f'{self.data_path}/prep_data/eosmodule.mod'):
-            p = Popen('make eos', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            output = p.stdout.read()
-            p.stdout.close()            
+            cmd.popen('make eos')
         
-        p = Popen('make data', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        output = p.stdout.read()
-        p.stdout.close()
-        
-        p = Popen('make clean', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        output = p.stdout.read()
-        p.stdout.close()
+        cmd.popen('make data')        
+        cmd.popen('make clean')
         
         print('Data prepared')
 
     def edit_copy_template(self):     
         if not os.path.exists(self.run_path): 
             # Edit Makefile
-            run_project_dir = f'PROJECT_DIR:={self.run_path}/project\n'
-            filepath = f'{self.data_path}/Makefile' 
-            with open(filepath, 'r') as file:    
-                data = file.readlines()            
-                for i, line in enumerate(data):                
-                    if 'PROJECT_DIR:=' in line:
-                        data[i] = run_project_dir
+            #run_project_dir = f'PROJECT_DIR:={self.run_path}/project\n'
+            # filepath = f'{self.data_path}/Makefile' 
+            # with open(filepath, 'r') as file:    
+            #     data = file.readlines()            
+            #     for i, line in enumerate(data):                
+            #         # if 'PROJECT_DIR:=' in line:
+            #         #     data[i] = run_project_dir
+            #         if 'HDF5PATH =' in line:
+            #             data[i] = 'HDF5PATH =   /home/$(USER)/Downloads/hdf5-1.12.2/hdf5/lib'
+            #         elif 'HDF5INCS =' in line:
+            #             data[i] = 'HDF5INCS = -I/home/$(USER)/Downloads/hdf5-1.12.2/hdf5/include'
+            #         elif 'COMPILER =' in line:
+            #             data[i] = 'COMPILER = ifort'
                     
-            self.write_data(filepath, data)
+            # self.write_data(filepath, data)
             
-            shutil.copytree(self.template_path, self.run_path, ignore = shutil.ignore_patterns("*presn*", '.git', 'docs', 
-                                                                                               'mkdocs', 'examples', 'legacy',
-                                                                                               'papers'))
+            shutil.copytree(self.template_path, self.run_path, 
+                            ignore = shutil.ignore_patterns('*presn*', '.git', 'docs', 
+                                                            'mkdocs', 'examples', 'legacy',
+                                                            'papers'))
             
     def check_path(self, path):
         if not os.path.exists(path):
@@ -225,6 +218,7 @@ class multirun:
             
     def find_last_dump(self):
         outfiles = [filename for filename in os.listdir(f'{self.full_output_path}') if "restart" in filename]
+
         if any("restart" in file for file in outfiles):             
             last_num   = max([int(filename.split('_')[-1]) for filename in outfiles])            
             input_name = f"DataOut_restart_{last_num}" 
@@ -233,7 +227,7 @@ class multirun:
             input_name = "DataOut"             
             
         next_num  = last_num + 1
-                        
+        
         read      = Readout(self.run_path, self.full_output_path,
                             base_file = 'DataOut_read', outfile=input_name)
         last_dump = read.run_readable()
@@ -299,15 +293,18 @@ class Readout:
 
     def run_readable(self):
         
-        self.setup_readout()
+        self.setup_readout()        
         
+        if not os.path.isfile('readout'): 
+            colored.warn("readout executable doesn't exist; creating...")
+            
+            os.chdir(f'{self.run_path}')
+            
+            cmd.popen('make readout')
+            
         os.chdir(f'{self.sim_path}')
         
-        if not os.path.isfile('readout'): colored.error("readout executable doesn't exist")
-        
-        p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        output = p.stdout.read()
-        p.stdout.close()
+        cmd.popen('./readout')
 
         return self.get_lastdump()
     
@@ -335,6 +332,7 @@ class Readout:
     def write_data(self, filepath, data):
         with open(filepath, 'w') as file:   
             file.writelines(data)
+        
             
 class colored:
     RED    = '\033[31m'
@@ -355,4 +353,14 @@ class colored:
     def warn(cls, message): print(cls.YELLOW+f"WARNING: {message}"+cls.RESET)
 
     @classmethod        
-    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+cls.RESET)            
+    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+cls.RESET)     
+    
+    
+class cmd:
+    
+    @classmethod
+    def popen(cls, process):
+        p = Popen(f'{process}', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        output = p.stdout.read()
+        p.stdout.close()
+    
