@@ -48,7 +48,8 @@ all:
 	make eos
 	make cpp_wrappers
 	make fort_bindings
-	make fort_project	
+	make fort_project
+	make eos_data	
 	make data
 	make readout
 	@echo "=== Compilation Successful ==="
@@ -96,7 +97,10 @@ examples:
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(EXAMPLES_DIR)/$${f}; done
 	@echo "=== Prepared examples ==="
 
-data:
+data: HDF5PATH = /usr/lib/x86_64-linux-gnu/hdf5/serial
+data: HDF5INCS = -I/usr/include/hdf5/serial
+data: COMPILER = gfortran
+data: eos_data
 	@echo "=== Using prep_data/setup ==="
 	cd prep_data && \
 	$(COMPILER) -std=legacy prep_data.f90 nuc_eos.a -L$(HDF5PATH) -lhdf5_fortran -lhdf5 -o prep_data && \
@@ -108,14 +112,19 @@ readout:
 	cd ${PROJECT_DIR}/${PROJECT_NAME} && \
         gfortran -O readout.f90 -o readout
 
-eos: $(OBJECTS) $(FOBJECTS) 
+eos: clean_eos $(OBJECTS) $(FOBJECTS) 
 	ar r $(EOSDRIVER_DIR)/nuc_eos.a $(EOSDRIVER_DIR)/*.o 	
 	if [ -s  eosmodule.mod ]; then mv eosmodule.mod $(EOSDRIVER_DIR)/; fi	
 	cp $(EOSDRIVER_DIR)/nuc_eos.a $(PROJECT_DIR)
-	cp $(EOSDRIVER_DIR)/nuc_eos.a $(DATA_DIR)
 	cp $(EOSDRIVER_DIR)/eosmodule.mod $(PROJECT_DIR)/$(PROJECT_NAME)
-	cp $(EOSDRIVER_DIR)/eosmodule.mod $(DATA_DIR)
 	@echo "=== Compiled EOS Tables ==="
+
+eos_data: clean_eos $(OBJECTS) $(FOBJECTS)
+	ar r $(EOSDRIVER_DIR)/nuc_eos.a $(EOSDRIVER_DIR)/*.o 	
+	if [ -s  eosmodule.mod ]; then mv eosmodule.mod $(EOSDRIVER_DIR)/; fi	
+	cp $(EOSDRIVER_DIR)/nuc_eos.a $(DATA_DIR)
+	cp $(EOSDRIVER_DIR)/eosmodule.mod $(DATA_DIR)
+	@echo "=== Compiled EOS Tables with GFortran ==="	
 
 $(OBJECTS): %.o: %.F90 $(EXTRADEPS)
 	$(COMPILER) $(F90FLAGS) $(HDF5INCS) -c $< -o $@
@@ -135,6 +144,7 @@ clean_eos:
 clean:
 	rm -rf build/ install/ CMakeFiles/
 	rm -rf $(EOSDRIVER_DIR)/*.o $(EOSDRIVER_DIR)/*.mod $(EOSDRIVER_DIR)/*.a
+	rm -rf $(DATA_DIR)/*.mod
 	rm -rf $(PROJECT_DIR)/*.a $(PROJECT_DIR)/$(PROJECT_NAME)/*.mod
 	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/fort.* $(PROJECT_DIR)/$(PROJECT_NAME)/$(PROJECT_NAME)
 	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/*.so $(EXAMPLES_DIR)/*/*.so
