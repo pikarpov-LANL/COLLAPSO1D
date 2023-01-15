@@ -32,15 +32,15 @@ def main():
     
     # --- Datasets and values to plot ---        
     vals             = [
-                        # 'rho', 
+                        'rho', 
                         'v',
                         'ye',
-                        # 'P',
-                        # 'T',
-                        # 'encm',
-                        # 'vsound',
-                        # 'mach',
-                        # 'entropy',
+                        'P',
+                        'T',
+                        'encm',
+                        'vsound',
+                        'mach',
+                        'entropy',
                        ]        
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
@@ -108,26 +108,28 @@ def main():
             colored.head('<<< Converting Binary to Readable >>>')
             if only_last: print(f'Only Last: {only_last}')
             interval = get_interval(size, len(datasets))
-                        
-            for i in range(size): 
-                rd = Readout(i, base_path, None, base_file, readout_path, only_last)    
-                rd.copy_readout()
-                
-        else: interval = 0   
+                       
+            for i in range(size):
+                for j in range(interval[i][0], interval[i][1]):
+                    rd = Readout(i, base_path, datasets[j], base_file, readout_path, only_last)    
+                    rd.copy_readout()
+                                                
+        else: interval = 0                   
         
         interval = comm.scatter(interval, root=0)
         if rank < len(datasets): print(f'Rank',f'{rank}'.ljust(2, ' '),f'got {datasets[interval[0]:interval[1]]}')
         if rank == 0: time.sleep(0.1); print()
         
-        for i in range(interval[0], interval[1]):  
-            dataset  = datasets[i]                                                            
+        for j in range(interval[0], interval[1]):  
+            dataset  = datasets[j]                                                            
             rd       = Readout(rank, base_path, dataset, base_file, readout_path, only_last)
             numfiles = rd.run_readable()
             
         comm.Barrier()
         time.sleep(0.1)
         
-        if rank == 0: rd.clean(); print()
+        if rank == 0: 
+            rd.clean(); print()
                           
     # calculate metrics and produce plots
     for dataset in datasets:
@@ -330,12 +332,13 @@ class Readout:
     def run_readable(self):
         # print( '---- Converting Binary ----')
         
+        self.tmp_path += f'/{self.dataset}'
         for outfile in self.get_all_outfiles():
     
             # self.status(outfile, done=False)                                
                         
             self.setup_readout(outfile)
-                        
+                                                
             os.chdir(self.tmp_path)
             
             p = Popen('./readout', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
@@ -362,6 +365,7 @@ class Readout:
         return outfiles
 
     def copy_readout(self):
+        self.tmp_path += f'/{self.dataset}'
         if not os.path.exists(self.tmp_path): os.makedirs(self.tmp_path)
         shutil.copy(f'{self.readout_path}/readout', f'{self.tmp_path}/readout')
         shutil.copy(f'{self.readout_path}/setup_readout', f'{self.tmp_path}/setup_readout')            

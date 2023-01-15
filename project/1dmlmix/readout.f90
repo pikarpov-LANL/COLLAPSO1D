@@ -34,16 +34,16 @@
       character*32 dumpn 
       character(:), allocatable :: outname
       character*1024 infile 
-      integer iskip, ndump, idump
+      integer iskip, ndump, idump, idump_old
       logical from_dump
 !                                                                       
       double precision dm,press,enue,enueb,ks,ka,ksb,kab,ksx 
       
       utemp=1e9
       udist=1e9
-      utime=1.d1       
+      utime=1.d1           
       uergg=dble(udist)**2/dble(utime)**2 
-      sfrac= avokb*utemp/uergg                                                         
+      sfac =avokb*utemp/uergg                                                         
 !   
        if (command_argument_count() == 1) then
            print*, 'ERROR: Wrong number of arguments: [Input, Output, #Dumps]'
@@ -81,8 +81,9 @@
 !
       ibasenamelen = index(basename,' ')-1 
       nqn=17
+      idump_old = -1
 
-      do k=1,ndump   
+      do k=1,ndump  
          read(42) idump,nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,             &
                pns_ind,pns_x,shock_ind,shock_x,                          &
                bounce_time,from_dump,rlumnue,rlumnueb,rlumnux,           &
@@ -96,8 +97,12 @@
                (dj(i),i=1,nc),                                           &
                (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),            &
                (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),            &                  
-               (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)                
+               (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)               
 !        
+         if (idump.eq.idump_old) then            
+            stop "Repeated idump: probably reached the end of the file"
+         endif
+
          if (k.lt.40) then 
             imp=1 
 !         else                                                          
@@ -156,7 +161,8 @@
             write(69,*) 'Time [s]  Bounce_Time [s] R_PNS [index] R_PNS [cm] R_shock [index]  R_shock [cm] nu_e_flux [foe/s]'
             write(69,108)10.d0*t, 10.d0*bounce_time, int(pns_ind), 1.d9*pns_x, int(shock_ind), 1.d9*shock_x, 2.d-3*rlumnue            
             write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
-                        & Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s]  Entropy [kb/baryon]'            
+                        & Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s]  Entropy [kb/baryon] &
+                        & P_turb [g/cm/s^2]'            
             do i=1,nc 
 !               write(69,103)i,encm(i),x(i),rho(i),v(i),ye(i),          
 !     $           vsound(i)                                             
@@ -228,7 +234,8 @@
                      write(69,103)i,encm(i),1.d9*x(i),2.d6*rho(i),      &
 !                         1.d8*v(i),ye(i),1.d16*pr(i)!,                  &
                          1.d8*v(i), ye(i),2.d22*pr(i),                  &
-                         1.d9*temp(i), 1.d8*vsound(i), u2(i)/sfrac                                     
+                         1.d9*temp(i), 1.d8*vsound(i), u2(i)/sfac,     &
+                         2.d22*pr_turb(i)                                     
 !                  if (i.gt.1) then                                     
                      if (ufreez(i).lt.1.d-10) then 
                        dene2=dene2+                                     &
@@ -295,6 +302,7 @@
  !        print *, 'energy',dk/50.,dene/50. 
          deallocate(outname)
          print*, 'Dump: ', idump
+         idump_old = idump
       end do 
   103 format(I5,1pe12.4,1pe14.6,22(1pe12.4)) 
   105 format(1pe12.4,1pe14.6,7(1pe12.4)) 
