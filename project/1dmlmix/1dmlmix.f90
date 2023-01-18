@@ -895,7 +895,7 @@
       pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
                                                    mlin_grid_size,1,mlin_grid_size,           &
                                                    int(shock_ind-pns_ind))*scale_pr_relative
-      !pr_relative = 0.3
+      !pr_relative(pns_ind:shock_ind) = 0.3
       !print*, pr_relative(int(pns_ind):int(shock_ind))
       print*, 'pr_relative', maxval(pr_relative), size(pr_relative)
       pr_turb = pr_relative*pr
@@ -984,7 +984,7 @@
       logical :: print_nuloss
 !      
 !--g/cm^3 / unit conversion
-      rho_threshold = 1.d13/udens
+      rho_threshold = 1.d12/udens
 !
       do i=size(rho), 1, -1        
           if (rho(i) .ge. rho_threshold) then                        
@@ -2813,6 +2813,8 @@
 !                                                                       
       parameter (idim=10000) 
       parameter (tiny=1d-15) 
+
+      ! TODO: try lower rcrit to 0.1 or less to trap ~everything
       parameter (rcrit=1.) 
 !                                                                       
       dimension x(0:idim), ye(idim) 
@@ -2874,18 +2876,23 @@
 !-rnue usually set at 1.                                                
          if (rnue.lt.rcrit) then 
             trapnue(k)=.false. 
+            trapnueb(k)=.false.
          else 
             kountnue=kountnue+1 
             trapnue(k)=.true. 
             cmaxnue=dmax1(ak,cmaxnue) 
-         endif 
-         if (rnueb.lt.rcrit) then 
-            trapnueb(k)=.false. 
-         else 
+
             kountnueb=kountnueb+1 
             trapnueb(k)=.true. 
             cmaxnueb=dmax1(ak,cmaxnueb) 
          endif 
+        !  if (rnueb.lt.rcrit) then 
+        !    trapnueb(k)=.false. 
+        !  else 
+        !     kountnueb=kountnueb+1 
+        !     trapnueb(k)=.true. 
+        !     cmaxnueb=dmax1(ak,cmaxnueb) 
+        !  endif 
          if (rnux.lt.rcrit) then 
             trapnux(k)=.false. 
          else 
@@ -5853,6 +5860,7 @@
       common /idump/ idump
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
+      common /eosnu / prnu(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
       dimension uint(idim), s(idim) 
@@ -5893,7 +5901,7 @@
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
             (steps(i),i=1,nc),((ycc(i,j),j=1,iqn),i=1,nc),             &
-            (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
+            (vsound(i),i=1,nc),(pr_turb(i),i=1,nc),(prnu(i),i=1,nc)             
 !          (vturb2(i),i=1,nc),                                          &
 !                                  
       return 
@@ -6557,7 +6565,7 @@
   120    format((1pe12.5),6(1x,1pe10.2))
 !                                                                       
 !--start new time step                                                  
-!                        
+!            
          if(time.lt.tnext)then 
             !print *, '****time*****',time                              
   520       format(A,I12,A) 
