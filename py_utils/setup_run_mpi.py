@@ -112,17 +112,19 @@ class multirun:
                                     
                 colored.subhead(f'--- {self.run_name} ---')
                 
-                if len(os.listdir(self.full_output_path)) != 0:
-                    valid_input = False
-                    yes, no     = ['y', 'yes'], ['n', 'no']
-                    while not valid_input:
-                        overwrite = input("Output exists. Overwrite? [Y/N]")
-                        if overwrite.lower() in yes+no: valid_input = True
-                        else: print(f"Invalid input: '{overwrite}'")
-                        
-                    if overwrite.lower() in no: 
-                        colored.warn(f'Aborted: {self.run_name}')
-                        continue
+                if os.path.exists(self.full_output_path):
+                    if len(os.listdir(self.full_output_path)) != 0:
+                        print(self.full_output_path)
+                        valid_input = False
+                        yes, no     = ['y', 'yes'], ['n', 'no']
+                        while not valid_input:
+                            overwrite = input("Output exists. Overwrite? [Y/N]")
+                            if overwrite.lower() in yes+no: valid_input = True
+                            else: print(f"Invalid input: '{overwrite}'")
+                            
+                        if overwrite.lower() in no: 
+                            colored.warn(f'Aborted: {self.run_name}')
+                            continue
                 
                 print(f'Mass:                   {self.mass}')
                 print(f'Enclosed PNS  Cutoff:   {self.enclmass_pns}')
@@ -168,24 +170,24 @@ class multirun:
                 elif 'EOS Table Path' in line: 
                     data[i+1] = f'{self.eos_table_path}\n'                                                
                                                            
-        self.write_data(filepath, data)
-        
-        # check if run_folder exists; create and copy template if not
-        self.edit_copy_template()      
+        self.write_data(filepath, data)                      
         
         # run 'make data'
         os.chdir(self.data_path)
         
         if not os.path.exists(f'{self.data_path}/prep_data/eosmodule.mod'):
-            cmd.popen('make eos')
+            cmd.popen('make eos_data')
         
         cmd.popen('make data')        
         cmd.popen('make clean')
         
         print('Data prepared')
+        
+        # deletes run_folder if exists exists; create and copy template if not
+        self.edit_copy_template()
 
     def edit_copy_template(self):     
-        if not os.path.exists(self.run_path): 
+        # if not os.path.exists(self.run_path): 
             # Edit Makefile
             #run_project_dir = f'PROJECT_DIR:={self.run_path}/project\n'
             # filepath = f'{self.data_path}/Makefile' 
@@ -194,19 +196,16 @@ class multirun:
             #     for i, line in enumerate(data):                
             #         # if 'PROJECT_DIR:=' in line:
             #         #     data[i] = run_project_dir
-            #         if 'HDF5PATH =' in line:
-            #             data[i] = 'HDF5PATH =   /home/$(USER)/Downloads/hdf5-1.12.2/hdf5/lib'
-            #         elif 'HDF5INCS =' in line:
-            #             data[i] = 'HDF5INCS = -I/home/$(USER)/Downloads/hdf5-1.12.2/hdf5/include'
-            #         elif 'COMPILER =' in line:
-            #             data[i] = 'COMPILER = ifort'
                     
             # self.write_data(filepath, data)
             
-            shutil.copytree(self.template_path, self.run_path, 
-                            ignore = shutil.ignore_patterns('*presn*', '.git', 'docs', 
-                                                            'mkdocs', 'examples', 'legacy',
-                                                            'papers'))
+        if os.path.exists(self.run_path):
+            shutil.rmtree(self.run_path)         
+               
+        shutil.copytree(self.template_path, self.run_path, 
+                        ignore = shutil.ignore_patterns('*presn*', '.git', 'docs', 
+                                                        'mkdocs', 'examples', 'legacy',
+                                                        'papers'))
             
     def check_path(self, path):
         if not os.path.exists(path):
