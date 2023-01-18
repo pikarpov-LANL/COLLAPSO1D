@@ -1,7 +1,7 @@
 
 # EOS Tables
 
-COLLAPSO1D supports a EOS tables through the integrated [EOSdriver](https://github.com/evanoconnor/EOSdriver) by [Evan O'Connor](https://github.com/evanoconnor/EOSdriver). By default, the code is set up with [SFHo](http://adsabs.harvard.edu/abs/2012arXiv1207.2184S) tables in mind ([download link](https://su.drive.sunet.se/index.php/s/FQkikyGcRnHTZNL)). For a full list of supported tables, their format, and how they are interpolated upon read-in, please refer to Evan's [official website](https://github.com/evanoconnor/EOSdriver) and the corresponding GitHub repos. You will be able to download the formatted tables from there as well.
+COLLAPSO1D supports a EOS tables through the integrated [EOSdriver](https://github.com/evanoconnor/EOSdriver) by Evan O'Connor. By default, the code is set up with [SFHo](http://adsabs.harvard.edu/abs/2012arXiv1207.2184S) tables in mind ([download link](https://su.drive.sunet.se/index.php/s/FQkikyGcRnHTZNL)). For a full list of supported tables, their format, and how they are interpolated upon read-in, please refer to Evan's [official website](https://ttt.astro.su.se/~eoco/eos.html) and the corresponding GitHub repos. You will be able to download the formatted tables from there as well.
 
 ## Installation
 
