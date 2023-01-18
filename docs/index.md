@@ -1,17 +1,17 @@
 # Welcome
 
-COLLAPSO1D is a 1D lagrangian code for Core-Collapse Supernova (CCSN) modeling. For progenitors, it takes [KEPLER](https://2sn.org/kepler/doc/Introduction.html) generated data. Currently, there is support for [Heger & Woosley, 2000:](https://2sn.org/stellarevolution/) and [Sukhbold et al, 2016](https://arxiv.org/abs/1510.04643).
+COLLAPSO1D is a 1D lagrangian code for Core-Collapse Supernova (CCSN) modeling. For progenitors, it takes [KEPLER](https://2sn.org/kepler/doc/Introduction.html) generated data. Currently, there is support for [Heger & Woosley, 2000](https://2sn.org/stellarevolution/) and [Sukhbold et al, 2016](http://doi.org/10.17617/1.b).
 
-Turbulence is treated through Mixing-Length Theory (MLT) and Machine Learning (ML) based models. The latter has been trained using the [Sapsan](https://github.com/pikarpov-LANL/Sapsan) ML pipeline.
+Turbulence is treated through Machine Learning (ML) based models. The latter has been trained using the [Sapsan](https://github.com/pikarpov-LANL/Sapsan) ML pipeline.
 
 PyTorch is implemented based on [pytorch-fortran](https://github.com/alexeedm/pytorch-fortran).
 
 ---
 
 
-## Additional Notes
+<!-- ## Additional Notes
 
-Notes on ML subgrid turbulence model implementation within this code can be found on [Overleaf](https://www.overleaf.com/read/pgsnmxgdjkrq).
+Notes on ML subgrid turbulence model implementation within this code can be found on [Overleaf](https://www.overleaf.com/read/pgsnmxgdjkrq). -->
 
 
 ??? abstract "License"

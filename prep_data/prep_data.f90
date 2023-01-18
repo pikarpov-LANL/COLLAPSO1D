@@ -1,12 +1,14 @@
 program read 
-    !*********************************************************              
-    !                                                        *              
-    !  This program reads data from models constructed by    *              
-    !  Stan Woosley of Supernova precursors.                 *              
-    !  It then sets up a file that can be read by our        *              
-    !  1d supernova model.                                   *              
-    !                                                        *              
-    !*********************************************************              
+    !*************************************************************              
+    !                                                            *              
+    !  This program reads data from models constructed by        *              
+    !  Heger & Woosley, 2000 (https://2sn.org/stellarevolution/) *
+    !  and Sukhbold et al, 2016 (http://doi.org/10.17617/1.b)    * 
+    !  of Supernova pregenitors.                                 *              
+    !  It then sets up a binary file that can be read by         *
+    !  COLLAPSO1D, our 1d supernova model.                       *              
+    !                                                            *              
+    !*************************************************************              
     !                                                                             
           implicit double precision (a-h, o-z) 
     !                                                                       
@@ -205,24 +207,24 @@ program read
     !
     !--find the optimal deltam for the given convective region resolution      
     !
-    !       call search_deltam(nkep,yccin,vel,rad,dens,              &
-    !                          t9,yel,ab,omega,press,                &
-    !                          maxrad,deltam_growth,ieos,            &
-    !                          conv_grid,conv_grid_goal,             &
-    !                          enclmass_conv_cutoff,deltam_conv,     &
-    !                          pns_grid_goal,pns_cutoff,pns_grid)
-    ! !
-    ! !--Interpolate and setup the grid.
-    ! !--Growth rate past enclmass_conv_cutoff will keep  
-    ! !--adjusting via a binary-search-like algorithm until 
-    ! !--total grid size is within 1% of the idim
-    ! !     
-    !       call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
-    !                          t9,yel,ab,omega,press,                &
-    !                          maxrad,deltam_growth,ieos,            &
-    !                          conv_grid,enclmass_conv_cutoff,       &
-    !                          grid_goal,deltam_conv,                &
-    !                          pns_grid_goal,pns_cutoff,pns_grid)
+          call search_deltam(nkep,yccin,vel,rad,dens,              &
+                             t9,yel,ab,omega,press,                &
+                             maxrad,deltam_growth,ieos,            &
+                             conv_grid,conv_grid_goal,             &
+                             enclmass_conv_cutoff,deltam_conv,     &
+                             pns_grid_goal,pns_cutoff,pns_grid)
+    !
+    !--Interpolate and setup the grid.
+    !--Growth rate past enclmass_conv_cutoff will keep  
+    !--adjusting via a binary-search-like algorithm until 
+    !--total grid size is within 1% of the idim
+    !     
+          call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
+                             t9,yel,ab,omega,press,                &
+                             maxrad,deltam_growth,ieos,            &
+                             conv_grid,enclmass_conv_cutoff,       &
+                             grid_goal,deltam_conv,                &
+                             pns_grid_goal,pns_cutoff,pns_grid)
     
     !--if you want to avoid binary search and do the original grid setup
     !--comment the above 2 subroutine calls, and uncomment setup_grid() below
@@ -233,13 +235,15 @@ program read
         !                   conv_grid,enclmass_conv_cutoff,         &
         !                   deltam_conv,pns_grid_goal,pns_cutoff,pns_grid) 
           
-          ! resizable grid
-          call resizable_grid(nkep,yccin,vel,rad,dens,                &
-                          t9,yel,ab,omega,press,                  &
-                          maxrad,deltam_growth,ieos,              &
-                          conv_grid,enclmass_conv_cutoff,         &
-                          deltam_conv,pns_grid_goal,pns_cutoff,   &
-                          pns_grid,maxmass,conv_grid_goal,grid_goal)           
+        !   ! for resizable grid
+        !   ! deltam_conv stays constant from the setup - it doesn't vary
+        !   ! enclmass_conv_cutoff doesn't do anything
+        !   call resizable_grid(nkep,yccin,vel,rad,dens,                &
+        !                   t9,yel,ab,omega,press,                  &
+        !                   maxrad,deltam_growth,ieos,              &
+        !                   conv_grid,enclmass_conv_cutoff,         &
+        !                   deltam_conv,pns_grid_goal,pns_cutoff,   &
+        !                   pns_grid,maxmass,conv_grid_goal,grid_goal)           
 
       102 format(20(1pe9.2)) 
       103 format(3(1pe16.8)) 
@@ -861,8 +865,7 @@ program read
                              deltam_conv,pns_grid_goal,pns_cutoff,pns_grid) 
 
              if (conv_grid.eq.0) then
-                 print*, "ERROR: Initial Cell Mass is to small for the grid! Increase it.", conv_grid
-                 !call exit
+                 write(*,'(I4,A,I6)'), counter, ' Convective size: above goal'
              else
                  write(*,'(I4,A,I6)'), counter, ' Convective size:', conv_grid
              endif
@@ -870,14 +873,6 @@ program read
              ! exit condition once convection grid is of the right size
              if (conv_grid.eq.conv_grid_goal) then
                  exit
-             
-             elseif (conv_grid.lt.conv_grid_goal) then            
-                 if (.not.initial_growth) then
-                     low           = adjust_deltam
-                     deltam_conv   = deltam_conv*adjust_deltam           
-                     adjust_deltam = adjust_deltam + (high-adjust_deltam)*0.5                
-                 endif
-                 deltam_conv = deltam_conv/adjust_deltam
  
              elseif (conv_grid.gt.conv_grid_goal.or.conv_grid.eq.0) then
                  if (initial_growth) initial_growth = .false.
@@ -885,6 +880,14 @@ program read
                  deltam_conv   = deltam_conv*adjust_deltam
                  adjust_deltam = adjust_deltam - (adjust_deltam-low)*0.5
                  deltam_conv   = deltam_conv/adjust_deltam
+
+             elseif (conv_grid.lt.conv_grid_goal) then            
+                 if (.not.initial_growth) then
+                     low           = adjust_deltam
+                     deltam_conv   = deltam_conv*adjust_deltam           
+                     adjust_deltam = adjust_deltam + (high-adjust_deltam)*0.5                
+                 endif
+                 deltam_conv = deltam_conv/adjust_deltam
              endif
 
              counter = counter + 1
@@ -952,7 +955,7 @@ program read
                           deltam_conv,pns_grid_goal,pns_cutoff,pns_grid)  
                         
           ! exit condition once precision of under 1% is reached
-          if (abs(grid_goal-ncell).lt.0.01*ncell) then
+          if (abs(grid_goal-ncell).eq.0) then
             write(*,'(I4,A,I6)'), counter, ' Grid size:', ncell
             exit
 

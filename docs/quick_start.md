@@ -71,4 +71,5 @@ cd project/1dmlmix
 | `make project`  | model compilation                                                                             |
 | `make readout`  | to convert from binary output to readable tables, you need to run `./readout`                 |
 | `make examples` | prepare PyTorch in Fortran integration examples                                               |
+| `make test`     | test installation with gfortran                                                               |
 | `make clean`    | clean up everything                                                                           |

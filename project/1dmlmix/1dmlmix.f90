@@ -194,7 +194,8 @@
       logical profile 
       
       ! set to .true. to print function cpu processing time
-      profile = .false.      
+      profile = .false.
+    !   profile = .true.      
 
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
@@ -894,7 +895,7 @@
       pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
                                                    mlin_grid_size,1,mlin_grid_size,           &
                                                    int(shock_ind-pns_ind))*scale_pr_relative
-      !pr_relative = 0.3
+      !pr_relative(pns_ind:shock_ind) = 0.3
       !print*, pr_relative(int(pns_ind):int(shock_ind))
       print*, 'pr_relative', maxval(pr_relative), size(pr_relative)
       pr_turb = pr_relative*pr
@@ -927,11 +928,20 @@
       double precision :: mach_threshold
       real             :: initial_v, old_max_v
       real             :: v_old(ncell)
-      integer          :: i,j, ind, minv
+      integer          :: i,j, ind, minv, search_range
       logical          :: print_nuloss
-!
-      ! need to subtract 1 since the array has a ghost cell at (0)
-      minv = minloc(v, dim=1)-1      
+
+      search_range = 2 ! grid cell range to search for local minima
+!      
+      if (shock_ind.eq.0) then
+        ! initialize shock position after bounce from global minima - it is well defined
+        ! need to subtract 1 since the array has a ghost cell at (0)
+        minv = minloc(v, dim=1)-1      
+      else
+        ! only look for local minima in the search_range
+        minv = minloc(v(shock_ind-search_range:shock_ind+search_range), dim=1)
+        minv = minv + (shock_ind-search_range-1)
+      endif
 
       shock_ind = minv
       shock_x   = x(shock_ind)    
@@ -974,7 +984,7 @@
       logical :: print_nuloss
 !      
 !--g/cm^3 / unit conversion
-      rho_threshold = 1.d13/udens
+      rho_threshold = 1.d12/udens
 !
       do i=size(rho), 1, -1        
           if (rho(i) .ge. rho_threshold) then                        
@@ -1730,7 +1740,8 @@
         !     SFHo tables                                           
         !                                                                       
         !************************************************************           
-        !                                            
+        !                                         
+            !   use omp_lib   
               use eosmodule, clight_eos => clight                           
               implicit double precision (a-h,o-z) 
         !                                                                       
@@ -1779,10 +1790,9 @@
               data emssmev/0.511e0/, boltzmev/8.617e-11/ 
               data ergmev /6.2422e5/, sigma1/9d-44/, sigma2/5.6d-45/ 
               data c2cgs /6.15e-4/, c3cgs /5.04e-10/, fermi/1d-13/
-        !                                                                       
-              tempmx =-1e20 !? 
-              tempmn = 1e20 !?
-              vsmax  = 0.   !?
+        !      
+              !$OMP PARALLEL PRIVATE(k,xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,xmuhat_table) &
+              !$OMP SHARED(rho,u,temp,ye_table,u2,abar,xalpha,xheavy,yeh,xmue,xmuhat,xp,xn,eta,prold,pr,vsound)
 
 ! keytemp: 0 -> coming in with rho,eps,ye (solve for temp)
 !          1 -> coming in with rho,temperature,ye
@@ -1804,7 +1814,9 @@
               ifign(:) = .false.  
               
               276 format(A,I4,1p,20(E10.3))            
-              
+                            
+            !   print*, '< Thread > ', OMP_GET_THREAD_NUM()
+              !$OMP DO 
               do k=1,ncell                 
                  xrho  = rho(k)*udens
                  xenr  = u(k)*uergg
@@ -1813,42 +1825,41 @@
                  xent  = u2(k)/sfac
                  
                  ! set upper and lower bounds based on SFHo table limits
-                 if (xye  .gt.0.59999)  xye   = 0.59999
-                 if (xrho .lt.166.054)  then
-                    print*, 'xrho hit min', k
-                    xrho  = 166.054
+                 if (xye  .gt.eos_yemax)  then
+                    print*, 'xye hit max', k
+                    xye   = eos_yemax
                  endif
-                 if (xtemp.lt.0.01) then
+                 if (xrho .lt.eos_rhomin)  then
+                    print*, 'xrho hit min', k
+                    xrho  = eos_rhomin
+                 endif
+                 if (xtemp.lt.eos_tempmin) then
                     print*, 'xtemp hit min', k
-                    xtemp = 0.01
+                    xtemp = eos_tempmin
                  endif   
                  if (xent .lt.0.000131) then
                     print*, 'xent hit min', k
                     xent  = 0.000131  
                  endif
-                 !if (xenr .lt.-1.d17) then
-                    !print*, 'xenr hit min', k
-                 !   xenr  = -1.d17
-                 !endif
 
                  if (xye.lt.0.) then 
                     print *,'k,yek',k,xye 
                     stop "ERROR: xye < 0"
-                 endif 
-                 
+                 endif                  
         !                                                                       
         !--SFHo EOS tables                                               
-        !              
+        !        
+                 !if (k.eq.ncell) print*, 'thread, k', OMP_GET_THREAD_NUM(), k, xtemp, xrho, xye, xent
                  call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,             &
-                    xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-                    xmuhat_table,keytemp,keyerr,precision)   
+                     xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
+                     xmuhat_table,keytemp,keyerr,precision)   
                  !                                                                       
-                 !--store values - CHECK UNITS!!!                                                        
-                 !                 
-                 abar(k)   = xabar !
-                 xalpha(k) = xxa   !
-                 xheavy(k) = xxh   !
-                 yeh(k)    = xye   !
+                 !--store values                                                       
+                 !                           
+                 abar(k)   = xabar
+                 xalpha(k) = xxa  
+                 xheavy(k) = xxh  
+                 yeh(k)    = xye  
                  xmue(k)   = xmu_e/utemp/boltzmev  ! Units: 1e9 K -> MeV               
                  xmuhat(k) = xmuhat_table/utemp/boltzmev                 
 
@@ -1859,9 +1870,9 @@
                     xxn=0. 
                  end if 
 
-                 xp(k)     = xxp !
-                 xn(k)     = xxn !
-                 eta(k)    = xmu_e/xtemp !
+                 xp(k)     = xxp
+                 xn(k)     = xxn
+                 eta(k)    = xmu_e/xtemp
                  temp(k)   = xtemp/utemp/boltzmev
                  prold(k)  = pr(k) 
                  pr(k)     = xprs/upr
@@ -1869,12 +1880,10 @@
                  u2(k)     = xent*sfac
                  vsound(k) = sqrt(xcs2)/uv                  
 
-                 ! zbar would be nice but not completely *necessary*
-                 vsmax  = dmax1(vsmax,vsound(k)) 
-                 tempmx = dmax1(tempmx,temp(k)) 
-                 tempmn = dmin1(tempmn,temp(k))                          
-              enddo                 
-
+                 ! zbar would be nice but not completely *necessary*          
+              enddo   
+              !$OMP END PARALLEL              
+              !stop
               return 
               END        
                                                                         
@@ -2804,6 +2813,8 @@
 !                                                                       
       parameter (idim=10000) 
       parameter (tiny=1d-15) 
+
+      ! TODO: try lower rcrit to 0.1 or less to trap ~everything
       parameter (rcrit=1.) 
 !                                                                       
       dimension x(0:idim), ye(idim) 
@@ -2865,18 +2876,23 @@
 !-rnue usually set at 1.                                                
          if (rnue.lt.rcrit) then 
             trapnue(k)=.false. 
+            trapnueb(k)=.false.
          else 
             kountnue=kountnue+1 
             trapnue(k)=.true. 
             cmaxnue=dmax1(ak,cmaxnue) 
-         endif 
-         if (rnueb.lt.rcrit) then 
-            trapnueb(k)=.false. 
-         else 
+
             kountnueb=kountnueb+1 
             trapnueb(k)=.true. 
             cmaxnueb=dmax1(ak,cmaxnueb) 
          endif 
+        !  if (rnueb.lt.rcrit) then 
+        !    trapnueb(k)=.false. 
+        !  else 
+        !     kountnueb=kountnueb+1 
+        !     trapnueb(k)=.true. 
+        !     cmaxnueb=dmax1(ak,cmaxnueb) 
+        !  endif 
          if (rnux.lt.rcrit) then 
             trapnux(k)=.false. 
          else 
@@ -5844,6 +5860,7 @@
       common /idump/ idump
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
+      common /eosnu / prnu(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
       dimension uint(idim), s(idim) 
@@ -5884,7 +5901,7 @@
             (dj(i),i=1,nc),                                            &
             (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),             &
             (steps(i),i=1,nc),((ycc(i,j),j=1,iqn),i=1,nc),             &
-            (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)             
+            (vsound(i),i=1,nc),(pr_turb(i),i=1,nc),(prnu(i),i=1,nc)             
 !          (vturb2(i),i=1,nc),                                          &
 !                                  
       return 
@@ -6193,7 +6210,7 @@
                     ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,              &
                     unue,unueb,unux,f1unue,f1unueb,f1unux,              &
                     print_nuloss,ntstep)                                          
-      end if  
+      end if        
 !                                                                       
 !--set step counter                                                     
 !                                                                       
@@ -6548,15 +6565,15 @@
   120    format((1pe12.5),6(1x,1pe10.2))
 !                                                                       
 !--start new time step                                                  
-!                
+!            
          if(time.lt.tnext)then 
             !print *, '****time*****',time                              
   520       format(A,I12,A) 
             print 520,'<',ntstep,                                       &
             '          > ----------------------------------'            
             write(*,500)'[    time/tmax, dt (s) ]',                     &
-                        time*utime,'/',tmax*utime,steps(1)*utime                              
-  500       format(A,1p,E10.3,A,E9.3,E15.3)
+                        time*utime,' /',tmax*utime,steps(1)*utime                              
+  500       format(A,1p,E10.3,A,E10.3,E13.3)
   
             if (post_bounce.eqv..true.) then
                 write(*,501)'[    bounce time (s)   ]', bounce_time*utime                              

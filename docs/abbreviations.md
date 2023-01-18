@@ -18,3 +18,5 @@
 *[KH]: Kelvin-Helmholtz
 *[RT]: Rayleigh-Taylor
 *[DNS]: Direct Numerical Simulation
+*[SFHo]: Steiner-Fischer-Hempel EOS
+*[HDF5]: Hierarchical Data Format 5

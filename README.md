@@ -1,6 +1,6 @@
 # COLLAPSO1D - Core Collapse Supernova in 1D <a href="https://github.com/pikarpov-LANL/COLLAPSO1D"><img src="https://github.com/pikarpov-LANL/COLLAPSO1D/blob/images/docs/images/collapso1d.png?raw=true"  alt="COLLAPSO1D logo" align="right" width="80"></a>
 
-This is a 1D lagrangian code to explore CCSN modeling. For progenitors, it takes KEPLER generated data. Currently, there is support for [Heger & Woosley, 2000:](https://2sn.org/stellarevolution/) and [Sukhbold et al, 2016](https://arxiv.org/abs/1510.04643).
+This is a 1D lagrangian code for modeling Core-Collapse Supernovae (CCSN). For progenitors, it takes KEPLER generated data. Currently, there is support for [Heger & Woosley, 2000:](https://2sn.org/stellarevolution/) and [Sukhbold et al, 2016](http://doi.org/10.17617/1.b).
 
 Turbulence is treated through mixing length theory (MLT) and Machine Learning (ML) based models. The latter has been trained using the [Sapsan](https://github.com/pikarpov-LANL/Sapsan) ML pipeline.
 
