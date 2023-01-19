@@ -29,18 +29,17 @@ import numpy as np
 from sapsan.utils import line_plot, plot_params
 
 def main():
-    
     # --- Datasets and values to plot ---        
-    vals             = [
-                        'rho', 
+    vals             = [                         
                         'v',
-                        'ye',
-                        'P',
-                        'T',
-                        'encm',
-                        'vsound',
-                        'mach',
-                        'entropy',
+                        # 'ye',
+                        # 'rho',
+                        # 'P',
+                        # 'T',
+                        # 'encm',
+                        # 'vsound',
+                        # 'mach',
+                        # 'entropy',
                        ]        
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
@@ -53,7 +52,7 @@ def main():
     # base            = 'g9k_c8.4k_p_0.3k'
     # base            = 'g9k_c8.4k_p0.3k'
     # base            = 'g1.5k_c0.5k_p0.3k'
-    base            = 'g2k_c1k_p0.3k'    
+    base            = 'g2k_c1.4k_p0.3k'    
     # base            = 'g6k_c5k_p0.3k'
     # base            = 'g4k_c3k_p0.3k'        
     
@@ -78,9 +77,9 @@ def main():
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = True   # convert binary to readable (really only needed to be done once) 
+    convert2read     = False#True   # convert binary to readable (really only needed to be done once) 
     only_last        = True   # only convert from the latest binary file (e.g., latest *_restart_*)
-    only_post_bounce = True   # only produce plots after the bounce    
+    only_post_bounce = False#True   # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
     compute          = False#True
@@ -142,8 +141,6 @@ def main():
             
             if numfiles==0: colored.error('No readable files found; try setting convert2read = True'); comm.Abort()
 
-            #numfiles = 8941            
-
             colored.subhead('--------- Summary ---------')
             print(f'Total number of files:  {numfiles}') 
             
@@ -152,42 +149,38 @@ def main():
             pf = Profiles(rank = rank, numfiles = numfiles, 
                           base_path = base_path, base_file = base_file, dataset = dataset,
                           save_name_amend=save_name_amend, only_post_bounce = only_post_bounce)
-            
-            #shift = 8361-1000
-            #shift = 8000
-            #numfiles = numfiles-shift   
                      
             if only_post_bounce:       
                 bounce_files = pf.check_bounce(compute=False)         
                 shift        = pf.bounce_ind
                 numfiles     = bounce_files
-                # shift        = bounce_shift + bounce_files-numfiles
             
                 print(f'Bounce at file:         {shift+1}')
                 print(f'Post bounce files:      {bounce_files}')
             else:
                 shift = get_first_dump(base_path, dataset, base_file)
-                numfiles -=1
+                numfiles -= 1
                         
             colored.subhead( '\n-------- Intervals --------')
-            interval = get_interval(size, numfiles)                                  
+            interval  = get_interval(size, numfiles)                                  
                         
-            interval+=shift
-            
-            # creates (if needed) directories to store all plots
-            if save_plot: [pf.set_paths(val, versus, check_path=True) for val in vals]
-            
-            # TODO: this needs to be nicer
+            interval += shift
             numfiles += shift
             last_file = numfiles
+            
+            # creates (if needed) directories to store all plots
+            if save_plot: [pf.set_paths(val, versus, check_path=True) for val in vals]                
+            pf.plot_grid(idump=1)                                           
         else:
-            last_file    = 0
-            interval     = 0   
-            shift        = 0   
-        #continue
-        numfiles = comm.bcast(last_file, root=0)
-        interval = comm.scatter(interval, root=0)                
+            last_file = 0
+            interval  = 0   
+            shift     = 0   
+            
+        continue
 
+        numfiles = comm.bcast(last_file, root=0)
+        interval = comm.scatter(interval, root=0)       
+        
         pf = Profiles(rank = rank, numfiles = numfiles, 
                       base_path = base_path, base_file = base_file, dataset = dataset,
                       save_name_amend=save_name_amend, only_post_bounce = only_post_bounce, 
@@ -213,14 +206,14 @@ def main():
                            )     
 
         pf.progress_bar(i+1, 'Done!', done = True)           
-
+        
         gather_pns_ind    = comm.gather(pf.pns_ind_ar,    root=0)
         gather_pns_x      = comm.gather(pf.pns_x_ar,      root=0)
         gather_pns_encm   = comm.gather(pf.pns_encm_ar,   root=0)
         gather_shock_ind  = comm.gather(pf.shock_ind_ar,  root=0)
         gather_shock_x    = comm.gather(pf.shock_x_ar,    root=0)
         gather_shock_encm = comm.gather(pf.shock_encm_ar, root=0)
-        gather_lumnue     = comm.gather(pf.lumnue,        root=0)
+        gather_lumnue     = comm.gather(pf.lumnue,        root=0)        
         gather_shell      = comm.gather(pf.shell_ar,      root=0)
         gather_time       = comm.gather(pf.time_ar,       root=0)        
         
@@ -240,7 +233,7 @@ def main():
             pf.time_ar       = sum(gather_time)          
             pf.bounce_ind    = shift
             
-            pf.save_evolution()
+            if versus == 'r': pf.save_evolution()
             
             ax = pf.plot_convection()
             ax = pf.plot_lumnue()
@@ -488,6 +481,7 @@ class Profiles:
         self.dpi              = dpi
         self.cm2km            = 1e-5
         self.s2ms             = 1e3
+        self.msol             = 1.989e33
         self.delta_shell      = delta_shell
         #self.progress_bar(0)
         
@@ -637,8 +631,8 @@ class Profiles:
         np.savetxt(evolution_path, evolution, header = header)
         
         
-    def plot_format(self, series, xlabel, ylabel, title, save_path, 
-                          show_plot, plot_style = 'plot', bounce_lim=False,
+    def plot_format(self, series, xlabel, ylabel, title, 
+                          plot_style = 'plot', bounce_lim=False,
                           label=None, ax=None, marker='.', linewidth=1.5):                       
         
         style = 'tableau-colorblind10'
@@ -669,10 +663,7 @@ class Profiles:
             if self.only_post_bounce: ax.set_xlim(self.bounce_ind,self.numfiles)
             
         plt.tight_layout()
-        if 'None' not in label: ax.legend(loc=0)
-        
-        plt.savefig(save_path)        
-        if not show_plot: plt.close()        
+        if 'None' not in label: ax.legend(loc=0)                       
         #print(save_path, flush=True)
          
         return ax       
@@ -681,7 +672,56 @@ class Profiles:
         m,res = self.dataset.split('_')[:2]
         ax.text(x, y, f'{m} | {res}', 
                 horizontalalignment='right',transform=ax.transAxes,
-                bbox=dict(boxstyle='square', facecolor='white',linewidth=1))     
+                bbox=dict(boxstyle='square', facecolor='white',linewidth=1))  
+    
+    def plot_grid(self, idump=1, show_plot=False):
+        
+        ps, time1d, bounce_time = self.open_checkpoint(idump, fullout=False)
+        encm    = ps[1]
+        r       = ps[2]
+        rho     = ps[3]
+        dm      = np.zeros(r.shape)
+        dm[0]   = rho[0]*4/3*np.pi*r[0]**3/self.msol
+
+        for i in range(1,len(r)):
+            dm[i] = 4/3*np.pi*rho[i]*(r[i]**3-r[i-1]**3)/self.msol
+            
+            
+        save_path = f'{self.base_save_path}{self.save_name_amend}grid.png'
+        
+        ax = self.plot_format(series     = [[encm[1:],dm[1:]]],
+                              xlabel     = r'Enclosed Mass [$M_{\odot}$]', 
+                              ylabel     = r'Delta Mass [$M_{\odot}$]',
+                              title      = r'Grid Size', 
+                              plot_style = 'semilogy')
+        
+        plt.savefig(save_path)        
+        if not show_plot: plt.close() 
+        
+        save_path = f'{self.base_save_path}{self.save_name_amend}grid_zoom.png'
+        
+        ax = self.plot_format(series     = [[encm[1:],dm[1:]]],
+                              xlabel     = r'Enclosed Mass [$M_{\odot}$]', 
+                              ylabel     = r'Delta Mass [$M_{\odot}$]',
+                              title      = r'Grid Size', 
+                              plot_style = 'semilogy',
+                              label      = ['grid'])   
+        
+        for i in range(len(dm)-1):
+            if abs(dm[i+1]-dm[i])<dm[i+1]*1e-3:
+                ax.axvline(encm[i], color='r',linewidth=1, label=f'start[{i}] = {encm[i]}')
+                break
+        
+        for i in range(len(dm)-2,-1,-1):
+            if abs(dm[i+1]-dm[i])<dm[i+1]*1e-3:
+                ax.axvline(encm[i], color='r',linewidth=1, linestyle='--',label=f'end[{i}] = {encm[i]}')
+                break
+        
+        ax.set_xlim(1.1,2)
+        plt.legend()
+        
+        plt.savefig(save_path)        
+        if not show_plot: plt.close()     
         
     def plot_convection(self, show_plot=False):        
                  
@@ -691,13 +731,13 @@ class Profiles:
                               xlabel     = 'index', 
                               ylabel     = 'Convection Grid Size',
                               title      = f'Bounce index = {self.bounce_ind+1}', 
-                              save_path  = save_path, 
-                              show_plot  = show_plot,
                               bounce_lim = True)    
+        
+        plt.savefig(save_path)        
+        if not show_plot: plt.close() 
         
         print(f'Convection  : {self.save_name_amend}convgrid.png')
                             
-        return ax
     
     def plot_lumnue(self, show_plot=False):                  
         
@@ -709,16 +749,16 @@ class Profiles:
         ax = self.plot_format(series     = [[self.ind_ar, self.lumnue]],
                               xlabel     = 'index', 
                               ylabel     = r'$F_{\nu_{e}} \; [foe/s]$', 
-                              title      = f'Bounce index = {self.bounce_ind+1}',
-                              save_path  = save_path, 
-                              show_plot  = show_plot,
+                              title      = f'Bounce index = {self.bounce_ind+1}', 
                               plot_style = 'semilogy',
                               bounce_lim = True) 
         
+        plt.savefig(save_path)        
+        if not show_plot: plt.close() 
+        
         print(f'lumnue      : {self.save_name_amend}lumnue{name_amend}.png')
                  
-        return ax   
-    
+                     
     def plot_pns_shock(self, show_plot=False):                  
                 
         plot_data = [[self.pns_x_ar[self.bounce_ind:]*self.cm2km,
@@ -734,9 +774,10 @@ class Profiles:
                               xlabel    = r'$Radius \; [km]$', 
                               ylabel    = r'$M_{enc} \; [M_{\odot}]$', 
                               title     = f'Bounce index = {self.bounce_ind+1}',
-                              save_path = save_path, 
-                              show_plot = show_plot,
                               label     = labels)  
+        
+        plt.savefig(save_path)        
+        if not show_plot: plt.close() 
         
         print(f'pns_shock   : {self.save_name_amend}pns_shock.png')    
                                
@@ -771,12 +812,13 @@ class Profiles:
                               xlabel    = r'$t-t_{bounce}$ [s]', 
                               ylabel    = r'log(R) [km]', 
                               title     = f'Bounce index = {self.bounce_ind+1}',
-                              save_path = save_path, 
-                              show_plot = show_plot,
                               label     = labels,
                               ax        = ax,
                               marker    = '',
-                              linewidth = 2.5)                 
+                              linewidth = 2.5)    
+        
+        plt.savefig(save_path)        
+        if not show_plot: plt.close()              
         
         print(f'mass_shells : {self.save_name_amend}mass_shells.png')    
                                     
@@ -947,16 +989,18 @@ class Profiles:
             if not show_plot: plt.close()
             
             # Get time evolution metrics
-            if vals.index(val)==0:
-                self.pns_ind_ar[i]    = pns_ind
-                self.pns_x_ar[i]      = pns_x
-                self.pns_encm_ar[i]   = encm[pns_ind]                
-                self.shock_ind_ar[i]  = shock_ind
-                self.shock_x_ar[i]    = shock_x
-                self.shock_encm_ar[i] = encm[shock_ind]
-                self.time_ar[i]       = time1d   
+            if vals.index(val)==0:                
                 
-                self.old_shock_ind    = shock_ind                                                              
+                if pns_x!=0:
+                    self.pns_ind_ar[i]    = pns_ind
+                    self.pns_x_ar[i]      = pns_x
+                    self.pns_encm_ar[i]   = encm[pns_ind]                
+                    self.shock_ind_ar[i]  = shock_ind
+                    self.shock_x_ar[i]    = shock_x
+                    self.shock_encm_ar[i] = encm[shock_ind]
+                    self.time_ar[i]       = time1d   
+                    
+                    self.old_shock_ind    = shock_ind                                                              
                 
                 # Find mass shell indexes (initializes only once)
                 if self.shell_ar.size == 0: 
