@@ -18,7 +18,7 @@ class multirun:
                  pns_grid_goals, conv_grid_goals, grid_goals,
                  maxrads, mlmodel='None',
                  read_dump=0, dump_interval=1e-3, restart=False,
-                 data_names=None, maxtime=0.5):
+                 data_names=None, maxtime=0.5, eos=5):
         
         self.suffixs         = suffixs
         self.masses          = masses
@@ -40,6 +40,7 @@ class multirun:
         self.dump_interval   = dump_interval
         self.maxtime         = maxtime
         self.restart         = restart
+        self.eos             = eos
         
     def setup_pars(self, i):
         self.mass          = self.masses[i]
@@ -168,7 +169,9 @@ class multirun:
                 elif 'Maximum Radius of the Grid' in line: 
                     data[i+1] = f'{self.maxrad}\n'                                      
                 elif 'EOS Table Path' in line: 
-                    data[i+1] = f'{self.eos_table_path}\n'                                                
+                    data[i+1] = f'{self.eos_table_path}\n'    
+                elif 'EOS option' in line: 
+                    data[i+1] = f'{self.eos}\n'                                              
                                                            
         self.write_data(filepath, data)                      
         
@@ -257,7 +260,9 @@ class multirun:
                 elif 'Max time' in line: 
                     data[i+1] = f'{self.maxtime}\n'                                                           
                 elif 'EOS Table Path' in line: 
-                    data[i+1] = f'{self.eos_table_path}\n'                                                       
+                    data[i+1] = f'{self.eos_table_path}\n' 
+                elif 'EOS option' in line: 
+                    data[i+1] = f'{self.eos}\n'                                                                          
                     
         self.write_data(filepath, data)            
             
@@ -294,14 +299,13 @@ class Readout:
         
         self.setup_readout()        
         
+        os.chdir(f'{self.sim_path}')
         if not os.path.isfile('readout'): 
             colored.warn("readout executable doesn't exist; creating...")
             
-            os.chdir(f'{self.run_path}')
-            
-            cmd.popen('make readout')
-            
-        os.chdir(f'{self.sim_path}')
+            os.chdir(f'{self.run_path}')            
+            cmd.popen('make readout')  
+            os.chdir(f'{self.sim_path}')                  
         
         cmd.popen('./readout')
 
