@@ -1,7 +1,7 @@
 <Input File>
 Data
 <Output File>
-Test
+DataOut
 <Input PyTorch Model>
 None
 <Input Grid Size to interpolate for PyTorch Model>
@@ -9,9 +9,9 @@ None
 <Dump # to read>
 0
 <Dump time intervals [s]>
-1.d-3
+5.d-4
 <Max time [s]>
-1
+0.5
 <Artifiicqial Viscocity #1>
 1.0
 <Artificial Viscocity #2>

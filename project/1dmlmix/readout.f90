@@ -19,7 +19,8 @@
       dimension temp(idim), ye(idim), xp(idim), xn(idim) 
       dimension ynue(idim), ynueb(idim), ynux(idim) 
       dimension unue(idim), unueb(idim), unux(idim) 
-      dimension ufreez(idim), pr(idim), u2(idim), pr_turb(idim) 
+      dimension ufreez(idim), pr(idim), u2(idim)
+      dimension pr_turb(idim), prnu(idim)
       real ycc(idim,19) 
       dimension eta(idim) 
       dimension vsound(idim) 
@@ -97,7 +98,8 @@
                (dj(i),i=1,nc),                                           &
                (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),            &
                (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),            &                  
-               (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)               
+               (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)
+            !    (prnu(i),i=1,nc)               
 !        
          if (idump.eq.idump_old) then            
             stop "Repeated idump: probably reached the end of the file"
@@ -158,11 +160,16 @@
             sumzn=0. 
             sumfe=0. 
             iskip=0 
-            write(69,*) 'Time [s]  Bounce_Time [s] R_PNS [index] R_PNS [cm] R_shock [index]  R_shock [cm] nu_e_flux [foe/s]'
-            write(69,108)10.d0*t, 10.d0*bounce_time, int(pns_ind), 1.d9*pns_x, int(shock_ind), 1.d9*shock_x, 2.d-3*rlumnue            
+            write(69,*) 'Time [s]  Bounce_Time [s] R_PNS [index] R_PNS [cm] R_shock [index]  R_shock [cm] &
+                        & nue_flux [foe/s] nu_e_flux [foe/s] nux_flux [foe/s]'
+            write(69,108)10.d0*t, 10.d0*bounce_time, int(pns_ind), 1.d9*pns_x,  &
+                         int(shock_ind), 1.d9*shock_x, 2.d-3*rlumnue,           &
+                         2.d-3*rlumnueb, 2.d-3*rlumnux
             write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
                         & Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s]  Entropy [kb/baryon] &
-                        & P_turb [g/cm/s^2]'            
+                        & P_turb [g/cm/s^2]  Abar  U_int [erg/g] U_nue [erg/g] &
+                        & U_nueb [erg/g]  U_nux [erg/g] Y_nue Y_nueb Y_nux'            
+                        ! & P_turb [g/cm/s^2]  P_nu [g/cm/s^2]  Abar  U_int [erg/g] U_nue [erg/g] &
             do i=1,nc 
 !               write(69,103)i,encm(i),x(i),rho(i),v(i),ye(i),          
 !     $           vsound(i)                                             
@@ -234,8 +241,12 @@
                      write(69,103)i,encm(i),1.d9*x(i),2.d6*rho(i),      &
 !                         1.d8*v(i),ye(i),1.d16*pr(i)!,                  &
                          1.d8*v(i), ye(i),2.d22*pr(i),                  &
-                         1.d9*temp(i), 1.d8*vsound(i), u2(i)/sfac,     &
-                         2.d22*pr_turb(i)                                     
+                         1.d9*temp(i), 1.d8*vsound(i), u2(i)/sfac,      &
+                         2.d22*pr_turb(i),                              & 
+                        !  2.d22*prnu(i),                                 &
+                         abar(i),                                       &
+                         uergg*u(i), uergg*unue(i), uergg*unueb(i),     &
+                         uergg*unux(i), ynue(i), ynueb(i), ynux(i)
 !                  if (i.gt.1) then                                     
                      if (ufreez(i).lt.1.d-10) then 
                        dene2=dene2+                                     &
@@ -309,7 +320,7 @@
   106 format(4(1pe14.7)) 
                                                                         
   107 format(I3,24(1pe13.5)) 
-  108 format(1pe12.4,1pe12.4,I5,1pe12.4,I5,1pe12.4,1pe12.4) 
+  108 format(1pe12.4,1pe12.4,I5,1pe12.4,I5,4(1pe12.4)) 
 
       print*,' ==============================================='       
       print*, '  Converted ',trim(adjustl(infile)),' to ',trim(adjustl(basename))

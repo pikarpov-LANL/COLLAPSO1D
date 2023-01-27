@@ -76,7 +76,7 @@ fort_project:
 	cmake --build . && \
 	make install
 	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(PROJECT_DIR)/$${f}; done
-	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(PROJECT_DIR)/$${f}; done
+	@for f in $(shell cd ${PROJECT_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.* $(PROJECT_DIR)/$${f}; done
 
 project:
 	mkdir -p build/proxy build/fortproxy build/projectproxy
@@ -94,7 +94,7 @@ examples:
 	cmake --build .  && \
 	make install	
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp $(INST)/bin/$${f%%/} $(EXAMPLES_DIR)/$${f}; done
-	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.so $(EXAMPLES_DIR)/$${f}; done
+	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.* $(EXAMPLES_DIR)/$${f}; done
 	@echo "=== Prepared examples ==="
 
 data: HDF5PATH = /usr/lib/x86_64-linux-gnu/hdf5/serial
@@ -148,6 +148,7 @@ clean:
 	rm -rf $(PROJECT_DIR)/*.a $(PROJECT_DIR)/$(PROJECT_NAME)/*.mod
 	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/fort.* $(PROJECT_DIR)/$(PROJECT_NAME)/$(PROJECT_NAME)
 	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/*.so $(EXAMPLES_DIR)/*/*.so
+	rm -rf $(PROJECT_DIR)/$(PROJECT_NAME)/*.dylib $(EXAMPLES_DIR)/*/*.dylib
 	rm -rf $(EXAMPLES_DIR)/*/*.pt
 
 
