@@ -235,9 +235,9 @@ program read
         !                   conv_grid,enclmass_conv_cutoff,         &
         !                   deltam_conv,pns_grid_goal,pns_cutoff,pns_grid) 
           
-        !   ! for resizable grid
-        !   ! deltam_conv stays constant from the setup - it doesn't vary
-        !   ! enclmass_conv_cutoff doesn't do anything
+    ! !--for resizable grid
+    ! !--deltam_conv stays constant from the setup - it doesn't vary
+    ! !--enclmass_conv_cutoff doesn't do anything
         !   call resizable_grid(nkep,yccin,vel,rad,dens,                &
         !                   t9,yel,ab,omega,press,                  &
         !                   maxrad,deltam_growth,ieos,              &
