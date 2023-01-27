@@ -353,10 +353,10 @@ class colored:
     def subhead(cls, message): print(cls.PURPLE+f"{message}"+cls.RESET)   
     
     @classmethod
-    def warn(cls, message): print(cls.YELLOW+f"WARNING: {message}"+cls.RESET)
+    def warn(cls, message): print(cls.YELLOW+f"WARNING: {message}"+"\033[K"+cls.RESET)
 
     @classmethod        
-    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+cls.RESET)     
+    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+"\033[K"+cls.RESET)     
     
     
 class cmd:

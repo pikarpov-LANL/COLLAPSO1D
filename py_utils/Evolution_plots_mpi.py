@@ -31,26 +31,27 @@ from sapsan.utils import line_plot, plot_params
 def main():
     # --- Datasets and values to plot ---
     vals             = [
-                        'v',
+                        'velocity',
                         'ye',
                         'rho',
-                        'P',
-                        'T',
+                        'pressure',
+                        'temperature',
                         'encm',
-                        'vsound',
+                        'sound',
                         'mach',
                         'entropy',
                         'abar',
-                        'uint',
-                        'unu', # neutrino energies
-                        'ynu'
+                        'u_int',
+                        'u_nu', # neutrino energies
+                        'y_nu',                        
                        ]
-    versus           = 'encm'   # options are either 'r' or 'encm' for enclosed mass
+    versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
     # masses           = [11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] # for 1.5k and 2k 
-    masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k
+    masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
     # masses           = [13.0,15.0] # for ye
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
+    masses           = [12.0]
 
     # --- Paths & Names ---        
     # base            = 'g9k_c8.4k_p_0.3k'
@@ -59,6 +60,7 @@ def main():
     base            = 'g2k_c1.4k_p0.3k'
     # base            = 'g6k_c5k_p0.3k'
     # base            = 'g4k_c3k_p0.3k'
+    base            = 'g2k_rcrit1.0'#_eosflg5'
     
     end             = ''
     # end             = '_ye'
@@ -70,20 +72,24 @@ def main():
     if 19.0 in masses and 'g9k' in base and '1.3P' not in end:
         datasets[masses.index(19.0)] = f's19.0_g10k_c9.4k_p0.3k{end}'
         
-    if   end == ''     : base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit/sleos/'#test_extrema/'
+    if   end == ''     : base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/'#test_extrema/'
     elif end == '_1.3P': 
         # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/boost_1.3P/'
         base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit/'#test_extrema/'
     elif '_ye' in end  : base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/ye/'
     #base_path        = '/home/pkarpov/scratch/1dccsn/sleos/funiek/'
     #base_path        = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
+    
+    #base_path = '/home/pkarpov/scratch/1dccsn/sleos/rcrit/'
+    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit/entropy_test/'
+    
     base_file        = f'DataOut_read'
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = False#True   # convert binary to readable (really only needed to be done once) 
+    convert2read     = True   # convert binary to readable (really only needed to be done once) 
     only_last        = False#True   # only convert from the latest binary file (e.g., latest *_restart_*)
-    only_post_bounce = True   # only produce plots after the bounce    
+    only_post_bounce = True    # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
     compute          = False#True
@@ -154,13 +160,11 @@ def main():
                           base_path = base_path, base_file = base_file, dataset = dataset,
                           save_name_amend=save_name_amend, only_post_bounce = only_post_bounce)
                      
-            if only_post_bounce:       
-                bounce_files = pf.check_bounce(compute=False)         
-                shift        = pf.bounce_ind
-                numfiles     = bounce_files
-            
-                print(f'Bounce at file:         {shift+1}')
-                print(f'Post bounce files:      {bounce_files}')
+            bounce_files = pf.check_bounce(compute=compute)  
+            bounce       = pf.bounce_ind      
+            if only_post_bounce:                   
+                shift        = bounce
+                numfiles     = bounce_files                            
             else:
                 shift = get_first_dump(base_path, dataset, base_file)
                 numfiles -= 1
@@ -174,11 +178,13 @@ def main():
             
             # creates (if needed) directories to store all plots
             if save_plot: [pf.set_paths(val, versus, check_path=True) for val in vals]                
-            pf.plot_grid(idump=1)                                           
+            pf.plot_grid(idump=1) 
+                                                     
         else:
             last_file = 0
             interval  = 0   
-            shift     = 0   
+            shift     = 0 
+            bounce    = 0   
             
         numfiles = comm.bcast(last_file, root=0)
         interval = comm.scatter(interval, root=0)       
@@ -188,7 +194,8 @@ def main():
                       save_name_amend=save_name_amend, only_post_bounce = only_post_bounce, 
                       interval = interval, dpi = dpi)
         
-        pf.bounce_ind = comm.bcast(shift, root=0)
+        if not only_post_bounce: pf.bounce_ind = comm.bcast(bounce, root=0)
+        else: pf.bounce_ind = comm.bcast(shift, root=0)
 
         print('rank',f'{rank}'.ljust(2, ' '),f': interval {interval}')
 
@@ -237,16 +244,16 @@ def main():
             pf.lumnux        = sum(gather_lumnux)  
             pf.shell_ar      = sum(gather_shell)
             pf.time_ar       = sum(gather_time)          
-            pf.bounce_ind    = shift
+            # pf.bounce_ind    = shift
             
-            if versus == 'r': pf.save_evolution()
+            if versus == 'r': 
+                pf.save_evolution()
+                if pf.bounce_ind > 0:
+                    pf.plot_convection()
+                    pf.plot_pns_shock()
+                    pf.plot_shells()                
                         
-            ax = pf.plot_lumnue()
-            
-            if pf.bounce_ind > 0:
-                ax = pf.plot_convection()
-                ax = pf.plot_pns_shock()
-                ax = pf.plot_shells()            
+            pf.plot_lumnue()                                    
         
         # --- Movies are produced in parallel ---            
         if make_movies:            
@@ -316,7 +323,7 @@ def get_first_dump(base_path, dataset, base_file):
     alldumps = [filename for filename in os.listdir(f'{base_path}{dataset}') if base_file in filename]
     alldumps = [int(filename.split('.')[-1]) for filename in alldumps]
 
-    return min(alldumps) 
+    return min(alldumps)-1
 
 class Readout:
     def __init__(self, rank, base_path, dataset, base_file, readout_path, only_last=False):
@@ -531,7 +538,7 @@ class Profiles:
 
         arrow       = int(fraction * bar_length - 1) * '-' + '>'
         padding     = int(bar_length - len(arrow)) * ' '
-        padding_val = int(8-len(val)) * ' '
+        padding_val = int(12-len(val)) * ' '
 
         ending = '\n' if done == True else '\r'
 
@@ -599,11 +606,17 @@ class Profiles:
         file1d = f'{self.base_path}{self.dataset}/{file}' 
             
         with open(file1d, "r") as file:
-            line = file.readline()        
+            line = file.readline()                                                                                                      
             header_vals = file.readline()
             vals_strip  = header_vals[:-1].split(' ')        
             try: time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue, rlumnueb, rlumnux = [float(x) for x in vals_strip if x!='']        
-            except: time1d, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']            
+            except: 
+                time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']            
+                rlumnueb = 0
+                rlumnux  = 0
+            self.header = file.readline() 
+            self.header = self.header.split(' ')
+            self.header = list(filter(None, self.header))            
 
         pns_ind   = int(pns_ind)-1
         shock_ind = int(shock_ind)-1
@@ -864,43 +877,38 @@ class Profiles:
         #print('Time %.2f ms'%(float(time1d)*1e3)) 
         
         # Columns in the readable files:
-        # Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s]  Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s] 
-        ncell   = ps[0]
-        encm    = ps[1]
-        r       = ps[2]
-        rho     = ps[3]
-        v       = ps[4]
-        ye      = ps[5]
-        P       = ps[6]
-        T       = ps[7]
-        try: vsound  = ps[8]
-        except: vsound = np.ones(v.shape)
-        s       = ps[9] #entropy        
-        try: pturb  = ps[10]
-        except: pturb = np.zeros(v.shape)
+        # Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s]  Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s]  Entropy [kb/baryon]  P_turb [g/cm/s^2]  Abar  U_int [erg/g] U_nue [erg/g]  U_nueb [erg/g]  U_nux [erg/g] Y_nue Y_nueb Y_nux
+
+        valmap = {} 
+        index  = 0
+          
+        for h in self.header:            
+            if '[' in h: continue  
+            valname = h.lower()
+            if '\n' in valname: valname = valname.split('\n')[0]
+            valmap[valname] = ps[index]            
+            index            += 1
+            
+        if 'sound' not in valmap.keys(): valmap['sound'] = np.ones(valmap[list(valmap.keys())[0]].shape)
+        if 'p_turb' not in valmap.keys(): valmap['p_turb'] = np.zeros(valmap[list(valmap.keys())[0]].shape)
         
-        # prnu  = ps[11]
-        abar  = ps[11]
-        uint  = ps[12]
-        unue  = ps[13]
-        unueb = ps[14]
-        unux  = ps[15]
-        ynue  = ps[16]
-        ynueb = ps[17]
-        ynux  = ps[18]
-                
+        encm = valmap['m_enclosed']
+        r    = valmap['radius']
+        
         # Print out enclosed mass at 200km without plotting anything
         # if i == self.numfiles-1:         
         #     for j in range(len(cell)):
         #         if r[j] >= 2e7:
         #             print(f'at {r[j]:.2e}, mass is {encm[j]:.3e}')
         #             return
-        # else: return
-                    
+        # else: return                      
+        
         for val in vals:
             
             label  = [f'ind     {i+1}']
-            unlogy = False
+            loc    = 4
+            ylim   = None
+            unlogy = False            
             
             if versus=='encm':
                 if val == 'encm': continue
@@ -916,81 +924,78 @@ class Profiles:
                 plot_type = 'loglog'
                 unit      = self.cm2km
             else: colored.error("unknown 'versus' {versus}, trying to exit")
+                        
+            if val in valmap.keys(): to_plot = [[x*unit, valmap[val]]]
+            else: to_plot = [[x*unit, valmap.get(val, 'empty')]]
             
             if val == 'rho': 
-                to_plot = [[x*unit, rho]]
                 ylabel  = r'Density $[g/cm^3]$'
                 ylim    = (1e4,1e15)
                 loc     = 1
-            elif val == 'v':                
-                to_plot = [[x*unit, v]]
+            elif val == 'velocity':                
                 ylabel  = r'Velocity $[cm/s]$'
                 ylim    = (-1.5e10, 3e9)
-                loc     = 4
                 unlogy  = True                              
-            elif val == 'vsound':                
-                to_plot = [[x*unit, vsound]]
+            elif val == 'sound':                
                 ylabel  = r'$V_{sound}$ $[cm/s]$'
                 ylim    = (0, 1.4e10)
                 loc     = 1
                 unlogy  = True  
             elif val == 'mach':                
-                to_plot = [[x*unit, abs(v/vsound)]]
+                to_plot = [[x*unit, abs(valmap['velocity']/valmap['sound'])]]
                 ylabel  = 'Mach'
                 ylim    = (0,11)
                 loc     = 1
                 unlogy  = True                                               
-            elif val == 'P':                
-                to_plot = [[x*unit, P]]
+            elif val == 'pressure':                
                 ylabel  = r'$P_{gas} \; [\frac{g}{cm\;s^2}]$'
                 ylim    = (1e20,1e36)   
                 loc     = 1
-            elif val == 'T':                
-                to_plot = [[x*unit, T]]
+            elif val == 'temperature':                
                 ylabel  = r'Temperature $[K]$'
                 ylim    = (1e7,4e11)
                 loc     = 1
-            elif val == 'encm':                
-                to_plot = [[x*unit, encm]]
+            elif val == 'encm':    
+                to_plot = [[x*unit, encm]]            
                 ylabel  = r'Enclosed Mass $[M_{\odot}]$'
                 ylim    = (1,2)
-                loc     = 4
                 unlogy  = True                
             elif val == 'ye':                
-                to_plot = [[x*unit, ye]]
                 ylabel  = r'$Y_e$'
                 ylim    = (0,1)
-                loc     = 4   
                 unlogy  = True 
             elif val == 'entropy':                
-                to_plot = [[x*unit, s]]
                 ylabel  = r'Entropy $[k_b/baryon]$'
-                ylim    = None
-                loc     = 4         
             elif val == 'abar':                
-                to_plot = [[x*unit, abar]]
                 ylabel  = r'$\bar{A}$'
                 ylim    = (0,150)
-                loc     = 4 
                 unlogy  = True
-            elif val == 'uint':                
-                to_plot = [[x*unit, uint]]
+            elif val == 'u_int':                
                 ylabel  = r'Energy $[erg/g]$'
                 ylim    = (1e15,1e22)
-                loc     = 4
-            elif val == 'unu':
-                to_plot = [[x*unit, unue],[x*unit, unueb],[x*unit, unux]]
+            elif val == 'u_nu':
+                to_plot = [[x*unit, valmap.get('u_nue',  'empty')],
+                           [x*unit, valmap.get('u_nueb', 'empty')],
+                           [x*unit, valmap.get('u_nux',  'empty')]]
                 ylabel  = r'Energy $\nu$ $[erg/g]$'
                 ylim    = (1e8,1e22)
                 label   = ['nue', 'nueb', 'nux']
-                loc     = 4
-            elif val == 'ynu':                
-                to_plot = [[x*unit, ynue],[x*unit, ynueb],[x*unit, ynux]]
+            elif val == 'y_nu':                
+                to_plot = [[x*unit, valmap.get('y_nue',  'empty')],
+                           [x*unit, valmap.get('y_nueb', 'empty')],
+                           [x*unit, valmap.get('y_nux',  'empty')]]
                 ylabel  = r'Fraction $\nu$'
                 ylim    = (1e-10,1)
                 label   = ['nue', 'nueb', 'nux']
-                loc     = 4
-            else: colored.error(f"unknown val {val}, trying to exit")    
+            else:                 
+                if self.rank==0 and i==self.interval[0]: 
+                    colored.warn(f"no plotting parameters for val '{val}'; setting default")                
+                ylabel  = val                
+            
+            if type(to_plot[-1][1]) != np.ndarray:
+                if self.rank==0 and i==self.interval[0]: 
+                    colored.warn(f"entries to plot '{val}' were not found; skipping")                        
+                continue                
             
             if versus=='encm': loc = 0    
             
@@ -1008,9 +1013,10 @@ class Profiles:
             
             # check if after bounce                
             if i >= self.bounce_ind:                
-                
                 if compute and vals.index(val)==0:
-                    rt = ComputeRoutines(x, rho=rho, v=v, vsound=vsound)
+                    rt = ComputeRoutines(x, rho    = valmap['rho'], 
+                                            v      = valmap['velocity'], 
+                                            vsound = valmap['sound'])
                                      
                     if self.dataset=='s12.0_g1.5k_c0.5k_p0.3k' and i<=650: self.old_shock_ind = -1
                     elif self.dataset=='s12.0_g9k_c8.4k_p_0.3k' and i<=670: self.old_shock_ind = -1
@@ -1026,9 +1032,9 @@ class Profiles:
                 ax.axvline(x=pns_edge,linestyle='-',color='r',linewidth=1,
                            label=f'PNS    {line_label%pns_edge}')
                 ax.axvline(x=shock_front,linestyle='--',color='r',linewidth=1,
-                           label=f'shock {line_label%shock_front}')
-                ax.set_title('$t-t_{bounce}$ = %.2f ms'%((float(time1d)-float(bounce_time))*1e3))
-                
+                           label=f'shock {line_label%shock_front}')                
+                            
+            if self.only_post_bounce: ax.set_title('$t-t_{bounce}$ = %.2f ms'%((float(time1d)-float(bounce_time))*1e3))
             else: ax.set_title('$t$ = %.2f ms'%(float(time1d)*1e3))
                 
             ax.set_xlabel(xlabel)
@@ -1089,8 +1095,11 @@ class Profiles:
         return
     
     def movie(self, val, versus='r', fps=15, start=1, printout=False):      
+        
         self.set_paths(val,versus)
-        padding_val = int(8-len(val)) * ' '
+        if len(os.listdir(self.plot_path)) == 0: return # if dir is empty
+        
+        padding_val = int(12-len(val)) * ' '
         
         if self.only_post_bounce:
             name_amend = '_bounce'
@@ -1110,7 +1119,7 @@ class Profiles:
         
         print(f'{val}{padding_val}: {val}{self.versus_name}{self.save_name_amend}{name_amend}.mp4')
         
-        return    
+        return            
     
 class colored:
     RED    = '\033[31m'
@@ -1128,10 +1137,10 @@ class colored:
     def subhead(cls, message): print(cls.PURPLE+f"{message}"+cls.RESET)   
     
     @classmethod
-    def warn(cls, message): print(cls.YELLOW+f"WARNING: {message}"+cls.RESET)
+    def warn(cls, message): print(cls.YELLOW+f"WARNING: {message}"+"\033[K"+cls.RESET)
 
     @classmethod        
-    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+cls.RESET)    
+    def error(cls, message): sys.exit(cls.RED+f"ERROR: {message}"+"\033[K"+cls.RESET)    
     
 if __name__=='__main__':
     main()
