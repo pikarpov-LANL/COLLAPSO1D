@@ -31,19 +31,19 @@ from sapsan.utils import line_plot, plot_params
 def main():
     # --- Datasets and values to plot ---
     vals             = [
-                        'velocity',
-                        'ye',
-                        'rho',
-                        'pressure',
-                        'temperature',
-                        'encm',
-                        'sound',
-                        'mach',
-                        'entropy',
+                        # 'velocity',
+                        # 'ye',
+                        # 'rho',
+                        # 'pressure',
+                        # 'temperature',
+                        # 'encm',
+                        # 'sound',
+                        # 'mach',
+                        # 'entropy',
                         'abar',
-                        'u_int',
-                        'u_nu', # neutrino energies
-                        'y_nu',                        
+                        # 'u_int',
+                        # 'u_nu', # neutrino energies
+                        # 'y_nu',                        
                        ]
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
@@ -60,7 +60,7 @@ def main():
     base            = 'g2k_c1.4k_p0.3k'
     # base            = 'g6k_c5k_p0.3k'
     # base            = 'g4k_c3k_p0.3k'
-    base            = 'g2k_rcrit1.0'#_eosflg5'
+    base            = 'g2k_rcrit1.0_eosflg5'
     
     end             = ''
     # end             = '_ye'
@@ -87,9 +87,9 @@ def main():
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = True   # convert binary to readable (really only needed to be done once) 
+    convert2read     = False#True   # convert binary to readable (really only needed to be done once) 
     only_last        = False#True   # only convert from the latest binary file (e.g., latest *_restart_*)
-    only_post_bounce = True    # only produce plots after the bounce    
+    only_post_bounce = False#True    # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
     compute          = False#True
