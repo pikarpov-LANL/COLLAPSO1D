@@ -53,7 +53,10 @@ program read
           character*1024 filin,filout,eos_table
           character*1 ajunk
     !          
-          legacy_grid = .true.         
+          ! applies legacy grid conditions; ignores grid size parameters
+          ! it only works with subroutine setup_grid, which does not iterate on the grid
+          ! if you want to use it, please uncomment the setup_grid in the main program below
+          legacy_grid = .false.
     !                                                                                                                           
           mcut    = 40. 
           max     = 0 
