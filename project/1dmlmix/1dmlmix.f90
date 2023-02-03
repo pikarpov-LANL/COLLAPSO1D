@@ -220,7 +220,7 @@
       if(ieos.eq.1)call eospg(ncell,rho,u) 
       if(ieos.eq.2)call eospgr(ncell,rho,u) 
       if(ieos.eq.3.or.ieos.eq.4)call eos3(ncell,rho,u,ye) 
-      if(ieos.eq.5.or.ieos.eq.6)call eos5(ncell,rho,u,ye)
+      if(ieos.eq.5)call eos5(ncell,rho,u,ye)
 !                                                                       
 !--do gravity                                                           
 !  --------------------------------------------------------             
@@ -1154,16 +1154,16 @@
          else 
             if (ieos.eq.3) then 
 !--the energy is the variable of state:                                 
-            du(kp05) =-pdv + 0.5*dq(kp05) - dunu(kp05) 
-            if (rho(kp05+1).gt.0.1.and.kp05.lt.1) then 
-               xp05 = .5d0*(x(k)+x(k1)) 
-               xp15 = .5d0*(x(k1)+x(k1+1)) 
-               if (temp(kp05)*xp05.gt.1.2d0*temp(kp05+1)*xp15) then 
-                  dubef    = du(kp05) 
-                  du(kp05) = min(1.2d0*du(kp05),-1.d-2*du(kp05)) 
-                  print *, 'Artificial Cooling', dubef, du(kp05) 
-               end if 
-            end if 
+                du(kp05) =-pdv + 0.5*dq(kp05) - dunu(kp05) 
+                if (rho(kp05+1).gt.0.1.and.kp05.lt.1) then 
+                    xp05 = .5d0*(x(k)+x(k1)) 
+                    xp15 = .5d0*(x(k1)+x(k1+1)) 
+                    if (temp(kp05)*xp05.gt.1.2d0*temp(kp05+1)*xp15) then 
+                        dubef    = du(kp05) 
+                        du(kp05) = min(1.2d0*du(kp05),-1.d-2*du(kp05)) 
+                        print *, 'Artificial Cooling', dubef, du(kp05) 
+                    end if 
+                end if 
 !            du(kp05)=-pdv  - dunu(kp05)                                
 !                                                                       
             elseif (ieos.eq.4.or.ieos.eq.5) then 
@@ -1258,7 +1258,7 @@
       kount23  = 0
       kount32  = 0
       rhomax   = 0.0
-      t9freeze = t9nse-1.5
+      t9freeze = t9nse-1.5      
 !                                                                       
 !--entropy conversion factor                                            
       sfac=avokb*utemp/uergg 
@@ -1319,156 +1319,72 @@
             ycc(k,2)      = real(xpk) 
             ycc(k,3)      = real(xnk) 
             ycc(k,iycc)   = (1.0-real(dyccm))/(amas(iycc))**2 
-            ycc(k,iycc+1) = real(dyccm)/(amas(iycc))**2
-         
-!--if EOS tables are used
-        elseif(ieos.eq.5.and.ieos.eq.6) then
-            
-            keyerr  = 0   
-            keytemp = 1 ! coming in with rho,temperature,ye         
-            
-            upr  = umass/udist/utime**2
-            uv   = udist/utime
-            sfac = avokb*utemp/uergg
-
-            if(ifleos(k).ne.3.and.rho(k).gt.rhoswe) then 
-                ifleos(k) = 3                 
-                kount23   = kount23+1 
-    !--make call to EOS Tables to get the entropy or intenal energy              
-    !--at present rho, ye, T  
-                
-                xrho  = rho(k)*udens
-                !xenr  = u(k)*uergg
-                xtemp = temp(k)*utemp*boltzmev
-                xye   = ye_table(k)
-                !xent  = u2(k)/sfac                                                                    
-                            
-                call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,             &
-                    xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-                    xmuhat_table,keytemp,keyerr,precision)
-
-                u(k)   = xenr/uergg 
-                xp(k)  = xxp
-                xn(k)  = xxn
-                eta(k) = xmu_e/xtemp                
-                xmuek  = xmu_e/utemp/boltzmev
-                xmuhk  = xmuhat_table/utemp/boltzmev 
-    !--recalculate du if necessary                                          
-                if (ieos.eq.5) then 
-                    du(k) = (0.5*dq(k) - dunu(k) +                           &
-                            sfac*dye(k)*(xmuhk-xmuek))/                      &
-                            temp(k)   
-                    print *,'du was recalculated,'
-                    print *,'change occured at cell',k,u(k),ifleos(k) 
-                endif 
-            elseif(ifleos(k).eq.3.and.rho(k).lt.rhoswe) then 
-    !-- switch back to internal energy variable of state                    
-                call nsestart(tempk,rhok,yek,xpk,xnk) 
-                call nsetemp(k,tempk,rhok,yek,tempk,xpk,xnk,                &
-                             xak,xhk,yehk,zbark,abark,ubind,dubind)         
-                dens  = rho(k)*uorho1 
-                abar2 = zbark/yek 
-
-                !
-                keytemp = 3 !coming in with pressure,temp,ye (solve for rho)
-
-                xtemp = temp(k)*utemp*boltzmev
-                xye   = ye_table(k)
-                xprs  = upr*pr(k)
-
-                call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,             &
-                    xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-                    xmuhat_table,keytemp,keyerr,precision)
-                ! dens = xrho/udens !maybe not?
-                dens  = rho(k)
-                etak  = xmu_e/xtemp
-                zbark = xzbar
-
-                call coulomb(dens,zbark,yek,ucoul,pcoul)             
-                u(k)      = ucoul+ubind/uergg+etot/uou1 
-                xp(k)     = xpk 
-                xn(k)     = xnk 
-                eta(k)    = etak 
-                ifleos(k) = 2 !<-- TODO: check this!
-                kount32   = kount32+1 
-    !--recalculate du if needed                                             
-                if (ieos.eq.5) then 
-                    km1  = k-1 
-                    akp1 = pi4*x(k)*x(k) 
-                    akp  = pi4*x(km1)*x(km1) 
-                    pdv  = pr(k)*(akp1*v(k)-akp*v(km1)) 
-        !-- we subtract the energy added to the neutrino field                  
-                    du(k)=-pdv/deltam(k) + 0.5*dq(k) - dunu(k) 
-                endif 
-            endif
-
-!--if EOS tables are *NOT* used            
-        else
-            if(ifleos(k).ne.3.and.rho(k).gt.rhoswe) then 
-    !ifleos(k).eq.2.and.rho(k).gt.rhoswe) then                              
-                ifleos(k) = 3 
-                kount23   = kount23+1 
-    !--make call to sleos to get the entropy or intenal energy              
-    !--at present rho, ye, T                                                
-                brydns    = rho(k)*uslrho 
-                pprev     = xpf(k) 
-                inpvar(1) = tempk*usltemp 
-                inpvar(2) = pvar2(k) 
-                inpvar(3) = pvar3(k) 
-                inpvar(4) = pvar4(k) 
-    !            if (k.gt.20.and.k.lt.30) then                              
-    !               print *, k, rho(k), tempk, u(k)                         
-    !               print *, k, inpvar(1), yek, brydns                      
-    !            end if                                                     
-                call slwrap(k,inpvar,yek,brydns,pprev,                      &
-                            psl,usl,dusl,gamsl,etak,xpk,xnk,xak,xhk,        &
-                            yehk,abark,xmuh,stot)                                  
-                xpf(k)   = pprev 
-                pvar2(k) = inpvar(2) 
-                pvar3(k) = inpvar(3) 
-                pvar4(k) = inpvar(4) 
-                u(k)     = usl/uslu 
-                xp(k)    = xpk 
-                xn(k)    = xnk 
-                eta(k)   = etak 
-                xmuek    = etak*temp(k) 
-                xmuhk    = xmuh/utmev 
-    !--recalculate du if necessary                                          
-                if (ieos.eq.4) then 
+            ycc(k,iycc+1) = real(dyccm)/(amas(iycc))**2                  
+        
+        elseif(ifleos(k).ne.3.and.rho(k).gt.rhoswe) then 
+!ifleos(k).eq.2.and.rho(k).gt.rhoswe) then                              
+            ifleos(k) = 3 
+            kount23   = kount23+1 
+!--make call to sleos to get the entropy or intenal energy              
+!--at present rho, ye, T                                                
+            brydns    = rho(k)*uslrho 
+            pprev     = xpf(k) 
+            inpvar(1) = tempk*usltemp 
+            inpvar(2) = pvar2(k) 
+            inpvar(3) = pvar3(k) 
+            inpvar(4) = pvar4(k) 
+!            if (k.gt.20.and.k.lt.30) then                              
+!               print *, k, rho(k), tempk, u(k)                         
+!               print *, k, inpvar(1), yek, brydns                      
+!            end if                                                     
+            call slwrap(k,inpvar,yek,brydns,pprev,                      &
+                        psl,usl,dusl,gamsl,etak,xpk,xnk,xak,xhk,        &
+                        yehk,abark,xmuh,stot)                                  
+            xpf(k)   = pprev 
+            pvar2(k) = inpvar(2) 
+            pvar3(k) = inpvar(3) 
+            pvar4(k) = inpvar(4) 
+            u(k)     = usl/uslu 
+            xp(k)    = xpk 
+            xn(k)    = xnk 
+            eta(k)   = etak 
+            xmuek    = etak*temp(k) 
+            xmuhk    = xmuh/utmev 
+!--recalculate du if necessary                                          
+            if (ieos.eq.4) then 
                 du(k) = (0.5*dq(k) - dunu(k) +                           &
                         sfac*dye(k)*(xmuhk-xmuek))/                      &
                         temp(k)   
                 print *,'du was recalculated,'
                 print *,'change occured at cell',k,u(k),ifleos(k) 
-                endif 
-            elseif(ifleos(k).eq.3.and.rho(k).lt.rhoswe) then 
-    !-- switch back to internal energy variable of state                    
-                call nsestart(tempk,rhok,yek,xpk,xnk) 
-                call nsetemp(k,tempk,rhok,yek,tempk,xpk,xnk,                &
-        &                   xak,xhk,yehk,zbark,abark,ubind,dubind)         
-                dens  = rho(k)*uorho1 
-                abar2 = zbark/yek 
-                call nados(tempk,dens,zbark,abar2,pel,eel,sel,              &
-        &                  ptot,etot,stot,dpt,det,dpd,ded,gamsl,etak)      
-                dens = rho(k) 
-                call coulomb(dens,zbark,yek,ucoul,pcoul)             
-                u(k)      = ucoul+ubind/uergg+etot/uou1 
-                xp(k)     = xpk 
-                xn(k)     = xnk 
-                eta(k)    = etak 
-                ifleos(k) = 2 
-                kount32   = kount32+1 
-    !--recalculate du if needed                                             
-                if (ieos.eq.4) then 
+            endif 
+        elseif(ifleos(k).eq.3.and.rho(k).lt.rhoswe) then 
+!-- switch back to internal energy variable of state                    
+            call nsestart(tempk,rhok,yek,xpk,xnk) 
+            call nsetemp(k,tempk,rhok,yek,tempk,xpk,xnk,                &
+    &                   xak,xhk,yehk,zbark,abark,ubind,dubind)         
+            dens  = rho(k)*uorho1 
+            abar2 = zbark/yek 
+            call nados(tempk,dens,zbark,abar2,pel,eel,sel,              &
+    &                  ptot,etot,stot,dpt,det,dpd,ded,gamsl,etak)      
+            dens = rho(k) 
+            call coulomb(dens,zbark,yek,ucoul,pcoul)             
+            u(k)      = ucoul+ubind/uergg+etot/uou1 
+            xp(k)     = xpk 
+            xn(k)     = xnk 
+            eta(k)    = etak 
+            ifleos(k) = 2 
+            kount32   = kount32+1 
+!--recalculate du if needed                                             
+            if (ieos.eq.4) then 
                 km1  = k-1 
                 akp1 = pi4*x(k)*x(k) 
                 akp  = pi4*x(km1)*x(km1) 
                 pdv  = pr(k)*(akp1*v(k)-akp*v(km1)) 
-    !-- we subtract the energy added to the neutrino field                  
+!-- we subtract the energy added to the neutrino field                  
                 du(k)=-pdv/deltam(k) + 0.5*dq(k) - dunu(k) 
-                endif 
-                !print *,'change occured at cell',k,ifleos(k)
             endif 
+            !print *,'change occured at cell',k,ifleos(k)
         endif
 !                                                                    
       enddo 
@@ -1813,10 +1729,9 @@
 !          2 -> coming in with rho,entropy,ye (solve for temp)
 !          3 -> coming in with pressure,temp,ye (solve for rho)
 !
+        ! TODO: remove ieos=6 option
         if (ieos.eq.5) then
             keytemp = 2
-        elseif (ieos.eq.6) then
-            keytemp = 0
         endif
 
         keyerr  = 0
@@ -1831,39 +1746,39 @@
                     
         do k=1,ncell                 
             xrho  = rho(k)*udens
-            xenr  = u(k)*uergg
+            xenr  = u2(k)*uergg
+            xent  = u(k)/sfac
             xtemp = temp(k)*utemp*boltzmev
-            xye   = ye_table(k)
-            xent  = u2(k)/sfac
-            
+            xye   = ye_table(k)            
+         
             ! set upper and lower bounds based on SFHo table limits
             if (xye  .gt.eos_yemax)  then
-            print*, 'xye hit max', k
-            xye   = eos_yemax
+                print*, 'xye hit max', k, xye
+                xye   = eos_yemax
             endif
             if (xrho .lt.eos_rhomin)  then
-            print*, 'xrho hit min', k
-            xrho  = eos_rhomin
+                print*, 'xrho hit min', k, xrho
+                xrho  = eos_rhomin
             endif
             if (xtemp.lt.eos_tempmin) then
-            print*, 'xtemp hit min', k
-            xtemp = eos_tempmin
+                print*, 'xtemp hit min', k, xtemp
+                xtemp = eos_tempmin
             endif   
             if (xent .lt.0.000131) then
-            print*, 'xent hit min', k
-            xent  = 0.000131  
+                print*, 'xent hit min', k, xent
+                xent  = 0.000131  
             endif
 
             if (xye.lt.0.) then 
-            print *,'k,yek',k,xye 
-            stop "ERROR: xye < 0"
+                print *,'k,yek',k,xye 
+                stop "ERROR: xye < 0"
             endif                  
 !                                                                       
 !--call EOS tables                                               
-!        
+!                    
             call nuc_eos_full(xrho,xtemp,xye,xenr,xprs,xent,xcs2,xdedt,             &
                 xdpderho,xdpdrhoe,xxa,xxh,xxn,xxp,xabar,xzbar,xmu_e,xmu_n,xmu_p,    &
-                xmuhat_table,keytemp,keyerr,precision)
+                xmuhat_table,keytemp,keyerr,precision)            
             !                                                                       
             !--store values                                                       
             !                           
@@ -1875,10 +1790,10 @@
             xmuhat(k) = xmuhat_table/utemp/boltzmev                 
 
             if (xxp.le.1d-20) then 
-            xxp=0. 
+                xxp=0. 
             end if 
             if (xxn.le.1d-20) then 
-            xxn=0. 
+                xxn=0. 
             end if 
 
             xp(k)     = xxp
@@ -1887,8 +1802,8 @@
             temp(k)   = xtemp/utemp/boltzmev
             prold(k)  = pr(k) 
             pr(k)     = xprs/upr
-            u(k)      = xenr/uergg
-            u2(k)     = xent*sfac
+            u2(k)     = xenr/uergg
+            u(k)      = xent*sfac
             vsound(k) = sqrt(xcs2)/uv                  
 
             ! zbar would be nice but not completely *necessary*          
@@ -2823,8 +2738,9 @@
       parameter (idim=10000) 
       parameter (tiny=1d-15) 
 
-      ! TODO: try lower rcrit to 0.1 or less to trap ~everything
-      parameter (rcrit=1.) 
+      ! rcrit=0.1: things go very south
+      ! rcrit=1.0: ieos=5 -> explodes, ieos=4 -> behaves OK
+      parameter (rcrit=10.0) 
 !                                                                       
       dimension x(0:idim), ye(idim) 
       dimension ynue(idim),ynueb(idim),ynux(idim),                      &
@@ -5627,7 +5543,8 @@
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
 !                                                                       
-      character*1024 filin,filout,eos_table      
+      character*1024 filin,filout,outpath,eos_table   
+      logical found_path   
 
       data pi4/12.56637d0/ 
       gg=13.34 
@@ -5690,7 +5607,7 @@
       print*, 'Dump time interval (s):', dtime
       print*, 'Max time (s):          ', tmax
       print*, 'EOS:                   ', ieos
-      if (ieos.eq.5.or.ieos.eq.6) print*, 'EOS Table Path:        ', trim(eos_table)
+      if (ieos.eq.5) print*, 'EOS Table Path:        ', trim(eos_table)
       !print*, cq,cl
       !print*, iextf,ieos,dcore
       !print*, ncell,delp,nups,damp,dcell
@@ -5702,10 +5619,20 @@
       tmax  = tmax/10 
 !                                                                       
 !--open binary file containing initial conditions                       
-!                                                  
-      open(59,file="Nu_lum.txt")           
+!                                                                 
       open(60,file=trim(filin),form='unformatted') 
-      open(61,file=trim(filout),form='unformatted')      
+      open(61,file=trim(filout),form='unformatted') 
+!      
+!--find binary output path to write readable neutrino luminosities
+!      
+      outpath    = ' '
+      found_path = .false.
+      do i=len(trim(filout)),1,-1          
+          if (filout(i:i).eq.'/'.or.filout(i:i).eq.'\') found_path = .true.          
+          if (found_path) outpath(i:i) = filout(i:i)
+      enddo
+
+      open(59,file=trim(outpath)//"nu_lum.txt")          
 !
 !--adjust position pointer relative to individual binary file
 !             
@@ -5813,7 +5740,7 @@
       enddo 
 
       
-      if (ieos.eq.5.or.ieos.eq.6) then 
+      if (ieos.eq.5) then 
         call readtable(trim(eos_table))
       endif
 !                                                                       
@@ -6344,7 +6271,7 @@
 !--this because in NSE, we can have u(i)< lt 0                          
 !--so take energy with respect to iron                                  
                   usi = u(i)+8.8*umevnuc 
-               elseif (ifleos(i).eq.3.or.ifleos(i).eq.4) then
+               elseif (ifleos(i).eq.3.or.ifleos(i).eq.4.or.ifleos(i).eq.5) then
                   if (ieos.eq.3) then 
                      usi = u(i)+8.8*umevnuc 
                   else 
@@ -6529,7 +6456,7 @@
 !                                                                       
 !--flag particles according to physical state                           
 !
-         if (ieos.ne.5.or.ieos.ne.6) then                                                            
+         if (ieos.ne.5.and.ieos.ne.6) then     
             call eosflg(ncell,rho,ye,u,f1ye,f1u)
          endif          
 !                                                                       
@@ -6553,7 +6480,7 @@
          if(ntstep.eq.1) then
              write(59,"(A)") "Time [s]  rlumnue [foe/s]  enue [MeV] &
                 & rlumnueb [foe/s]  enueb [MeV]  rlumnux [foe/s]  enux [MeV]"
-         endif
+         endif         
 
          if (mod(nupk,nups).eq.0) then 
             write(59,120)time*utime,convf*rlumnue,enue,convf*rlumnueb,enueb,  &
@@ -6581,6 +6508,7 @@
 !                                                                       
 !--start new time step                                                  
 !        
+        !  if (ntstep.eq.1) stop
          if(time.lt.tnext)then 
             !print *, '****time*****',time                              
   520       format(A,I12,A) 
