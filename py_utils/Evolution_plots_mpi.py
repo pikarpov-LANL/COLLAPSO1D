@@ -31,15 +31,15 @@ from sapsan.utils import line_plot, plot_params
 def main():
     # --- Datasets and values to plot ---
     vals             = [
-                        # 'velocity',
-                        # 'ye',
-                        # 'rho',
-                        # 'pressure',
-                        # 'temperature',
-                        # 'encm',
-                        # 'sound',
-                        # 'mach',
-                        # 'entropy',
+                        'entropy',
+                        'velocity',
+                        'ye',
+                        'rho',
+                        'pressure',
+                        'temperature',                        
+                        'encm',
+                        'sound',
+                        'mach',                        
                         'abar',
                         # 'u_int',
                         # 'u_nu', # neutrino energies
@@ -51,7 +51,7 @@ def main():
     masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
     # masses           = [13.0,15.0] # for ye
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
-    masses           = [12.0]
+    masses = [12.0]
 
     # --- Paths & Names ---        
     # base            = 'g9k_c8.4k_p_0.3k'
@@ -60,7 +60,8 @@ def main():
     base            = 'g2k_c1.4k_p0.3k'
     # base            = 'g6k_c5k_p0.3k'
     # base            = 'g4k_c3k_p0.3k'
-    base            = 'g2k_rcrit1.0_eosflg5'
+    # base            = 'g2k_rcrit1.0_eosflg5'
+    # base            = 'legacy_grid_ieos4'
     
     end             = ''
     # end             = '_ye'
@@ -81,7 +82,10 @@ def main():
     #base_path        = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
     
     #base_path = '/home/pkarpov/scratch/1dccsn/sleos/rcrit/'
-    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit/entropy_test/'
+    #base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit/entropy_test/'
+    #base_path = '/home/pkarpov/scratch/1dccsn/presn/input_grid/'
+    base_path = '/home/pkarpov/scratch/1dccsn/sleos/dupp0/'
+    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/fleos5/'
     
     base_file        = f'DataOut_read'
     save_name_amend  = ''      # add a custom index to the saved plot names
@@ -89,7 +93,7 @@ def main():
     # --- Extra ---
     convert2read     = False#True   # convert binary to readable (really only needed to be done once) 
     only_last        = False#True   # only convert from the latest binary file (e.g., latest *_restart_*)
-    only_post_bounce = False#True    # only produce plots after the bounce    
+    only_post_bounce = True    # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
     compute          = False#True
@@ -160,14 +164,18 @@ def main():
                           base_path = base_path, base_file = base_file, dataset = dataset,
                           save_name_amend=save_name_amend, only_post_bounce = only_post_bounce)
                      
-            bounce_files = pf.check_bounce(compute=compute)  
+            # bounce_delay is in [s]         
+            bounce_files = pf.check_bounce(compute=compute, bounce_delay=2e-3)
             bounce       = pf.bounce_ind      
             if only_post_bounce:                   
                 shift        = bounce
-                numfiles     = bounce_files                            
+                numfiles     = bounce_files                                                          
             else:
                 shift = get_first_dump(base_path, dataset, base_file)
                 numfiles -= 1
+                
+            print(f'Bounce at file:         {bounce+1}')
+            print(f'Post bounce files:      {bounce_files}')  
                         
             colored.subhead( '\n-------- Intervals --------')
             interval  = get_interval(size, numfiles)                                  
@@ -187,13 +195,17 @@ def main():
             bounce    = 0   
             
         numfiles = comm.bcast(last_file, root=0)
-        interval = comm.scatter(interval, root=0)       
+        interval = comm.scatter(interval, root=0)    
+        
+        # numfiles = 1
+        # interval = [0,1] 
+        # bounce   = 0  
         
         pf = Profiles(rank = rank, numfiles = numfiles, 
                       base_path = base_path, base_file = base_file, dataset = dataset,
                       save_name_amend=save_name_amend, only_post_bounce = only_post_bounce, 
                       interval = interval, dpi = dpi)
-        
+        pf.plot_grid(idump=0)
         if not only_post_bounce: pf.bounce_ind = comm.bcast(bounce, root=0)
         else: pf.bounce_ind = comm.bcast(shift, root=0)
 
@@ -287,7 +299,7 @@ def get_interval(size, numfiles, printout=True):
         idle = size - numfiles
         if printout: colored.warn(f'not enough work for all ranks - {idle} will idle during conversion\n')
         size = numfiles
-    
+        
     interval_size = int(numfiles/size)
     leftover      = numfiles%size
     
@@ -557,10 +569,10 @@ class Profiles:
         
         self.plot_file = f'{self.plot_path}/{val}{self.versus_name}'
 
-    def check_bounce(self, compute=False):     
+    def check_bounce(self, compute=False, bounce_delay=2e-3):     
+        # bounce_delay is in [s]
         self.bounce_ind = -1
         bounced         = 0
-        bounce_delay    = 2e-3 # [ms]
         
         # if compute, then the bounce time is unknown: 
         # need to go through each file from the beginning
@@ -568,8 +580,13 @@ class Profiles:
             for i in range(self.numfiles):
                 
                 ps, time1d, bounce_time = self.open_checkpoint(i, fullout=False)
-                                 
-                rho = ps[3]
+
+                index  = 0
+                for h in self.header:            
+                    if '[' in h: continue  
+                    valname = h.lower()                    
+                    if 'rho' in valname: rho = ps[index]
+                    index += 1
                 
                 # check for nuclear density
                 if np.amax(rho) > 2e14:
@@ -905,10 +922,10 @@ class Profiles:
         
         for val in vals:
             
-            label  = [f'ind     {i+1}']
-            loc    = 4
-            ylim   = None
-            unlogy = False            
+            label     = [f'ind     {i+1}']
+            loc       = 4
+            ylim      = None
+            unlogy    = False            
             
             if versus=='encm':
                 if val == 'encm': continue
@@ -920,72 +937,76 @@ class Profiles:
             elif versus=='r':
                 x         = r
                 xlabel    = r'$Radius \; [km]$'
-                xlim      = (1e0,1e5)
+                xlim      = [1e0,1e5]
                 plot_type = 'loglog'
                 unit      = self.cm2km
             else: colored.error("unknown 'versus' {versus}, trying to exit")
                         
-            if val in valmap.keys(): to_plot = [[x*unit, valmap[val]]]
-            else: to_plot = [[x*unit, valmap.get(val, 'empty')]]
+            if val in valmap.keys(): to_plot = np.array([[x*unit, valmap[val]]], dtype=object)
+            else: to_plot = np.array([[x*unit, valmap.get(val, 'empty')]], dtype=object)
             
             if val == 'rho': 
                 ylabel  = r'Density $[g/cm^3]$'
-                ylim    = (1e4,1e15)
+                ylim    = [1e4,1e15]
                 loc     = 1
             elif val == 'velocity':                
                 ylabel  = r'Velocity $[cm/s]$'
-                ylim    = (-1.5e10, 3e9)
+                ylim    = [-1.5e10, 3e9]
                 unlogy  = True                              
             elif val == 'sound':                
                 ylabel  = r'$V_{sound}$ $[cm/s]$'
-                ylim    = (0, 1.4e10)
+                ylim    = [0, 1.4e10]
                 loc     = 1
                 unlogy  = True  
             elif val == 'mach':                
-                to_plot = [[x*unit, abs(valmap['velocity']/valmap['sound'])]]
+                to_plot = np.array([[x*unit, abs(valmap['velocity']/valmap['sound'])]], dtype=object)
                 ylabel  = 'Mach'
-                ylim    = (0,11)
+                ylim    = [0,11]
                 loc     = 1
                 unlogy  = True                                               
             elif val == 'pressure':                
                 ylabel  = r'$P_{gas} \; [\frac{g}{cm\;s^2}]$'
-                ylim    = (1e20,1e36)   
+                ylim    = [1e20,1e36]
                 loc     = 1
             elif val == 'temperature':                
                 ylabel  = r'Temperature $[K]$'
-                ylim    = (1e7,4e11)
+                ylim    = [1e7,4e11]
                 loc     = 1
             elif val == 'encm':    
-                to_plot = [[x*unit, encm]]            
+                to_plot = np.array([[x*unit, encm]], dtype=object)            
                 ylabel  = r'Enclosed Mass $[M_{\odot}]$'
-                ylim    = (1,2)
-                unlogy  = True                
+                ylim    = [1,2]
+                unlogy    = True                
             elif val == 'ye':                
                 ylabel  = r'$Y_e$'
-                ylim    = (0,1)
+                ylim    = [0,1]
                 unlogy  = True 
             elif val == 'entropy':                
                 ylabel  = r'Entropy $[k_b/baryon]$'
+                ylim    = [1e-1, 2e1]
             elif val == 'abar':                
                 ylabel  = r'$\bar{A}$'
-                ylim    = (0,150)
+                ylim    = [0,150]
+                loc     = 1
                 unlogy  = True
             elif val == 'u_int':                
                 ylabel  = r'Energy $[erg/g]$'
-                ylim    = (1e15,1e22)
+                ylim    = [1e14,1e22]
             elif val == 'u_nu':
-                to_plot = [[x*unit, valmap.get('u_nue',  'empty')],
-                           [x*unit, valmap.get('u_nueb', 'empty')],
-                           [x*unit, valmap.get('u_nux',  'empty')]]
+                if i < self.bounce_ind: continue
+                to_plot = np.array([[x*unit, valmap.get('u_nue',  'empty')],
+                                    [x*unit, valmap.get('u_nueb', 'empty')],
+                                    [x*unit, valmap.get('u_nux',  'empty')]])
                 ylabel  = r'Energy $\nu$ $[erg/g]$'
-                ylim    = (1e8,1e22)
+                ylim    = [1e8,1e22]
                 label   = ['nue', 'nueb', 'nux']
             elif val == 'y_nu':                
-                to_plot = [[x*unit, valmap.get('y_nue',  'empty')],
-                           [x*unit, valmap.get('y_nueb', 'empty')],
-                           [x*unit, valmap.get('y_nux',  'empty')]]
+                if i < self.bounce_ind: continue
+                to_plot = np.array([[x*unit, valmap.get('y_nue',  'empty')],
+                                    [x*unit, valmap.get('y_nueb', 'empty')],
+                                    [x*unit, valmap.get('y_nux',  'empty')]])
                 ylabel  = r'Fraction $\nu$'
-                ylim    = (1e-10,1)
+                ylim    = [1e-10,1]
                 label   = ['nue', 'nueb', 'nux']
             else:                 
                 if self.rank==0 and i==self.interval[0]: 
@@ -995,8 +1016,17 @@ class Profiles:
             if type(to_plot[-1][1]) != np.ndarray:
                 if self.rank==0 and i==self.interval[0]: 
                     colored.warn(f"entries to plot '{val}' were not found; skipping")                        
-                continue                
-            
+                continue     
+                                    
+            if ylim!=None:                
+                ymin = np.amin(to_plot[:,1])
+                ymax = np.amax(to_plot[:,1])
+                if (plot_type=="loglog" or plot_type=='semilogy') and ymin <= 0:
+                    ymin = np.amin(np.absolute(to_plot[:,1]))
+                    if ymin == 0: ymin = 1 # if ymin is still <=0 for log y-axis, set it to 1\
+                while ymin < ylim[0]:ylim[0] *= 0.9
+                while ymax > ylim[1]:ylim[1] *= 1.1
+                                            
             if versus=='encm': loc = 0    
             
             if unlogy: 
@@ -1008,7 +1038,7 @@ class Profiles:
                            label     = label,
                            linestyle = ['-','--',':'],               
                            figsize   = (10,6), 
-                           dpi=self.dpi
+                           dpi       = self.dpi
                            )    
             
             # check if after bounce                
@@ -1039,8 +1069,8 @@ class Profiles:
                 
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
-            ax.set_xlim(xlim)
-            ax.set_ylim(ylim)              
+            ax.set_xlim(xlim)            
+            ax.set_ylim(ylim) 
             
             self.sim_label(ax)
 
