@@ -24,8 +24,7 @@ Parameters in the `project/1dmlmix/setup`
 | `2`  | eospgr     | equation of state that includes gas and radiation pressure                                                                              |
 | `3`  | eos3       | Ocean eos assuming NSE for low density and Swesty-Lattimer eos for high density above `rhoswe`. Uses *energy* as the primary variable.  |
 | `4`  | eos3       | Ocean eos assuming NSE for low density and Swesty-Lattimer eos for high density above `rhoswe`. Uses *entropy* as the primary variable. |
-| `5`  | eos5       | SFHo EOS Tables with *entropy* as a primary variable.                                                                                     |
-| `6`  | eos5       | SFHo EOS Tables with *energy* as a primary variable.                                                                                      |
+| `5`  | eos5       | SFHo EOS Tables with *entropy* as a primary variable.                                                                                   |
 
 ## Data Preparation
 
