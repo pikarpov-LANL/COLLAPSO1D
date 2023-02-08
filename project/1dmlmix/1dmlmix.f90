@@ -2513,8 +2513,7 @@
 !                                                                       
 !--check if denue larger than 0.25*rlumnue                              
 !                                                                       
-!--change this back to .25                                              
-      if (denue.gt.0.10*rlumnue) then 
+      if (denue.gt.0.50*rlumnue) then 
          jtrape = 1 
 !         print*,'nuabs: nue absorption/emission=',                     
 !     1              denue/rlumnue                                      
@@ -2524,8 +2523,7 @@
          jtrape = 0 
       endif 
 !                                                                       
-! --change this back to .25                                             
-      if (denueb.gt.0.10*rlumnueb) then 
+      if (denueb.gt.0.50*rlumnueb) then 
          jtrapb = 1 
 !         print*,'nuabs: nueb absorption/emission=',                    
 !     1            denueb/rlumnueb                                      
@@ -2801,23 +2799,18 @@
 !-rnue usually set at 1.                                                
          if (rnue.lt.rcrit) then 
             trapnue(k)=.false. 
-            trapnueb(k)=.false.
          else 
             kountnue=kountnue+1 
             trapnue(k)=.true. 
             cmaxnue=dmax1(ak,cmaxnue) 
-
+         endif 
+         if (rnueb.lt.rcrit) then 
+            trapnueb(k)=.false. 
+         else 
             kountnueb=kountnueb+1 
             trapnueb(k)=.true. 
             cmaxnueb=dmax1(ak,cmaxnueb) 
          endif 
-        !  if (rnueb.lt.rcrit) then 
-        !    trapnueb(k)=.false. 
-        !  else 
-        !     kountnueb=kountnueb+1 
-        !     trapnueb(k)=.true. 
-        !     cmaxnueb=dmax1(ak,cmaxnueb) 
-        !  endif 
          if (rnux.lt.rcrit) then 
             trapnux(k)=.false. 
          else 
@@ -4423,7 +4416,7 @@
 !                                                                       
 !--check if dex larger than 0.25*rlumnux                                
 !                                                                       
-      if (dex.gt.0.15*rlumnux) then 
+      if (dex.gt.0.5*rlumnux) then 
          jtrapx=1 
 !         print*,'nuscat: nux scattering=',                             
 !     1              dex/rlumnux                                        
@@ -5632,7 +5625,7 @@
           if (found_path) outpath(i:i) = filout(i:i)
       enddo
 
-      open(59,file=trim(outpath)//"nu_lum.txt")          
+      open(59,file=trim(outpath)//"nu_lum.txt")    
 !
 !--adjust position pointer relative to individual binary file
 !             
