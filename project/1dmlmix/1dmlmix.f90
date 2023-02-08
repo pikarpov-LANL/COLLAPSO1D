@@ -1729,11 +1729,7 @@
 !          2 -> coming in with rho,entropy,ye (solve for temp)
 !          3 -> coming in with pressure,temp,ye (solve for rho)
 !
-        ! TODO: remove ieos=6 option
-        if (ieos.eq.5) then
-            keytemp = 2
-        endif
-
+        keytemp = 2
         keyerr  = 0
         
         upr  = umass/udist/utime**2

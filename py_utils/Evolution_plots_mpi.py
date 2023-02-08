@@ -36,32 +36,33 @@ def main():
                         'ye',
                         'rho',
                         'pressure',
-                        'temperature',                        
+                        'temperature',
                         'encm',
-                        'sound',
-                        'mach',                        
+                        # 'sound',
+                        'mach',
                         'abar',
-                        # 'u_int',
-                        # 'u_nu', # neutrino energies
-                        # 'y_nu',                        
+                        'u_int',
+                        'u_nu', # neutrino energies
+                        # 'y_nu',
                        ]
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
     # masses           = [11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] # for 1.5k and 2k 
-    masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
+    # masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
     # masses           = [13.0,15.0] # for ye
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
-    masses = [12.0]
+    masses = [12.0,12.0,12.0,12.0,12.0,12.0]
 
     # --- Paths & Names ---        
     # base            = 'g9k_c8.4k_p_0.3k'
     # base            = 'g9k_c8.4k_p0.3k'
     # base            = 'g1.5k_c0.5k_p0.3k'
-    base            = 'g2k_c1.4k_p0.3k'
+    # base            = 'g2k_c1.4k_p0.3k'
     # base            = 'g6k_c5k_p0.3k'
     # base            = 'g4k_c3k_p0.3k'
     # base            = 'g2k_rcrit1.0_eosflg5'
     # base            = 'legacy_grid_ieos4'
+    base            = 'g2k_denue0.75'
     
     end             = ''
     # end             = '_ye'
@@ -69,9 +70,13 @@ def main():
     # end             = '_1.3P'
 
     datasets        = [f's{m}_{base}{end}' for m in masses]
+    
+    datasets        = ['s12.0_g2k_rcrit1','s12.0_g2k_rcrit2',
+                       's12.0_g2k_rcrit3','s12.0_g2k_rcrit5',
+                       's12.0_g2k_rcrit7','s12.0_g2k_rcrit10']
            
-    if 19.0 in masses and 'g9k' in base and '1.3P' not in end:
-        datasets[masses.index(19.0)] = f's19.0_g10k_c9.4k_p0.3k{end}'
+    # if 19.0 in masses and 'g9k' in base and '1.3P' not in end:
+    #     datasets[masses.index(19.0)] = f's19.0_g10k_c9.4k_p0.3k{end}'
         
     if   end == ''     : base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/'#test_extrema/'
     elif end == '_1.3P': 
@@ -84,15 +89,16 @@ def main():
     #base_path = '/home/pkarpov/scratch/1dccsn/sleos/rcrit/'
     #base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit/entropy_test/'
     #base_path = '/home/pkarpov/scratch/1dccsn/presn/input_grid/'
-    base_path = '/home/pkarpov/scratch/1dccsn/sleos/dupp0/'
-    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/fleos5/'
+    # base_path = '/home/pkarpov/scratch/1dccsn/sleos/dupp0/rcrit10/'
+    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/fleos5/rcrit10/'
+    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit_study/'
     
     base_file        = f'DataOut_read'
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = False#True   # convert binary to readable (really only needed to be done once) 
-    only_last        = False#True   # only convert from the latest binary file (e.g., latest *_restart_*)
+    convert2read     = True   # convert binary to readable (really only needed to be done once) 
+    only_last        = True   # only convert from the latest binary file (e.g., latest *_restart_*)
     only_post_bounce = True    # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
@@ -114,6 +120,11 @@ def main():
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
     rank = comm.Get_rank()    
+    
+    if rank==0: 
+        colored.head(f'\n=====================================')
+        colored.head(f'PATH: {base_path}')
+        colored.head(f'=====================================\n')
         
     # convert datasets in parallel
     if convert2read:# and len(datasets)>1:
@@ -996,7 +1007,7 @@ class Profiles:
                 if i < self.bounce_ind: continue
                 to_plot = np.array([[x*unit, valmap.get('u_nue',  'empty')],
                                     [x*unit, valmap.get('u_nueb', 'empty')],
-                                    [x*unit, valmap.get('u_nux',  'empty')]])
+                                    [x*unit, valmap.get('u_nux',  'empty')]], dtype=object)
                 ylabel  = r'Energy $\nu$ $[erg/g]$'
                 ylim    = [1e8,1e22]
                 label   = ['nue', 'nueb', 'nux']
@@ -1004,7 +1015,7 @@ class Profiles:
                 if i < self.bounce_ind: continue
                 to_plot = np.array([[x*unit, valmap.get('y_nue',  'empty')],
                                     [x*unit, valmap.get('y_nueb', 'empty')],
-                                    [x*unit, valmap.get('y_nux',  'empty')]])
+                                    [x*unit, valmap.get('y_nux',  'empty')]], dtype=object)
                 ylabel  = r'Fraction $\nu$'
                 ylim    = [1e-10,1]
                 label   = ['nue', 'nueb', 'nux']

@@ -97,6 +97,11 @@ class multirun:
             
     def initialize(self, rank):
         
+        if rank==0: 
+            colored.head(f'\n=====================================')
+            colored.head(f'PATH: {self.base_path}')
+            colored.head(f'=====================================\n')
+        
         if self.restart:
             # Restarts in parallel utilizing all given ranks
             if rank == 0: colored.head('<<< Converting Binary to Readable >>>') 
