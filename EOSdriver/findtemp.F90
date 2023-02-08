@@ -151,6 +151,7 @@ subroutine findtemp_entropy(lr,lt0,y,sin,keyerrt,rfeps)
   ltmax=logtemp(ntemp)
   ltmin=logtemp(1)
 
+!   print*, 'From findtemp ', lr,lt,y,s
   !preconditioning 1: do we already have the right temperature?
   call findthis(lr,lt,y,s,alltables(:,:,:,3),d1,d2,d3)
   if (abs(s-s0).lt.tol*abs(s0)) then
@@ -183,7 +184,6 @@ subroutine findtemp_entropy(lr,lt0,y,sin,keyerrt,rfeps)
         d2 = (s-s1)/(lt-lt1)
      endif
   enddo
-
 
  if(i.ge.itmax) then
     keyerrt=667

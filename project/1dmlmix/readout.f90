@@ -99,8 +99,20 @@
                (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc),            &
                (steps(i),i=1,nc),((ycc(i,j),j=1,nqn),i=1,nc),            &                  
                (vsound(i),i=1,nc),(pr_turb(i),i=1,nc)
-            !    (prnu(i),i=1,nc)               
-!        
+            !    (prnu(i),i=1,nc)   
+               
+!                read(42) nc,t,xmcore,rb,ftrape,ftrapb,ftrapx,    &
+!                   (x(i),i=0,nc),(v(i),i=0,nc),(q(i),i=1,nc),(dq(i),i=1,nc), &
+!                      (u(i),i=1,nc),(deltam(i),i=1,nc),(abar(i),i=1,nc), &
+!                      (rho(i),i=1,nc),(temp(i),i=1,nc),(ye(i),i=1,nc), &
+!                      (xp(i),i=1,nc),(xn(i),i=1,nc),(ifleos(i),i=1,nc), &
+!                      (ynue(i),i=1,nc),(ynueb(i),i=1,nc),(ynux(i),i=1,nc), &
+!                      (unue(i),i=1,nc),(unueb(i),i=1,nc),(unux(i),i=1,nc), &
+!                      (ufreez(i),i=1,nc),(pr(i),i=1,nc),(u2(i),i=1,nc), &
+!                     (te(i),i=1,nc),(teb(i),i=1,nc),(tx(i),i=1,nc)
+! !      
+!                  idump = k
+
          if (idump.eq.idump_old) then            
             stop "Repeated idump: probably reached the end of the file"
          endif
@@ -160,16 +172,25 @@
             sumzn=0. 
             sumfe=0. 
             iskip=0 
-            write(69,*) 'Time [s]  Bounce_Time [s] R_PNS [index] R_PNS [cm] R_shock [index]  R_shock [cm] &
-                        & nue_flux [foe/s] nu_e_flux [foe/s] nux_flux [foe/s]'
-            write(69,108)10.d0*t, 10.d0*bounce_time, int(pns_ind), 1.d9*pns_x,  &
-                         int(shock_ind), 1.d9*shock_x, 2.d-3*rlumnue,           &
+            write(69,'(A)') 'Time [s]  Bounce_Time [s] R_PNS [index] R_PNS [cm] R_shock [index]  R_shock [cm] &
+                        & nue_flux [foe/s] nueb_flux [foe/s] nux_flux [foe/s]'                        
+            write(69,108)utime*t, utime*bounce_time, int(pns_ind), udist*pns_x,  &
+                         int(shock_ind), udist*shock_x, 2.d-3*rlumnue,           &
                          2.d-3*rlumnueb, 2.d-3*rlumnux
-            write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
+            write(69,'(A)')'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
                         & Ye  Pressure [g/cm/s^2]  Temperature [K]  Sound [cm/s]  Entropy [kb/baryon] &
                         & P_turb [g/cm/s^2]  Abar  U_int [erg/g] U_nue [erg/g] &
                         & U_nueb [erg/g]  U_nux [erg/g] Y_nue Y_nueb Y_nux'            
                         ! & P_turb [g/cm/s^2]  P_nu [g/cm/s^2]  Abar  U_int [erg/g] U_nue [erg/g] &
+
+            ! write(69,*) 'Time [s]'
+            ! write(69,108) 10.d0*t
+
+            ! write(69,*)'Cell  M_enclosed [M_sol]  Radius [cm]  Rho [g/cm^3]  Velocity [cm/s] &
+            !             & Ye  Pressure [g/cm/s^2]  Temperature [K]  Entropy [kb/baryon] &
+            !             & Abar  U_int [erg/g] U_nue [erg/g] &
+            !             & U_nueb [erg/g]  U_nux [erg/g] Y_nue Y_nueb Y_nux'            
+
             do i=1,nc 
 !               write(69,103)i,encm(i),x(i),rho(i),v(i),ye(i),          
 !     $           vsound(i)                                             
@@ -247,6 +268,12 @@
                          abar(i),                                       &
                          uergg*u(i), uergg*unue(i), uergg*unueb(i),     &
                          uergg*unux(i), ynue(i), ynueb(i), ynux(i)
+
+                    !  write(69,103)i,encm(i),1.d9*x(i),2.d6*rho(i),      &
+                    !     1.d8*v(i), ye(i),2.d22*pr(i),                  &
+                    !     1.d9*temp(i), u2(i)/sfac, abar(i),             &
+                    !     uergg*u(i), uergg*unue(i), uergg*unueb(i),     &
+                    !     uergg*unux(i), ynue(i), ynueb(i), ynux(i)
 !                  if (i.gt.1) then                                     
                      if (ufreez(i).lt.1.d-10) then 
                        dene2=dene2+                                     &
@@ -266,8 +293,8 @@
 !     $                       1.d16*pr(i),1.d8*v(i),1.d9*temp(i)        
 !1.d14*ufreez(i),1.d16*pr(i),1.d8*v(i)                                  
                      end if 
-                     write(70,106) t*10.,deltam(i),2.d6*rho(i)          &
-     &                    ,1.d9*temp(i)                                 
+    !                  write(70,106) t*10.,deltam(i),2.d6*rho(i)          &
+    !  &                    ,1.d9*temp(i)                                 
                   else 
                      iskip=iskip+1 
                   end if 

@@ -212,35 +212,35 @@ program read
     !
     !--find the optimal deltam for the given convective region resolution      
     !
-    !       call search_deltam(nkep,yccin,vel,rad,dens,              &
-    !                          t9,yel,ab,omega,press,                &
-    !                          maxrad,deltam_growth,ieos,            &
-    !                          conv_grid,conv_grid_goal,             &
-    !                          enclmass_conv_cutoff,deltam_conv,     &
-    !                          pns_grid_goal,pns_cutoff,pns_grid)
-    ! !
-    ! !--Interpolate and setup the grid.
-    ! !--Growth rate past enclmass_conv_cutoff will keep  
-    ! !--adjusting via a binary-search-like algorithm until 
-    ! !--total grid size is within 1% of the idim
-    ! !     
-    !       call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
-    !                          t9,yel,ab,omega,press,                &
-    !                          maxrad,deltam_growth,ieos,            &
-    !                          conv_grid,enclmass_conv_cutoff,       &
-    !                          grid_goal,deltam_conv,                &
-    !                          pns_grid_goal,pns_cutoff,pns_grid)
+          call search_deltam(nkep,yccin,vel,rad,dens,              &
+                             t9,yel,ab,omega,press,                &
+                             maxrad,deltam_growth,ieos,            &
+                             conv_grid,conv_grid_goal,             &
+                             enclmass_conv_cutoff,deltam_conv,     &
+                             pns_grid_goal,pns_cutoff,pns_grid)
+    !
+    !--Interpolate and setup the grid.
+    !--Growth rate past enclmass_conv_cutoff will keep  
+    !--adjusting via a binary-search-like algorithm until 
+    !--total grid size is within 1% of the idim
+    !     
+          call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
+                             t9,yel,ab,omega,press,                &
+                             maxrad,deltam_growth,ieos,            &
+                             conv_grid,enclmass_conv_cutoff,       &
+                             grid_goal,deltam_conv,                &
+                             pns_grid_goal,pns_cutoff,pns_grid)
     
     !--if you want to avoid binary search and do the original grid setup
     !--comment the above 2 subroutine calls, and uncomment setup_grid() below
     !             
-          if (legacy_grid.eqv..true.) print*,  'WARNING: producing legacy grid - grid sizes will be ignored'               
-          call setup_grid(nkep,yccin,vel,rad,dens,                &
-                          t9,yel,ab,omega,press,                  &
-                          maxrad,deltam_growth,ieos,              &
-                          conv_grid,enclmass_conv_cutoff,         &
-                          deltam_conv,pns_grid_goal,pns_cutoff,   &
-                          pns_grid,legacy_grid) 
+        !   if (legacy_grid.eqv..true.) print*,  'WARNING: producing legacy grid - grid sizes will be ignored'               
+        !   call setup_grid(nkep,yccin,vel,rad,dens,                &
+        !                   t9,yel,ab,omega,press,                  &
+        !                   maxrad,deltam_growth,ieos,              &
+        !                   conv_grid,enclmass_conv_cutoff,         &
+        !                   deltam_conv,pns_grid_goal,pns_cutoff,   &
+        !                   pns_grid,legacy_grid) 
           
     ! !--for resizable grid
     ! !--deltam_conv stays constant from the setup - it doesn't vary
