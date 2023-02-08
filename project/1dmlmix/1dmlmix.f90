@@ -3619,7 +3619,7 @@
 !                                                                       
       parameter (idim=10000) 
       parameter (small=1d-20) 
-      parameter (rcrit=1.) 
+      parameter (rcrit=10.) 
 !                                                                       
 !--so that we don't have to go double precision:                        
 !--avo*1e-44=6.02e-20                                                   
