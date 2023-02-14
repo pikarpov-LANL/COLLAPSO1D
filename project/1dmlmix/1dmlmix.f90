@@ -1729,11 +1729,7 @@
 !          2 -> coming in with rho,entropy,ye (solve for temp)
 !          3 -> coming in with pressure,temp,ye (solve for rho)
 !
-        ! TODO: remove ieos=6 option
-        if (ieos.eq.5) then
-            keytemp = 2
-        endif
-
+        keytemp = 2
         keyerr  = 0
         
         upr  = umass/udist/utime**2
@@ -2738,7 +2734,7 @@
 
       ! rcrit=0.1: things go very south
       ! rcrit=1.0: ieos=5 -> explodes, ieos=4 -> behaves OK
-      parameter (rcrit=10.0) 
+      parameter (rcrit=1.0) 
 !                                                                       
       dimension x(0:idim), ye(idim) 
       dimension ynue(idim),ynueb(idim),ynux(idim),                      &
@@ -3619,7 +3615,7 @@
 !                                                                       
       parameter (idim=10000) 
       parameter (small=1d-20) 
-      parameter (rcrit=10.) 
+      parameter (rcrit=1.0) 
 !                                                                       
 !--so that we don't have to go double precision:                        
 !--avo*1e-44=6.02e-20                                                   
@@ -4416,7 +4412,7 @@
 !                                                                       
 !--check if dex larger than 0.25*rlumnux                                
 !                                                                       
-      if (dex.gt.0.5*rlumnux) then 
+      if (dex.gt.0.25*rlumnux) then 
          jtrapx=1 
 !         print*,'nuscat: nux scattering=',                             
 !     1              dex/rlumnux                                        
