@@ -48,15 +48,23 @@ program read
           integer max,j,i,izone,ieos
           integer conv_grid,pns_grid,pns_grid_goal,conv_grid_goal,grid_goal
           integer nlines, nkep, header_length, counter 
-          logical initial_growth, legacy_grid
+          logical initial_growth, legacy_grid, iterate_grid
+
+          double precision const_deltam
     !                                                                       
           character*1024 filin,filout,eos_table
           character*1 ajunk
     !          
+          ! iterate to match the exact grid sizes for PNS and Convection from setup_prep
+          iterate_grid = .true.
+
           ! applies legacy grid conditions; ignores grid size parameters
-          ! it only works with subroutine setup_grid, which does not iterate on the grid
-          ! if you want to use it, please uncomment the setup_grid in the main program below
-          legacy_grid = .false.
+          ! it only works with subroutine setup_grid, hence set iterate_grid=.false.
+          legacy_grid  = .false.
+
+          ! if const_deltam is positive, the generated grid will be uniform
+          ! with a constant delta mass, only works with legacy_grid=.true.
+          const_deltam = -1          
     !                                                                                                                           
           mcut    = 40. 
           max     = 0 
@@ -191,7 +199,7 @@ program read
                                
              if (rad(i).ge.maxrad.and.maxmass.eq.0.) then
                 maxmass=dmtot
-                print*, rad(i), maxmass
+                ! print*, rad(i), maxmass
              endif
           end do        
                  
@@ -207,40 +215,45 @@ program read
     !      
           if (ieos.eq.5) then 
             call readtable(trim(eos_table))
-          endif   
-                    
-    !
-    !--find the optimal deltam for the given convective region resolution      
-    !
-          call search_deltam(nkep,yccin,vel,rad,dens,              &
-                             t9,yel,ab,omega,press,                &
-                             maxrad,deltam_growth,ieos,            &
-                             conv_grid,conv_grid_goal,             &
-                             enclmass_conv_cutoff,deltam_conv,     &
-                             pns_grid_goal,pns_cutoff,pns_grid)
-    !
-    !--Interpolate and setup the grid.
-    !--Growth rate past enclmass_conv_cutoff will keep  
-    !--adjusting via a binary-search-like algorithm until 
-    !--total grid size is within 1% of the idim
-    !     
-          call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
-                             t9,yel,ab,omega,press,                &
-                             maxrad,deltam_growth,ieos,            &
-                             conv_grid,enclmass_conv_cutoff,       &
-                             grid_goal,deltam_conv,                &
-                             pns_grid_goal,pns_cutoff,pns_grid)
-    
-    !--if you want to avoid binary search and do the original grid setup
-    !--comment the above 2 subroutine calls, and uncomment setup_grid() below
-    !             
-        !   if (legacy_grid.eqv..true.) print*,  'WARNING: producing legacy grid - grid sizes will be ignored'               
-        !   call setup_grid(nkep,yccin,vel,rad,dens,                &
-        !                   t9,yel,ab,omega,press,                  &
-        !                   maxrad,deltam_growth,ieos,              &
-        !                   conv_grid,enclmass_conv_cutoff,         &
-        !                   deltam_conv,pns_grid_goal,pns_cutoff,   &
-        !                   pns_grid,legacy_grid) 
+          endif  
+          
+          if(iterate_grid.eqv..true.) then        
+            !
+            !--find the optimal deltam for the given convective region resolution      
+            !
+                call search_deltam(nkep,yccin,vel,rad,dens,              &
+                                    t9,yel,ab,omega,press,                &
+                                    maxrad,deltam_growth,ieos,            &
+                                    conv_grid,conv_grid_goal,             &
+                                    enclmass_conv_cutoff,deltam_conv,     &
+                                    pns_grid_goal,pns_cutoff,pns_grid)
+            !
+            !--Interpolate and setup the grid.
+            !--Growth rate past enclmass_conv_cutoff will keep  
+            !--adjusting via a binary-search-like algorithm until 
+            !--total grid size is within 1% of the idim
+            !     
+                call search_deltam_growth(nkep,yccin,vel,rad,dens,       &
+                                    t9,yel,ab,omega,press,                &
+                                    maxrad,deltam_growth,ieos,            &
+                                    conv_grid,enclmass_conv_cutoff,       &
+                                    grid_goal,deltam_conv,                &
+                                    pns_grid_goal,pns_cutoff,pns_grid)   
+          else
+            !--if you want to avoid binary search and do the original grid setup,
+            !--set iterate_grid=.false.
+            !                      
+                if (legacy_grid.eqv..true.) write(*,'(A)') 'WARNING: producing legacy grid - grid sizes will be ignored'               
+                if (const_deltam.gt.0) write(*,'(A,1pe10.3)') 'WARNING: grid will be uniform, with constant deltam =', const_deltam
+
+                call setup_grid(nkep,yccin,vel,rad,dens,                &
+                                t9,yel,ab,omega,press,                  &
+                                maxrad,deltam_growth,ieos,              &
+                                conv_grid,enclmass_conv_cutoff,         &
+                                deltam_conv,pns_grid_goal,pns_cutoff,   &
+                                pns_grid,legacy_grid, const_deltam) 
+
+          endif
           
     ! !--for resizable grid
     ! !--deltam_conv stays constant from the setup - it doesn't vary
@@ -635,7 +648,7 @@ program read
                                 maxrad,deltam_growth,ieos,                 &
                                 conv_grid,enclmass_conv_cutoff,            &
                                 deltam_conv,pns_grid_goal,pns_cutoff,      &
-                                pns_grid,legacy_grid)                         
+                                pns_grid,legacy_grid,const_deltam)                         
 !****************************************************************              
 !                                                               *              
 ! Woosely's code has nkep cells.  I want to make my code        *       
@@ -677,7 +690,7 @@ program read
           double precision rhocgs, tkelv, yej, abarj, ucgs, pcgs, xpj, xnj 
           double precision enclmass(0:idim)                       
           double precision maxrad, deltam_growth, deltam_conv, pns_growth
-          double precision exact_pns_cutoff      
+          double precision exact_pns_cutoff, const_deltam     
   
           logical beyond_focus, legacy_grid
           integer nkep,ieos,conv_grid,pns_grid,focus_i
@@ -691,6 +704,7 @@ program read
           v(0)         = 0.d0 
           enclmass(0)  = 0.d0 
 
+
           ! calculate by how much to raise deltam(1) for the PNS based on
           ! the given PNS mass cutoff and pns_grid_goal from setup
           deltam_init_fac = 2*pns_cutoff/(pns_grid_goal*deltam_conv)-1
@@ -699,6 +713,7 @@ program read
 
           ! if legacy grid is selected, deltam_conv is used as initial mass seed
           if(legacy_grid.eqv..true.) deltam(1) = deltam_conv
+          if(const_grid.gt.0) deltam(1) = const_deltam
 
           ! the actual pns mass cutoff will deviate slightly due to 
           ! a numerical error - calculate the exact pns cutoff
@@ -751,7 +766,7 @@ program read
           dj(i) = omei*x(i)*x(i) 
           
           enclmass(i) = enclmass(i-1) + deltam(i) 
-          write(45,*) i,enclmass(i),dj(i)
+        !   write(45,*) i,enclmass(i),dj(i)
   !                                                                        
   !--Adjust the grid here, choose a focus region
   !
@@ -780,15 +795,19 @@ program read
             end if 
 
          else
-             if (enclmass(i).lt..6d0) then
-                deltam(i+1) = deltam(1)*(x(i)/x(1))**1.0
-             elseif (enclmass(i).lt..7d0) then
+             if(const_deltam.gt.0) then
                 deltam(i+1) = deltam(i)
-             elseif(enclmass(i).ge.0.7d0.and.enclmass(i).lt.1.15d0) then
-                deltam(i+1) = deltam(i)*(x(i-1)/x(i))**2.45
              else
-                deltam(i+1) = deltam(i)*(x(i)/x(i-1))**(.2d0)
-             end if       
+                if (enclmass(i).lt..6d0) then
+                    deltam(i+1) = deltam(1)*(x(i)/x(1))**1.0
+                elseif (enclmass(i).lt..7d0) then
+                    deltam(i+1) = deltam(i)
+                elseif(enclmass(i).ge.0.7d0.and.enclmass(i).lt.1.15d0) then
+                    deltam(i+1) = deltam(i)*(x(i-1)/x(i))**2.45
+                else
+                    deltam(i+1) = deltam(i)*(x(i)/x(i-1))**(.2d0)
+                end if       
+            endif                
          endif
   !                                                                       
   !--call eos                                                             
@@ -831,12 +850,14 @@ program read
           xp(i)     = xpj 
           xn(i)     = xnj 
           
-          if (x(i).gt.maxrad) then               
-              ncell = i 
+          if (x(i).gt.maxrad) then   
+              ncell = i               
               goto 50 
           end if
           
         enddo 
+
+        write(*,'(A,1pe10.3)') 'WARNING: did not reach maxrad; grid ends at radius [cm] =', x(i-1)*udist
   !                  
         50 continue         
          return
@@ -887,7 +908,7 @@ program read
                              maxrad,deltam_growth,ieos,                 &
                              conv_grid,enclmass_conv_cutoff,            &
                              deltam_conv,pns_grid_goal,pns_cutoff,      &
-                             pns_grid,.false.) 
+                             pns_grid,.false.,real(-1,8)) 
 
              if (conv_grid.eq.0) then
                  write(*,'(I4,A,I6)'), counter, ' Convective size: above goal'
@@ -978,7 +999,7 @@ program read
                           maxrad,deltam_growth,ieos,                 &
                           conv_grid,enclmass_conv_cutoff,            &
                           deltam_conv,pns_grid_goal,pns_cutoff,      &
-                          pns_grid,.false.)  
+                          pns_grid,.false.,real(-1,8))  
                         
           ! exit condition once precision of under 1% is reached
           if (abs(grid_goal-ncell).eq.0) then
