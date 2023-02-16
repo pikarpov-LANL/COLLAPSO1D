@@ -64,7 +64,7 @@ program read
 
           ! if const_deltam is positive, the generated grid will be uniform
           ! with a constant delta mass, only works with legacy_grid=.true.
-          const_deltam = -1          
+          const_deltam = -1      
     !                                                                                                                           
           mcut    = 40. 
           max     = 0 
@@ -713,7 +713,7 @@ program read
 
           ! if legacy grid is selected, deltam_conv is used as initial mass seed
           if(legacy_grid.eqv..true.) deltam(1) = deltam_conv
-          if(const_grid.gt.0) deltam(1) = const_deltam
+          if(const_deltam.gt.0) deltam(1) = const_deltam
 
           ! the actual pns mass cutoff will deviate slightly due to 
           ! a numerical error - calculate the exact pns cutoff
