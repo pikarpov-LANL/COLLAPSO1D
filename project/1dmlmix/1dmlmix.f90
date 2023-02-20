@@ -328,6 +328,8 @@
         !--turbulence contribution to pressure via ML in post-bounce regime
         if (mlmodel_name == 'None') then
             pr_turb(:) = 0
+        elseif (mlmodel_name == 'constant') then
+            call turbpress_contant(ncell,v,vsound,pr) 
         else
             call turbpress(ncell,rho,x,v,temp)
         endif
@@ -842,6 +844,41 @@
       call exit(0)
       return 
       END       
+
+      subroutine turbpress_contant(ncell,v,vsound,pr) 
+!*********************************************************               
+!                                                        *               
+! This subroutine adds a constant Pturb=0.3Pgas          *
+! in the convective region where Mach>0.1                *                  
+!                                                        *               
+!*********************************************************                
+!
+      implicit double precision (a-h,o-z) 
+!          
+      double precision pr_turb
+!
+      parameter(idim=10000) 
+      parameter(idim1 = idim+1) 
+!                                                                                                                                                    
+      common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x       
+      common /mlout/ pr_turb(idim1)
+                                          
+      dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)
+      dimension pr(idim1)
+
+      double precision :: mach
+
+      mach       = ABS(v(:ncell-1)/vsound(:ncell-1))      
+      pr_turb(:) = 0   
+
+      do i=pns_ind, shock_ind
+            if (mach(i).ge.0.1) then
+                  pr_turb(i) = 0.3*pr(i)
+            endif
+      enddo
+      return 
+      END      
 !
 !
       subroutine shock_radius(ncell,x,v,vsound,print_nuloss)
