@@ -20,13 +20,13 @@ Data
 1.67415
 
 <Initial Cell Mass>
-5e-5
+4e-4
 
 <Cell Mass Growth Rate past enclosed mass cutoff>
 1e-3
 
 <Maximum Radius of the Grid (cm)>
-1500000000.0
+1.5e9
 
 <EOS option>
 5
