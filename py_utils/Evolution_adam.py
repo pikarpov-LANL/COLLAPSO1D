@@ -68,7 +68,7 @@ def main():
     masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
     # masses           = [13.0,15.0] # for ye
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
-    masses = [9.0,10.0,20.0]
+    # masses = [9.0,10.0,20.0]
 
     # --- Paths & Names ---        
     base             = 'swbj15.horo.3d'
@@ -88,7 +88,7 @@ def main():
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
     compute          = True
-    rho_threshold    = 1e13    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
+    rho_threshold    = 1e12    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
 
     # --- Plots & Movie Parameters ---
     dpi              = 80      # increase for production plots
@@ -123,7 +123,7 @@ def main():
                     rd = Readout(i, base_path, datasets[j], base_file, readout_path, only_last)    
                     rd.copy_readout()
                                                 
-        else: interval = 0                   
+        else: intervaplot_gridl = 0                   
         
         interval = comm.scatter(interval, root=0)
         if rank < len(datasets): print(f'Rank',f'{rank}'.ljust(2, ' '),f'got {datasets[interval[0]:interval[1]]}')
