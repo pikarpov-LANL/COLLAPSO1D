@@ -16,25 +16,34 @@ def main():
     size = comm.Get_size()
     rank = comm.Get_rank()    
     
-    suffixs = ['_g9k_c8.4k_p0.3k_1.3P','_g9k_c8.4k_p0.3k_1.3P','_g9k_c8.4k_p0.3k_1.3P',
-               '_g9k_c8.4k_p0.3k_1.3P','_g10k_c9.4k_p0.3k_1.3P']
-    masses  = [12.0,16.0,17.0,18.0,19.0]
-    enclosed_mass_cutoff = [1.49,1.55,1.57,1.55,1.63]
+    masses  = [12.0,13.0,14.0,15.0,
+               16.0,17.0,18.0,19.0]
     
-    pns_cutoff      = [1.25 for i in masses]    
-    pns_grid_goal   = [300 for i in masses]
-    conv_grid_goals = [8400,8400,8400,8400,9400]
-    grid_goals      = [9000,9000,9000,9000,10000]
-    maxrads         = [1.5e9,1.5e9,1.5e9,1.5e9,2e9] # 1e9 for 9.0 and 10.0 #2e9 for 19.0
+    enclosed_mass_cutoff = [1.67415 for i in masses]    
+    pns_cutoff           = [1.25 for i in masses]    
+    pns_grid_goal        = [300 for i in masses]
+    conv_grid_goals      = [8400 for i in masses]
+    grid_goals           = [9000 for i in masses]
+    maxrads              = [1.5e9 for i in masses] # 1e9 for 9.0 and 10.0
+    suffixs              = ['_g9k_c8.4k_p0.3k_1.3P' for i in masses]
+    
+    # for 19.0 at 10k
+    # enclosed_mass_cutoff[-1] = 1.63    
+    # pns_cutoff[-1]           = 1.34    
+    # conv_grid_goals[-1]      = 9400
+    # grid_goals[-1]           = 10000
+    # maxrads[-1]              = 2.0e9
+    # suffixs[-1]              = '_g10k_c9.4k_p0.3k'
+    
     dataset         = 'sukhbold2016'
-    base_path       = '/home/pkarpov/runs/boost_P'
+    base_path       = '/home/pkarpov/runs/rcrit'
     template_path   = f'{base_path}/template_boost_P'
-    output_path     = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/boost_1.3P'
+    output_path     = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit'
     eos_table_path  = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5'
     mlmodel         = '1.3P'
     read_dump       = 0
     dump_interval   = 5e-4
-    restart         = True
+    restart         = True#False
     
     mr = multirun(suffixs,masses,enclosed_mass_cutoff,pns_cutoff,
                   dataset,base_path,template_path,output_path,eos_table_path,

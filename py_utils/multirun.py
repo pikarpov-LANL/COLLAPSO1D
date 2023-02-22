@@ -22,21 +22,21 @@ def main():
     enclosed_mass_cutoff = [1.67415 for i in masses] # 1.67415 for all except s19.0
     pns_cutoff           = [1.25 for i in masses]
     pns_grid_goals       = [300 for i in masses]
-    conv_grid_goals      = [8400 for i in masses]
-    grid_goals           = [9000 for i in masses]
+    conv_grid_goals      = [1400 for i in masses]
+    grid_goals           = [2000 for i in masses]
     maxrads              = [1.5e9 for i in masses] # 1e9 for 9.0 and 10.0
-    suffixs              = ['_g9k_c8.4k_p_0.3k' for i in masses]
+    suffixs              = ['_g9k_c8.4k_p0.3k' for i in masses]
+    # suffixs              = ['_g2k_c1.4k_p0.3k' for i in masses]
     
-    mlmodel         = 'None'
     dataset         = 'sukhbold2016'
-    base_path       = '/home/pkarpov/production/'
+    base_path       = '/home/pkarpov/production'
     template_path   = '/home/pkarpov/production/template'
     output_path     = '/home/pkarpov/scratch/1dccsn/sfho_s/production'
     eos_table_path  = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5'
     mlmodel         = 'None'
     read_dump       = 0
     dump_interval   = 5e-4
-    restart         = False
+    restart         = True
     eos             = 5
     maxtime         = 0.7
     
