@@ -2,7 +2,7 @@
 DataOut
 
 <Output Basename>
-DataOut_read
+DataOut_readable
 
 <Number of dumps>
 10000
