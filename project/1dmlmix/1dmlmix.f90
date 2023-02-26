@@ -326,8 +326,10 @@
         call pns_radius(ncell,x,rho,print_nuloss)
         
         !--turbulence contribution to pressure via ML in post-bounce regime
-        if (mlmodel_name == 'None') then
+        if (mlmodel_name=='None'.or.mlmodel_name=='none') then
             pr_turb(:) = 0
+        elseif (mlmodel_name=='Constant'.or.mlmodel_name=='constant') then
+            call turbpress_constant(ncell,v,vsound,pr) 
         else
             call turbpress(ncell,rho,x,v,temp)
         endif
@@ -842,6 +844,43 @@
       call exit(0)
       return 
       END       
+
+      subroutine turbpress_constant(ncell,v,vsound,pr) 
+!*********************************************************               
+!                                                        *               
+! This subroutine adds a Pturb=constant_Pturb*Pgas       *
+! in the convective region where Mach>0.1                *                  
+!                                                        *               
+!*********************************************************                
+!
+      implicit double precision (a-h,o-z) 
+!          
+      double precision pr_turb
+!
+      parameter(idim=10000) 
+      parameter(idim1 = idim+1) 
+!                                                                                                                                                    
+      common /rshock/ shock_ind, shock_x
+      common /pns/ pns_ind, pns_x       
+      common /mlout/ pr_turb(idim1)
+      common /cpturb/ constant_pturb
+                                          
+      dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)
+      dimension pr(idim1)
+
+      double precision :: mach
+
+      mach       = ABS(v(:ncell-1)/vsound(:ncell-1))      
+      pr_turb(:) = 0   
+
+      print*, 'Constant Pturb ', constant_Pturb
+      do i=pns_ind, shock_ind
+        if (mach(i).ge.0.1) then
+                pr_turb(i) = constant_Pturb*pr(i)
+        endif
+      enddo
+      return 
+      END      
 !
 !
       subroutine shock_radius(ncell,x,v,vsound,print_nuloss)
@@ -5531,6 +5570,7 @@
       common /interp/ mlin_grid_size
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
+      common /cpturb/ constant_pturb
 !                                                                       
       character*1024 filin,filout,outpath,eos_table   
       logical found_path   
@@ -5586,6 +5626,8 @@
       read(11,*) ufact
       read(11,*)
       read(11,*) yefact 
+      read(11,*)
+      read(11,*) constant_Pturb
 
       print*,'================ Setup ================'
       print*, 'Input File:            ', trim(filin)

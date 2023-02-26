@@ -3,7 +3,7 @@ Data
 <Output File>
 DataOut
 <Input PyTorch Model>
-None
+constant
 <Input Grid Size to interpolate for PyTorch Model>
 200
 <Dump # to read>
@@ -27,7 +27,7 @@ Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5
 <delp (not default)>
 1.d-5
 <Number of steps per luminosity output>
-1
+100
 <Damping Term>
 0.01
 <Damping zones below this number>
@@ -40,3 +40,5 @@ Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5
 1.0
 <yefact (not used)>
 1.0
+<Constant Pturb>
+0.3

@@ -31,6 +31,7 @@ from sapsan.utils import line_plot, plot_params
 def main():
     # --- Datasets and values to plot ---
     vals             = [
+                        # 'p_turb',
                         'entropy',
                         'velocity',
                         'ye',
@@ -38,7 +39,7 @@ def main():
                         'pressure',
                         'temperature',
                         'encm',
-                        # 'sound',
+                        'sound',
                         'mach',
                         'abar',
                         'u_int',
@@ -48,21 +49,22 @@ def main():
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
     # masses           = [11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] # for 1.5k and 2k 
-    # masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
+    masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
     # masses           = [13.0,15.0] # for ye
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
-    masses = [12.0,12.0,12.0,12.0,12.0,12.0]
+    # masses = [12.0,12.0,12.0,12.0,12.0,12.0]
+    # masses = [16.0,17.0,18.0,19.0]
 
     # --- Paths & Names ---        
     # base            = 'g9k_c8.4k_p_0.3k'
     # base            = 'g9k_c8.4k_p0.3k'
     # base            = 'g1.5k_c0.5k_p0.3k'
-    # base            = 'g2k_c1.4k_p0.3k'
+    base            = 'g2k_c1.4k_p0.3k'
     # base            = 'g6k_c5k_p0.3k'
     # base            = 'g4k_c3k_p0.3k'
     # base            = 'g2k_rcrit1.0_eosflg5'
     # base            = 'legacy_grid_ieos4'
-    base            = 'g2k_denue0.75'
+    # base            = 'g2k_denue0.75'
     
     end             = ''
     # end             = '_ye'
@@ -71,9 +73,9 @@ def main():
 
     datasets        = [f's{m}_{base}{end}' for m in masses]
     
-    datasets        = ['s12.0_g2k_rcrit1','s12.0_g2k_rcrit2',
-                       's12.0_g2k_rcrit3','s12.0_g2k_rcrit5',
-                       's12.0_g2k_rcrit7','s12.0_g2k_rcrit10']
+    # datasets        = ['s12.0_g2k_rcrit1','s12.0_g2k_rcrit2',
+    #                    's12.0_g2k_rcrit3','s12.0_g2k_rcrit5',
+    #                    's12.0_g2k_rcrit7','s12.0_g2k_rcrit10']
            
     # if 19.0 in masses and 'g9k' in base and '1.3P' not in end:
     #     datasets[masses.index(19.0)] = f's19.0_g10k_c9.4k_p0.3k{end}'
@@ -91,19 +93,20 @@ def main():
     #base_path = '/home/pkarpov/scratch/1dccsn/presn/input_grid/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sleos/dupp0/rcrit10/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/fleos5/rcrit10/'
-    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit_study/'
+    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/baseline/'
+    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/constant10p/'
     
     base_file        = f'DataOut_read'
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
     convert2read     = True   # convert binary to readable (really only needed to be done once) 
-    only_last        = True   # only convert from the latest binary file (e.g., latest *_restart_*)
-    only_post_bounce = True    # only produce plots after the bounce    
+    only_last        = False#True   # only convert from the latest binary file (e.g., latest *_restart_*)
+    only_post_bounce = True   # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
     compute          = False#True
-    rho_threshold    = 1e13    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
+    rho_threshold    = 1e12    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
 
     # --- Plots & Movie Parameters ---
     dpi              = 80      # increase for production plots
@@ -638,10 +641,11 @@ class Profiles:
             header_vals = file.readline()
             vals_strip  = header_vals[:-1].split(' ')        
             try: time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue, rlumnueb, rlumnux = [float(x) for x in vals_strip if x!='']        
-            except: 
-                time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']            
+            except:
+                time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']
                 rlumnueb = 0
                 rlumnux  = 0
+                sys.exit()
             self.header = file.readline() 
             self.header = self.header.split(' ')
             self.header = list(filter(None, self.header))            
@@ -972,11 +976,14 @@ class Profiles:
             elif val == 'mach':                
                 to_plot = np.array([[x*unit, abs(valmap['velocity']/valmap['sound'])]], dtype=object)
                 ylabel  = 'Mach'
-                ylim    = [0,11]
+                ylim    = [3e-7,1.1e1]
                 loc     = 1
-                unlogy  = True                                               
             elif val == 'pressure':                
                 ylabel  = r'$P_{gas} \; [\frac{g}{cm\;s^2}]$'
+                ylim    = [1e20,1e36]
+                loc     = 1
+            elif val == 'p_turb':                
+                ylabel  = r'$P_{turb} \; [\frac{g}{cm\;s^2}]$'
                 ylim    = [1e20,1e36]
                 loc     = 1
             elif val == 'temperature':                
@@ -1066,7 +1073,8 @@ class Profiles:
                     pns_ind,   pns_x   = rt.pns_radius(rho_threshold = rho_threshold)   
                                     
                 pns_edge    = x[int(pns_ind)]*unit
-                shock_front = x[int(shock_ind)]*unit
+                if int(shock_ind)==len(x): shock_front = x[-1]*unit
+                else: shock_front = x[int(shock_ind)]*unit
                 if versus == 'r'   : line_label = '%.2e km'          
                 if versus == 'encm': line_label = '%.3f $M_{\odot}$'      
                          
