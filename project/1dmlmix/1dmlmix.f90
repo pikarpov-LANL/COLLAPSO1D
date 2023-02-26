@@ -329,7 +329,7 @@
         if (mlmodel_name == 'None') then
             pr_turb(:) = 0
         elseif (mlmodel_name == 'constant') then
-            call turbpress_contant(ncell,v,vsound,pr) 
+            call turbpress_constant(ncell,v,vsound,pr) 
         else
             call turbpress(ncell,rho,x,v,temp)
         endif
@@ -845,10 +845,10 @@
       return 
       END       
 
-      subroutine turbpress_contant(ncell,v,vsound,pr) 
+      subroutine turbpress_constant(ncell,v,vsound,pr) 
 !*********************************************************               
 !                                                        *               
-! This subroutine adds a constant Pturb=0.3Pgas          *
+! This subroutine adds a Pturb=constant_Pturb*Pgas       *
 ! in the convective region where Mach>0.1                *                  
 !                                                        *               
 !*********************************************************                
@@ -863,6 +863,7 @@
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x       
       common /mlout/ pr_turb(idim1)
+      common /cpturb/ constant_pturb
                                           
       dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)
       dimension pr(idim1)
@@ -872,10 +873,11 @@
       mach       = ABS(v(:ncell-1)/vsound(:ncell-1))      
       pr_turb(:) = 0   
 
+      print*, 'Constant Pturb ', constant_Pturb
       do i=pns_ind, shock_ind
-            if (mach(i).ge.0.1) then
-                  pr_turb(i) = 0.3*pr(i)
-            endif
+        if (mach(i).ge.0.1) then
+                pr_turb(i) = constant_Pturb*pr(i)
+        endif
       enddo
       return 
       END      
@@ -5568,6 +5570,7 @@
       common /interp/ mlin_grid_size
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /mlout/ pr_turb(idim1)
+      common /cpturb/ constant_pturb
 !                                                                       
       character*1024 filin,filout,outpath,eos_table   
       logical found_path   
@@ -5623,6 +5626,8 @@
       read(11,*) ufact
       read(11,*)
       read(11,*) yefact 
+      read(11,*)
+      read(11,*) constant_Pturb
 
       print*,'================ Setup ================'
       print*, 'Input File:            ', trim(filin)
