@@ -326,9 +326,9 @@
         call pns_radius(ncell,x,rho,print_nuloss)
         
         !--turbulence contribution to pressure via ML in post-bounce regime
-        if (mlmodel_name == 'None') then
+        if (mlmodel_name=='None'.or.mlmodel_name=='none') then
             pr_turb(:) = 0
-        elseif (mlmodel_name == 'constant') then
+        elseif (mlmodel_name=='Constant'.or.mlmodel_name=='constant') then
             call turbpress_constant(ncell,v,vsound,pr) 
         else
             call turbpress(ncell,rho,x,v,temp)
