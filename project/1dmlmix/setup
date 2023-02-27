@@ -26,7 +26,7 @@ Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5
 2.d0
 <delp (not default)>
 1.d-5
-<Number of steps per luminosity output>
+<Number of steps per printout>
 100
 <Damping Term>
 0.01
