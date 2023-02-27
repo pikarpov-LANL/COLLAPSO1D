@@ -43,7 +43,7 @@
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x
 
-      logical trapnue, trapnueb, trapnux, print_nuloss 
+      logical trapnue, trapnueb, trapnux, print_endstep 
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /typef/ iextf, ieos 
       common /units/ umass, udist, udens, utime, uergg, uergcc 
@@ -102,7 +102,7 @@
 !                        fmix,                                           &
                        ynue,ynueb,ynux,dynue,dynueb,dynux,              &
                        unue,unueb,unux,dunue,dunueb,dunux,              &
-                       print_nuloss,ntstep)                                          
+                       print_endstep,ntstep)                                          
 !                                                                       
 !****************************************************************       
 !                                                               *       
@@ -178,7 +178,7 @@
       common /swesty/ xpf(idim), pvar2(idim), pvar3(idim), pvar4(idim) 
       common /tempe/ temp(idim) 
       common /therm/ xmu(idim) 
-      logical trapnue, trapnueb, trapnux, print_nuloss 
+      logical trapnue, trapnueb, trapnux, print_endstep 
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /typef/ iextf, ieos 
       common /units/ umass, udist, udens, utime, uergg, uergcc 
@@ -198,8 +198,8 @@
 !--resize grid based on the shock position (not done)
 !     
     !   if (post_bounce.eqv..true.) then
-    !     if (print_nuloss.eqv..true.) then
-    !             call shock_radius(ncell,x,v,vsound,print_nuloss)
+    !     if (print_endstep.eqv..true.) then
+    !             call shock_radius(ncell,x,v,vsound,print_endstep)
     !             call resize_grid(ncell,x,v,u,rho,ye,f,du,dye,q,                 &
     !                              ynue,ynueb,ynux,dynue,dynueb,dynux,            &
     !                              unue,unueb,unux,dunue,dunueb,dunux) 
@@ -292,7 +292,7 @@
 !--fold-in neutrino background luminosity from the core                 
 !--and normalize energy sums                                            
 !            
-      call nulum(print_nuloss) 
+      call nulum(ntstep,print_endstep) 
 !                                                                       
 !--neutrino absorption                                                  
 !  
@@ -322,8 +322,8 @@
       !post_bounce = .true.
       if (post_bounce.eqv..true.) then
         !--calculate PNS & shock radii, only in post-bounce stage
-        call shock_radius(ncell,x,v,vsound,print_nuloss)
-        call pns_radius(ncell,x,rho,print_nuloss)
+        call shock_radius(ncell,x,v,vsound,ntstep,print_endstep)
+        call pns_radius(ncell,x,rho,ntstep,print_endstep)
         
         !--turbulence contribution to pressure via ML in post-bounce regime
         if (mlmodel_name=='None'.or.mlmodel_name=='none') then
@@ -873,7 +873,6 @@
       mach       = ABS(v(:ncell-1)/vsound(:ncell-1))      
       pr_turb(:) = 0   
 
-      print*, 'Constant Pturb ', constant_Pturb
       do i=pns_ind, shock_ind
         if (mach(i).ge.0.1) then
                 pr_turb(i) = constant_Pturb*pr(i)
@@ -883,7 +882,7 @@
       END      
 !
 !
-      subroutine shock_radius(ncell,x,v,vsound,print_nuloss)
+      subroutine shock_radius(ncell,x,v,vsound,ntstep,print_endstep)
 !***********************************************************            
 !                                                          *            
 !  This subroutine identifies the shock radius             *            
@@ -894,6 +893,7 @@
 
       common /rshock/ shock_ind, shock_x    
       common /units/ umass, udist, udens, utime, uergg, uergcc
+      common /nuprint/ nups,nupk,tacr
 
       dimension x(0:ncell),v(0:ncell),vsound(0:ncell),mach(0:ncell-1)
 
@@ -902,7 +902,7 @@
       real             :: initial_v, old_max_v
       real             :: v_old(ncell)
       integer          :: i,j, ind, minv, search_range
-      logical          :: print_nuloss
+      logical          :: print_endstep
 
       search_range = 2 ! grid cell range to search for local minima
 !      
@@ -931,15 +931,17 @@
     !   enddo
 
 511   format(A,1p,I5,A,E10.3) 
-      if (print_nuloss .eqv. .true.) then      
-          write(*,511)'[ shock radius (i, km) ]', int(shock_ind),               &
-          '                    ', shock_x*udist/1.d5           
-      end if 
+      if (mod(ntstep,nups).eq.0) then
+            if (print_endstep .eqv. .true.) then      
+            write(*,511)'[ shock radius (i, km) ]', int(shock_ind),               &
+            '                    ', shock_x*udist/1.d5           
+            end if 
+      endif
       
       return
       end
 !
-      subroutine pns_radius(ncell,x,rho,print_nuloss)
+      subroutine pns_radius(ncell,x,rho,ntstep,print_endstep)
 !***********************************************************            
 !                                                          *           
 !  This subroutine identifies the Proto-Neutron Star radius*            
@@ -950,11 +952,13 @@
 
       common /pns/ pns_ind, pns_x
       common /units/ umass, udist, udens, utime, uergg, uergcc   
+      common /nuprint/ nups,nupk,tacr
+
       dimension x(0:ncell)
       dimension rho(ncell) 
       real    :: rho_threshold      
       integer :: i
-      logical :: print_nuloss
+      logical :: print_endstep
 !      
 !--g/cm^3 / unit conversion
       rho_threshold = 1.d12/udens
@@ -967,12 +971,13 @@
           end if 
       end do      
 
-511   format(A,1p,I5,A,E10.3) 
-      if (print_nuloss .eqv. .true.) then      
-          write(*,511)'[   PNS radius (i, km) ]', int(pns_ind),               &
-          '                    ', pns_x*udist/1.d5          
-      end if 
-      
+      if (mod(ntstep,nups).eq.0) then
+      511   format(A,1p,I5,A,E10.3) 
+            if (print_endstep .eqv. .true.) then      
+            write(*,511)'[   PNS radius (i, km) ]', int(pns_ind),               &
+            '                    ', pns_x*udist/1.d5          
+            end if 
+      endif
       return
       end
 !
@@ -3970,7 +3975,7 @@
       return 
       END                                           
 !                                                                       
-      subroutine nulum(print_nuloss) 
+      subroutine nulum(ntstep,print_endstep) 
 !****************************************************                   
 !                                                                       
 ! This subroutine adds the core luminosity to the                       
@@ -3979,12 +3984,13 @@
 !***************************************************                    
 !                                                                       
       implicit double precision (a-h,o-z) 
-!                                                                       
+!             
+      common /nuprint/ nups,nupk,tacr                                                          
       common /units/ umass, udist, udens, utime, uergg, uergcc 
       common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg 
       common /nuout/ rlumnue, rlumnueb, rlumnux,                        &
      &               enue, enueb, enux, e2nue, e2nueb, e2nux            
-      logical print_nuloss 
+      logical print_endstep 
 !                                                                       
 !--normalize the energy sums                                            
 !                                                                       
@@ -4010,16 +4016,18 @@
       rlumnueb = 0.8*rlumnueb 
       rlumnux  = rlumnux 
 !                                                                       
-      unitf=ufoe/utime 
-      if (print_nuloss.eqv..true.) then 
-        write(*,510)'[nue loss (foe/s)@(MeV)]',rlumnue*unitf,           &
-     &  '               ',enue
-!        write(*,510)'[nueb loss(foe/s)@(MeV)]',rlumnueb*unitf,          &
-!     &  '               ',enueb
-!        write(*,510)'[nux loss (foe/s)@(MeV)]',rlumnux*unitf,           &
-!     &  '               ',enux
-  510   format(A,1p,E10.3,A,E10.3) 
-      endif 
+      unitf=ufoe/utime
+      if (mod(ntstep,nups).eq.0) then 
+            if (print_endstep.eqv..true.) then 
+            write(*,510)'[nue loss (foe/s)@(MeV)]',rlumnue*unitf,           &
+      &  '               ',enue
+      !        write(*,510)'[nueb loss(foe/s)@(MeV)]',rlumnueb*unitf,          &
+      !     &  '               ',enueb
+      !        write(*,510)'[nux loss (foe/s)@(MeV)]',rlumnux*unitf,           &
+      !     &  '               ',enux
+      510   format(A,1p,E10.3,A,E10.3) 
+            endif 
+      endif
 !                                                                            
       return 
       END                                             
@@ -6102,7 +6110,7 @@
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x
 
-      logical trapnue, trapnueb, trapnux, print_nuloss 
+      logical trapnue, trapnueb, trapnux, print_endstep 
       common /trap / trapnue(idim), trapnueb(idim), trapnux(idim) 
       common /typef/ iextf, ieos 
       common /units/ umass, udist, udens, utime, uergg, uergcc 
@@ -6142,7 +6150,17 @@
 !                                                                       
       tol   = 1.d-3 
       dt0   = 1.d0 
-      tnext = time+dtime 
+
+      ! if below 150 ms, write output only every 10 ms
+      ! pre-bounce stage is not as important to track
+      if (post_bounce) then
+        tnext = time+dtime 
+      elseif (time.lt.0.150/utime) then
+        tnext = time+0.01/utime
+      else
+        tnext = time+dtime 
+      endif
+
 !      xlog2=0.30103                                                    
 !                                                                       
 !--define coefficients for Runge-Kutta integrator                       
@@ -6171,13 +6189,13 @@
          enddo 
          
          write(*,'(A)')'<      Hydro Setup     >'       
-         print_nuloss=.false. 
+         print_endstep=.false. 
          call hydro(time,ncell,x,v,                                     &
                     u,rho,ye,f1v,f1u,f1ye,q,                            &
                    ! fmix1,                                              &
                     ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,              &
                     unue,unueb,unux,f1unue,f1unueb,f1unux,              &
-                    print_nuloss,ntstep)                                          
+                    print_endstep,ntstep)                                          
       end if        
 !                                                                       
 !--set step counter                                                     
@@ -6226,7 +6244,7 @@
 !--get forces at half the time step, using predictions                  
 !                                                                       
          thalf        = time + f11*steps(1) 
-         print_nuloss = .true.
+         print_endstep = .false.
          !call write_data(ntstep*2,ncell,x,v)
 
          call hydro(thalf,ncell,dumx,dumv,                                   &
@@ -6234,7 +6252,7 @@
                     !fmix2,                     &
                     dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
                     dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
-                    print_nuloss,ntstep) 
+                    print_endstep,ntstep) 
                                                             
 !                                                                       
 !--advance all the gas particles                                        
@@ -6265,7 +6283,7 @@
 !--get forces at end of time step                                       
 !                                                                       
          tfull        = time + steps(1) 
-         print_nuloss = .false. 
+         print_endstep = .true. 
          !call write_data(ntstep*2+1,ncell,x,v)
 
          call hydro(tfull,ncell,dumx,dumv,                                   &
@@ -6273,7 +6291,7 @@
                     !fmix2,                     &
                     dumynue,dumynueb,dumynux,f2ynue,f2ynueb,f2ynux,          &
                     dumunue,dumunueb,dumunux,f2unue,f2unueb,f2unux,          &
-                    print_nuloss,ntstep)                  
+                    print_endstep,ntstep)                  
 !                                                                       
 !--estimate integration error and set time step. If reduction           
 !  the maximum time step is set to dtime.                               
@@ -6460,7 +6478,7 @@
                           !fmix1,                      &
                           ynue,ynueb,ynux,f1ynue,f1ynueb,f1ynux,              &
                           unue,unueb,unux,f1unue,f1unueb,f1unux,              &
-                          print_nuloss,ntstep)                                       
+                          print_endstep,ntstep)                                       
             endif 
          endif 
          time=tfull 
@@ -6505,15 +6523,13 @@
          enddo
          convf=ufoe/utime 
          nupk=nupk+1 
-!         if (time.gt.4.d-3) then                                       
-!            5000                                                       
-!         end if                 
+                
          if(ntstep.eq.1) then
              write(59,"(A)") "Time [s]  rlumnue [foe/s]  enue [MeV] &
                 & rlumnueb [foe/s]  enueb [MeV]  rlumnux [foe/s]  enux [MeV]"
          endif         
 
-         if (mod(nupk,nups).eq.0) then 
+         if (mod(ntstep,nups).eq.0) then 
             write(59,120)time*utime,convf*rlumnue,enue,convf*rlumnueb,enueb,  &
                          convf*rlumnux,enux                                     
             ke=0. 
@@ -6541,24 +6557,18 @@
 !        
         !  if (ntstep.eq.1) stop
          if(time.lt.tnext)then 
-            !print *, '****time*****',time                              
-  520       format(A,I12,A) 
-            print 520,'<',ntstep,                                       &
-            '          > ----------------------------------'            
-            write(*,500)'[    time/tmax, dt (s) ]',                     &
-                        time*utime,' /',tmax*utime,steps(1)*utime                              
-  500       format(A,1p,E10.3,A,E10.3,E13.3)
-  
-            if (post_bounce.eqv..true.) then
-                write(*,501)'[    bounce time (s)   ]', bounce_time*utime                              
-      501       format(A,1p,E10.3)
-            endif
-!
-            if (mod(nupk,nups).eq.0) then 
-               lu=72 
-               open(lu,file='1dtmp',form='unformatted') 
-               call printout(lu) 
-               close (lu) 
+            if (mod(ntstep,nups).eq.0) then 
+      520         format(A,I12,A) 
+      501         format(A,1p,E10.3)
+      500         format(A,1p,E10.3,A,E10.3,E13.3)
+                  print 520,'<',ntstep,                                       &
+                  '          > ----------------------------------'            
+                  write(*,500)'[    time/tmax, dt (s) ]',                     &
+                              time*utime,' /',tmax*utime,steps(1)*utime                                    
+      
+                  if (post_bounce.eqv..true.) then
+                      write(*,501)'[    bounce time (s)   ]', bounce_time*utime                                          
+                  endif            
             end if 
             ntstep=ntstep+1 
             go to 99 
