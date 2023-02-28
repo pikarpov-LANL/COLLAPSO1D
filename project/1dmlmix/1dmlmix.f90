@@ -862,32 +862,33 @@
 !
       parameter(idim=10000) 
       parameter(idim1 = idim+1) 
-!                                                                                                                                                    
+!                                   
+      common /units/ umass, udist, udens, utime, uergg, uergcc                                                                                                                 
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x       
       common /mlout/ pr_turb(idim1)
       common /cpturb/ constant_pturb
                                           
-      dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)
-      dimension pr(idim1)
+      dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)      
+      dimension pr(idim1), rho(idim)
 
       double precision :: mach
-      character        :: mode
+      character*128    :: mode
 
     !   mode = 'mach'
       mode = 'rhov2'
 
       pr_turb(:) = 0
 
-      if (mode.eq.'mach') mach = ABS(v(:ncell-1)/vsound(:ncell-1))               
+      if (trim(mode).eq.'mach') mach = ABS(v(:ncell-1)/vsound(:ncell-1))               
 
       do i=pns_ind, shock_ind
-        if (mode.eq.'mach') then
+        if (trim(mode).eq.'mach') then
             ! constant_Pturb is a fraction of Pgas
             if (mach(i).ge.0.1) pr_turb(i) = constant_Pturb*pr(i)
-        elseif (mode.eq.'rhov2') then
-            ! constant_Pturb is velocity
-            pr_turb(i) = rho(i)*constant_Pturb**2
+        elseif (trim(mode).eq.'rhov2') then            
+            ! constant_Pturb is velocity in cgs
+            pr_turb(i) = rho(i)*(constant_Pturb/(udist/utime))**2
         endif
       enddo
       return 
