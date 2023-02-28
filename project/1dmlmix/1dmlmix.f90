@@ -191,7 +191,6 @@
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /interp/ mlin_grid_size
       common /mlout/ pr_turb(idim1)  
-
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !
@@ -329,7 +328,7 @@
         if (mlmodel_name=='None'.or.mlmodel_name=='none') then
             pr_turb(:) = 0
         elseif (mlmodel_name=='Constant'.or.mlmodel_name=='constant') then
-            call turbpress_constant(ncell,v,vsound,pr) 
+            call turbpress_constant(ncell,v,vsound,pr,rho,x) 
         else
             call turbpress(ncell,rho,x,v,temp)
         endif
@@ -845,11 +844,14 @@
       return 
       END       
 
-      subroutine turbpress_constant(ncell,v,vsound,pr) 
+      subroutine turbpress_constant(ncell,v,vsound,pr,rho,x) 
 !*********************************************************               
 !                                                        *               
-! This subroutine adds a Pturb=constant_Pturb*Pgas       *
-! in the convective region where Mach>0.1                *                  
+! This subroutine adds a constant Pturb base on 2 modes: *
+!   mode='mach' : Pturb=constant_Pturb*Pgas              *
+!                 in the convective region where Mach>0.1*
+!   mode='rhov2': Pturb=rho*velocity^2                   *
+!                 where velocity=constant_Pturb          *  
 !                                                        *               
 !*********************************************************                
 !
@@ -859,23 +861,33 @@
 !
       parameter(idim=10000) 
       parameter(idim1 = idim+1) 
-!                                                                                                                                                    
+!                                   
+      common /units/ umass, udist, udens, utime, uergg, uergcc                                                                                                                 
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x       
       common /mlout/ pr_turb(idim1)
       common /cpturb/ constant_pturb
                                           
-      dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)
-      dimension pr(idim1)
+      dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)      
+      dimension pr(idim1), rho(idim), x(0:idim)      
 
-      double precision :: mach
+      double precision             :: mach
+      character(:), allocatable    :: mode
+      
+      ! mode = 'mach'
+      mode = 'rhov2'
 
-      mach       = ABS(v(:ncell-1)/vsound(:ncell-1))      
-      pr_turb(:) = 0   
+      pr_turb(:) = 0
+
+      if (mode.eq.'mach') mach = ABS(v(:ncell-1)/vsound(:ncell-1))               
 
       do i=pns_ind, shock_ind
-        if (mach(i).ge.0.1) then
-                pr_turb(i) = constant_Pturb*pr(i)
+        if (mode.eq.'mach') then
+            ! constant_Pturb is a fraction of Pgas
+            if (mach(i).ge.0.1) pr_turb(i) = constant_Pturb*pr(i)
+        elseif (mode.eq.'rhov2') then            
+            ! constant_Pturb is velocity in cgs
+            pr_turb(i) = rho(i)*(constant_Pturb/(udist/utime))**2
         endif
       enddo
       return 
