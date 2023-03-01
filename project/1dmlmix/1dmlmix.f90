@@ -191,7 +191,6 @@
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /interp/ mlin_grid_size
       common /mlout/ pr_turb(idim1)  
-
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !
@@ -329,7 +328,7 @@
         if (mlmodel_name=='None'.or.mlmodel_name=='none') then
             pr_turb(:) = 0
         elseif (mlmodel_name=='Constant'.or.mlmodel_name=='constant') then
-            call turbpress_constant(ncell,v,vsound,pr,rho) 
+            call turbpress_constant(ncell,v,vsound,pr,rho,x) 
         else
             call turbpress(ncell,rho,x,v,temp)
         endif
@@ -845,7 +844,7 @@
       return 
       END       
 
-      subroutine turbpress_constant(ncell,v,vsound,pr,rho) 
+      subroutine turbpress_constant(ncell,v,vsound,pr,rho,x) 
 !*********************************************************               
 !                                                        *               
 ! This subroutine adds a constant Pturb base on 2 modes: *
@@ -870,23 +869,23 @@
       common /cpturb/ constant_pturb
                                           
       dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)      
-      dimension pr(idim1), rho(idim)
+      dimension pr(idim1), rho(idim), x(0:idim)      
 
-      double precision :: mach
-      character*128    :: mode
-
-    !   mode = 'mach'
+      double precision             :: mach
+      character(:), allocatable    :: mode
+      
+      ! mode = 'mach'
       mode = 'rhov2'
 
       pr_turb(:) = 0
 
-      if (trim(mode).eq.'mach') mach = ABS(v(:ncell-1)/vsound(:ncell-1))               
+      if (mode.eq.'mach') mach = ABS(v(:ncell-1)/vsound(:ncell-1))               
 
       do i=pns_ind, shock_ind
-        if (trim(mode).eq.'mach') then
+        if (mode.eq.'mach') then
             ! constant_Pturb is a fraction of Pgas
             if (mach(i).ge.0.1) pr_turb(i) = constant_Pturb*pr(i)
-        elseif (trim(mode).eq.'rhov2') then            
+        elseif (mode.eq.'rhov2') then            
             ! constant_Pturb is velocity in cgs
             pr_turb(i) = rho(i)*(constant_Pturb/(udist/utime))**2
         endif
