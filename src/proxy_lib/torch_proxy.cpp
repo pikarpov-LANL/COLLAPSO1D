@@ -30,26 +30,26 @@
 #define __TORCH_FTN_DEBUG 1
 #endif
 
-#ifdef __TORCH_FTN_DEBUG
-#include <cstdarg>
-#endif
+// #ifdef __TORCH_FTN_DEBUG
+// #include <cstdarg>
+// #endif
 
 
 using ftn_shape_type = int32_t;
-
 /*
  * Private functions
  */
 namespace {
 
-#ifdef __TORCH_FTN_DEBUG
-#define debug_print printf
-#else
+// #ifdef __TORCH_FTN_DEBUG
+// #define debug_print printf
+// #else
 void debug_print(const char* format, ...) {}
-#endif
+// #endif
 
 bool is_present_flag(int flags, int probe) {
     return (flags & probe) != 0;
+
 }
     
 //bool is_device_ptr(void* ptr) {
@@ -64,6 +64,9 @@ torch::Tensor tensor_from_array(const std::vector<ftn_shape_type>& f_shape, T* d
     // if (is_device_ptr(data)) device = torch::kCUDA;
 
     std::vector<int64_t> shape(f_shape.size());
+    
+    torch::set_num_threads(1);
+    
     for (size_t i=0; i<f_shape.size(); i++) {
         shape[i] = f_shape[ f_shape.size() - (i+1) ];
     }
