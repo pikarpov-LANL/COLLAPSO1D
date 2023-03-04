@@ -330,7 +330,7 @@
         elseif (mlmodel_name=='Constant'.or.mlmodel_name=='constant') then
             call turbpress_constant(ncell,v,vsound,pr,rho,x) 
         else
-            call turbpress(ncell,rho,x,v,temp,u)
+            call turbpress(ncell,rho,x,v,temp,u,ntstep,print_endstep)
         endif
       else
           !--check if bounced
@@ -756,7 +756,7 @@
       end
 !
 !
-      subroutine turbpress(ncell,rho,x,v,temp,u) 
+      subroutine turbpress(ncell,rho,x,v,temp,u,ntstep,print_endstep) 
 !*********************************************************               
 !                                                        *               
 ! This subroutine passes the grid to a trained           *
@@ -774,7 +774,7 @@
       double precision pr_turb
 !
       parameter(idim=10000) 
-      parameter(idim1 = idim+1) 
+      parameter(idim1=idim+1) 
       parameter (avokb=6.02e23*1.381e-16)
 !                                                                       
       dimension rho(idim), temp(idim), u(idim)
@@ -796,73 +796,72 @@
       common /mlout/ pr_turb(idim1)
                                     
       ! The tensor shape is exactly backwards from python: (Length,Channels,N batches)
-      real(real32) :: input(mlin_grid_size, 5, 1)
+      real(real32)              :: input(mlin_grid_size, 5, 1)
       real(real32), allocatable :: output_h(:,:,:)    
-      double precision pr_relative(idim1)
-      double precision interp_x(mlin_grid_size)         
+      double precision          :: pr_relative(idim1)
+      double precision          :: interp_x(mlin_grid_size)   
+      logical                   :: print_endstep      
       
-      !--entropy conversion factor                                            
-      sfac=avokb*utemp/uergg
-      
-      ! Scale Pressure to fit into single precission (taken from ML training)
-      scale_v       = udist/utime*1e-8
-      scale_rho     = 4.d-6   ! 2.d6*2e-12      
-      scale_pr      = 4.d-9   ! 2.d22*2e-31
-      scale_vsound  = 1       ! 1.d8*1.d-8
-      scale_temp    = 1.d-1   ! 1.d9*1.d-10
-      scale_entropy = 1./sfac*1.d-1 
-      scale_pr_relative = 1.
+      ! only inference once every 5 timesteps
+      if (mod(ntstep,5).eq.0) then
+        if (print_endstep.eqv..true.) then
+            !--entropy conversion factor                                            
+            sfac=avokb*utemp/uergg
+            
+            ! Scale Pressure to fit into single precission (taken from ML training)
+            scale_v       = udist/utime*1e-8
+            scale_rho     = 4.d-6   ! 2.d6*2e-12      
+            scale_pr      = 4.d-9   ! 2.d22*2e-31
+            scale_vsound  = 1       ! 1.d8*1.d-8
+            scale_temp    = 1.d-1   ! 1.d9*1.d-10
+            scale_entropy = 1./sfac*1.d-1 
+            scale_pr_relative = 1.
 
-    !   For model_s12_old.pt
-    !   scale_v       = udist/utime*1e-8
-    !   scale_rho     = 4.d-7   ! 2.d6*2e-13      
-    !   scale_pr      = 4.d-10  ! 2.d22*2e-32
-    !   scale_vsound  = 1       ! 1.d8*1.d-8
-    !   scale_temp    = 1.d-1   ! 1.d9*1.d-10
-    !   scale_entropy = 1./sfac
-    !   scale_pr_relative = 1.
+            !   For model_s12_old.pt
+            !   scale_v       = udist/utime*1e-8
+            !   scale_rho     = 4.d-7   ! 2.d6*2e-13      
+            !   scale_pr      = 4.d-10  ! 2.d22*2e-32
+            !   scale_vsound  = 1       ! 1.d8*1.d-8
+            !   scale_temp    = 1.d-1   ! 1.d9*1.d-10
+            !   scale_entropy = 1./sfac
+            !   scale_pr_relative = 1.
 
-    !   input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *  scale_v
-      input(:,1,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *        scale_rho
-      input(:,2,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *     scale_pr
-      input(:,3,1) = interpolate(x(1:),vsound(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) * scale_vsound      
-      input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *       scale_temp
-      input(:,5,1) = interpolate(x(1:),u,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *          scale_entropy
-      
-!   948 format(A, 1pe12.4, 1pe12.4)
-!       write(*,948), 'range rho    ', minval(input(:,1,1)), maxval(input(:,1,1))
-!       write(*,948), 'range P      ', minval(input(:,2,1)), maxval(input(:,2,1))
-!       write(*,948), 'range vsound ', minval(input(:,3,1)), maxval(abs(input(:,3,1)))      
-!       write(*,948), 'range T      ', minval(input(:,4,1)), maxval(input(:,4,1))
-!       write(*,948), 'range entropy', minval(input(:,5,1)), maxval(input(:,5,1))
-      
-      ! ML model (reverse the order for fortran data)
-      ! Input: ['u1','rho','Pgas', 'T'] (1, 4, 200)
-      ! Output: [pr_relative = P_turb/P_gas] (1, 1, 200)
+            !   input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *  scale_v
+            input(:,1,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *        scale_rho
+            input(:,2,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *     scale_pr
+            input(:,3,1) = interpolate(x(1:),vsound(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) * scale_vsound      
+            input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *       scale_temp
+            input(:,5,1) = interpolate(x(1:),u,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *          scale_entropy
+            
+        !   948 format(A, 1pe12.4, 1pe12.4)
+        !       write(*,948), 'range rho    ', minval(input(:,1,1)), maxval(input(:,1,1))
+        !       write(*,948), 'range P      ', minval(input(:,2,1)), maxval(input(:,2,1))
+        !       write(*,948), 'range vsound ', minval(input(:,3,1)), maxval(abs(input(:,3,1)))      
+        !       write(*,948), 'range T      ', minval(input(:,4,1)), maxval(input(:,4,1))
+        !       write(*,948), 'range entropy', minval(input(:,5,1)), maxval(input(:,5,1))
+            
+            ! ML model (reverse the order for fortran data)
+            ! Input: ['rho','Pgas', 'vsound', 'T', 'entropy'] (1, 5, 200)
+            ! Output: [pr_relative = P_turb/P_gas] (1, 1, 200)
 
-      output_h = mlmodel(input, trim(mlmodel_name))      
-    !   print*, output_h
-      
-      ! Re-shape output into code-shape mlout:
-      pr_turb(:)     = 0   
-      pr_relative(:) = 0
-      interp_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
-      pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
-                                                   mlin_grid_size,1,mlin_grid_size,           &
-                                                   int(shock_ind-pns_ind))*scale_pr_relative
-      
-    !   pr_relative(pns_ind:shock_ind) = 0.3
-    !   print*, pr_relative(int(pns_ind):int(shock_ind))
-    !   print*, 'pr_relative', maxval(pr_relative), size(pr_relative)
-      pr_turb = pr_relative*pr
-    !   print*, pr_relative(pns_ind-5:shock_ind+5)
-    !   print*, 'ML prediction'      
-    !   print*, size(output_h), shape(output_h), shock_ind-pns_ind
-    !   print*, '-- pr_relative --'
-    !   print*, pr_relative(shock_ind-5:shock_ind)
-    !   print*, '-- pr_turb --'
-    !   print*, pr_turb(shock_ind-5:shock_ind)
-    !   stop
+            output_h = mlmodel(input, trim(mlmodel_name))          
+            
+            ! Re-shape output into code-shape mlout:
+            pr_turb(:)     = 0   
+            pr_relative(:) = 0
+            interp_x       = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
+            pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
+                                                        mlin_grid_size,1,mlin_grid_size,           &
+                                                        int(shock_ind-pns_ind))*scale_pr_relative
+            
+            ! remove the points right before the shock
+            pr_relative(shock_ind-3:shock_ind) = 0.0
+            pr_turb = pr_relative*pr
+        endif
+      endif
+
+    !   print*, 'ntstep, max(pturb)', ntstep, maxval(pr_turb)
+   
       return 
       END       
 
@@ -903,7 +902,7 @@
 
       if (mode.eq.'mach') mach = ABS(v(:ncell-1)/vsound(:ncell-1))               
 
-      do i=pns_ind, shock_ind-3
+      do i=pns_ind, shock_ind
         if (mode.eq.'mach') then
             ! constant_Pturb is a fraction of Pgas
             if (mach(i).ge.0.1) pr_turb(i) = constant_Pturb*pr(i)
