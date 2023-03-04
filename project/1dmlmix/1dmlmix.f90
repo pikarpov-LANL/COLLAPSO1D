@@ -6588,7 +6588,7 @@
 !                                                                       
 !--start new time step                                                  
 !        
-         if (ntstep.eq.500) stop
+        !  if (ntstep.eq.500) stop
          if(time.lt.tnext)then 
             if (mod(ntstep,nups).eq.0) then 
       520         format(A,I12,A) 
