@@ -799,12 +799,12 @@
       real(real32)              :: input(mlin_grid_size, 5, 1)
       real(real32), allocatable :: output_h(:,:,:)    
       double precision          :: pr_relative(idim1)
-      double precision          :: interp_x(mlin_grid_size)   
+      double precision          :: interp_x(mlin_grid_size)
       logical                   :: print_endstep      
       
       ! only inference once every 5 timesteps
       if (mod(ntstep,5).eq.0) then
-        if (print_endstep.eqv..true.) then
+        if (print_endstep.eqv..false.) then
             !--entropy conversion factor                                            
             sfac=avokb*utemp/uergg
             
@@ -846,19 +846,20 @@
 
             output_h = mlmodel(input, trim(mlmodel_name))          
             
-            ! Re-shape output into code-shape mlout:
-            pr_turb(:)     = 0   
-            pr_relative(:) = 0
-            interp_x       = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
-            pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
-                                                        mlin_grid_size,1,mlin_grid_size,           &
-                                                        int(shock_ind-pns_ind))*scale_pr_relative
-            
-            ! remove the points right before the shock
-            pr_relative(shock_ind-3:shock_ind) = 0.0
-            pr_turb = pr_relative*pr
         endif
       endif
+
+      ! Re-shape output into code-shape mlout:
+      pr_turb(:)     = 0   
+      pr_relative(:) = 0
+      interp_x       = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
+      pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
+                                                  mlin_grid_size,1,mlin_grid_size,           &
+                                                  int(shock_ind-pns_ind))*scale_pr_relative
+      
+      ! remove the points right before the shock
+      pr_relative(shock_ind-3:shock_ind) = 0.0
+      pr_turb = pr_relative*pr
 
     !   print*, 'ntstep, max(pturb)', ntstep, maxval(pr_turb)
    
