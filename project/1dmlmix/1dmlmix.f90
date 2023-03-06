@@ -190,7 +190,7 @@
       common /pns/ pns_ind, pns_x
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /interp/ mlin_grid_size
-      common /mlout/ pr_turb(idim1)  
+      common /mlout/ pr_turb(idim1), output_preserve(idim) 
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !
@@ -771,7 +771,7 @@
       character*1024 :: mlmodel_name
       integer mlin_grid_size
       real scale_pr, scale_pr_relative
-      double precision pr_turb
+      double precision pr_turb,output_preserve
 !
       parameter(idim=10000) 
       parameter(idim1=idim+1) 
@@ -793,7 +793,7 @@
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x       
       common /interp/ mlin_grid_size
-      common /mlout/ pr_turb(idim1)
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
                                     
       ! The tensor shape is exactly backwards from python: (Length,Channels,N batches)
       real(real32)              :: input(mlin_grid_size, 5, 1)
@@ -802,29 +802,30 @@
       double precision          :: interp_x(mlin_grid_size)
       logical                   :: print_endstep      
       
+      !--entropy conversion factor                                            
+      sfac=avokb*utemp/uergg
+            
+      ! Scale Pressure to fit into single precission (taken from ML training)
+      scale_v       = udist/utime*1e-8
+      scale_rho     = 4.d-6   ! 2.d6*2e-12      
+      scale_pr      = 4.d-9   ! 2.d22*2e-31
+      scale_vsound  = 1       ! 1.d8*1.d-8
+      scale_temp    = 1.d-1   ! 1.d9*1.d-10
+      scale_entropy = 1./sfac*1.d-1 
+      scale_pr_relative = 1.
+
+      !   For model_s12_old.pt
+      !   scale_v       = udist/utime*1e-8
+      !   scale_rho     = 4.d-7   ! 2.d6*2e-13      
+      !   scale_pr      = 4.d-10  ! 2.d22*2e-32
+      !   scale_vsound  = 1       ! 1.d8*1.d-8
+      !   scale_temp    = 1.d-1   ! 1.d9*1.d-10
+      !   scale_entropy = 1./sfac
+      !   scale_pr_relative = 1.
+
       ! only inference once every 5 timesteps
       if (mod(ntstep,5).eq.0) then
         if (print_endstep.eqv..false.) then
-            !--entropy conversion factor                                            
-            sfac=avokb*utemp/uergg
-            
-            ! Scale Pressure to fit into single precission (taken from ML training)
-            scale_v       = udist/utime*1e-8
-            scale_rho     = 4.d-6   ! 2.d6*2e-12      
-            scale_pr      = 4.d-9   ! 2.d22*2e-31
-            scale_vsound  = 1       ! 1.d8*1.d-8
-            scale_temp    = 1.d-1   ! 1.d9*1.d-10
-            scale_entropy = 1./sfac*1.d-1 
-            scale_pr_relative = 1.
-
-            !   For model_s12_old.pt
-            !   scale_v       = udist/utime*1e-8
-            !   scale_rho     = 4.d-7   ! 2.d6*2e-13      
-            !   scale_pr      = 4.d-10  ! 2.d22*2e-32
-            !   scale_vsound  = 1       ! 1.d8*1.d-8
-            !   scale_temp    = 1.d-1   ! 1.d9*1.d-10
-            !   scale_entropy = 1./sfac
-            !   scale_pr_relative = 1.
 
             !   input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *  scale_v
             input(:,1,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *        scale_rho
@@ -844,14 +845,19 @@
             ! Input: ['rho','Pgas', 'vsound', 'T', 'entropy'] (1, 5, 200)
             ! Output: [pr_relative = P_turb/P_gas] (1, 1, 200)
 
-            output_h = mlmodel(input, trim(mlmodel_name))          
+            output_h = mlmodel(input, trim(mlmodel_name))   
             
+            output_preserve(:) = 0
+            output_preserve(:mlin_grid_size) = output_h(:,1,1)
         endif
       endif
 
       ! Re-shape output into code-shape mlout:
       pr_turb(:)     = 0   
       pr_relative(:) = 0
+
+      if (.not.allocated(output_h)) allocate(output_h(200,1,1))
+      output_h(:,1,1) = output_preserve(:mlin_grid_size)
       interp_x       = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
       pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
                                                   mlin_grid_size,1,mlin_grid_size,           &
@@ -861,6 +867,9 @@
       pr_relative(shock_ind-3:shock_ind) = 0.0
       pr_turb = pr_relative*pr
 
+    !   print*, 'output h ', maxval(output_h(:,1,1))
+    !   print*, 'pr_relative ', ntstep, maxval(pr_relative)
+    !   print*, output_preserve(mlin_grid_size-5:mlin_grid_size)
     !   print*, 'ntstep, max(pturb)', ntstep, maxval(pr_turb)
    
       return 
@@ -887,7 +896,7 @@
       common /units/ umass, udist, udens, utime, uergg, uergcc                                                                                                                 
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x       
-      common /mlout/ pr_turb(idim1)
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
       common /cpturb/ constant_pturb
                                           
       dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)      
@@ -1981,7 +1990,7 @@
       common /carac/ deltam(idim), abar(idim) 
       common /damping/ damp, dcell 
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
-      common /mlout/ pr_turb(idim1)
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
       data pi4/12.56637d0/ 
@@ -5611,7 +5620,7 @@
       common /idump/ idump
       common /interp/ mlin_grid_size
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
-      common /mlout/ pr_turb(idim1)
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
       common /cpturb/ constant_pturb
 !                                                                       
       character*1024 filin,filout,outpath,eos_table   
@@ -5869,7 +5878,7 @@
       common /dump/ from_dump
       common /idump/ idump
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
-      common /mlout/ pr_turb(idim1)
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
       common /eosnu / prnu(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
