@@ -827,7 +827,7 @@
       !   scale_entropy = 1./sfac
       !   scale_pr_relative = 1.
 
-      ! only inference once every 5 timesteps
+      ! only inference once every # timesteps
       if (mod(ntstep,5).eq.0) then
         if (print_endstep.eqv..false.) then
 
@@ -860,7 +860,7 @@
       pr_turb(:)     = 0.   
       pr_relative(:) = 0.
 
-      if (.not.allocated(output_h)) allocate(output_h(200,1,1))
+      if (.not.allocated(output_h)) allocate(output_h(mlin_grid_size,1,1))
       output_h(:,1,1) = output_preserve(:mlin_grid_size)
       
       interp_x        = linspace(x(int(pns_ind)), x(int(shock_offset)), mlin_grid_size)   
