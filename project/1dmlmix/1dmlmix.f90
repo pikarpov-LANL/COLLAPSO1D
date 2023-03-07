@@ -800,10 +800,14 @@
       real(real32), allocatable :: output_h(:,:,:)    
       double precision          :: pr_relative(idim1)
       double precision          :: interp_x(mlin_grid_size)
-      logical                   :: print_endstep      
+      logical                   :: print_endstep   
+      integer                   :: shock_offset   
       
       !--entropy conversion factor                                            
       sfac=avokb*utemp/uergg
+
+      !--don't inject right below the shock
+      shock_offset = int(shock_ind)-5 
             
       ! Scale Pressure to fit into single precission (taken from ML training)
       scale_v       = udist/utime*1e-8
@@ -827,12 +831,12 @@
       if (mod(ntstep,5).eq.0) then
         if (print_endstep.eqv..false.) then
 
-            !   input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *  scale_v
-            input(:,1,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *        scale_rho
-            input(:,2,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *     scale_pr
-            input(:,3,1) = interpolate(x(1:),vsound(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) * scale_vsound      
-            input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *       scale_temp
-            input(:,5,1) = interpolate(x(1:),u,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *          scale_entropy
+            !   input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),shock_offset,mlin_grid_size) *  scale_v
+            input(:,1,1) = interpolate(x(1:),rho,ncell,int(pns_ind),shock_offset,mlin_grid_size) *        scale_rho
+            input(:,2,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),shock_offset,mlin_grid_size) *     scale_pr
+            input(:,3,1) = interpolate(x(1:),vsound(1:),ncell,int(pns_ind),shock_offset,mlin_grid_size) * scale_vsound      
+            input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),shock_offset,mlin_grid_size) *       scale_temp
+            input(:,5,1) = interpolate(x(1:),u,ncell,int(pns_ind),shock_offset,mlin_grid_size) *          scale_entropy
             
         !   948 format(A, 1pe12.4, 1pe12.4)
         !       write(*,948), 'range rho    ', minval(input(:,1,1)), maxval(input(:,1,1))
@@ -853,24 +857,27 @@
       endif
 
       ! Re-shape output into code-shape mlout:
-      pr_turb(:)     = 0   
-      pr_relative(:) = 0
+      pr_turb(:)     = 0.   
+      pr_relative(:) = 0.
 
       if (.not.allocated(output_h)) allocate(output_h(200,1,1))
       output_h(:,1,1) = output_preserve(:mlin_grid_size)
-      interp_x       = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
-      pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
-                                                  mlin_grid_size,1,mlin_grid_size,           &
-                                                  int(shock_ind-pns_ind))*scale_pr_relative
       
+      interp_x        = linspace(x(int(pns_ind)), x(int(shock_offset)), mlin_grid_size)   
+      pr_relative(int(pns_ind):shock_offset) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
+                                                  mlin_grid_size,1,mlin_grid_size,           &
+                                                  int(shock_offset-int(pns_ind)+1))*scale_pr_relative
+    !   print*, 'output', maxval(output_h), maxval(pr_relative)
       ! remove the points right before the shock
-      pr_relative(shock_ind-3:shock_ind) = 0.0
+    !   pr_relative(shock_offset) = 0.
       pr_turb = pr_relative*pr
 
     !   print*, 'output h ', maxval(output_h(:,1,1))
     !   print*, 'pr_relative ', ntstep, maxval(pr_relative)
     !   print*, output_preserve(mlin_grid_size-5:mlin_grid_size)
-    !   print*, 'ntstep, max(pturb)', ntstep, maxval(pr_turb)
+    !   print*, 'ntstep, max(pturb)', ntstep, maxval(pr_turb), maxval(output_preserve)
+    !   667   format(A,1p,I6,11(E10.3)) 
+    !   write(*,667), 'ntstep, max(pturb)', ntstep, pr_relative(shock_offset-10:shock_offset)
    
       return 
       END       
