@@ -1072,10 +1072,6 @@
           endif
         
       endif
-      
-        !   if (bounce_time.eq.0) bounce_time=time
-        !   if (time-bounce_time.ge.bounce_delay) first_bounce = .true.
-      
       end
 !
       subroutine artvis(ncell,x,rho,v,q) 
