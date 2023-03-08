@@ -318,12 +318,16 @@
 !         
       call artvis(ncell,x,rho,v,q)
 !     
-      !post_bounce = .true.
-      if (post_bounce.eqv..true.) then
-        !--calculate PNS & shock radii, only in post-bounce stage
-        call shock_radius(ncell,x,v,vsound,ntstep,print_endstep)
+      if (post_bounce.eqv..true.) first_bounce=.true.
+      if (first_bounce.eqv..true.) then
+        !--calculate PNS radius, only in post-bounce stage        
         call pns_radius(ncell,x,rho,ntstep,print_endstep)
-        
+      endif
+
+      !post_bounce = .true.
+      if (post_bounce.eqv..true.) then  
+        !--calculate shock radius, only in post-bounce stage 
+        call shock_radius(ncell,x,v,vsound,ntstep,print_endstep)             
         !--turbulence contribution to pressure via ML in post-bounce regime
         if (mlmodel_name=='None'.or.mlmodel_name=='none') then
             pr_turb(:) = 0
@@ -333,7 +337,10 @@
             call turbpress(ncell,rho,x,v,temp,u,ntstep,print_endstep)
         endif
       else
-          !--check if bounced
+          !--check if: 
+          !--1. bounced 
+          !--2. convective region is in the high resolution region
+          !     (turbulent pressure won't be added before that)
           call bounce(ntstep,rho)
       endif
 !
@@ -1033,11 +1040,11 @@
 !
 !
       subroutine bounce(ntstep,rho)
-!***********************************************************            
-!                                                          *            
-!  This subroutine identifies if the bounce has occured    *            
-!                                                          *            
-!***********************************************************            
+!***********************************************************
+!                                                          *
+!  This subroutine identifies if the bounce has occured    *
+!                                                          *
+!***********************************************************
 !            
       implicit double precision (a-h,o-z) 
           
@@ -1049,21 +1056,25 @@
   
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
       common /timej / time, dt! 
-      common /units/ umass, udist, udens, utime, uergg, uergcc               
+      common /units/ umass, udist, udens, utime, uergg, uergcc
+      common /carac/ deltam(idim), abar(idim)
+      common /numb / ncell, ncell1 
+      common /pns/ pns_ind, pns_x
 
-      first_bounce = .false.
-      post_bounce  = .false.
       bounce_delay = 2.d-3/utime !delay of 2 ms
-      
+
       if (maxval(rho)*udens.gt.2.d14) then
-          first_bounce = .true.
-          if (bounce_time.eq.0) bounce_time=time
-          if (time-bounce_time.ge.bounce_delay) then
+        if (bounce_time.eq.0) bounce_time = time
+        if (first_bounce.eqv..false.) first_bounce = .true.
+        if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
             post_bounce   = .true.
-            bounce_ntstep = ntstep
-            bounce_time   = time
+            bounce_ntstep = ntstep            
           endif
-      endif                
+        
+      endif
+      
+        !   if (bounce_time.eq.0) bounce_time=time
+        !   if (time-bounce_time.ge.bounce_delay) first_bounce = .true.
       
       end
 !
@@ -5757,9 +5768,11 @@
       print*, 'idump as read =        ', idump
       
       if (shock_ind.ne.0) then
-            post_bounce = .true.
+            first_bounce = .true.
+            post_bounce  = .true.            
       else
-            post_bounce = .false.
+            first_bounce = .false.
+            post_bounce  = .false.
       endif
 
       ncell = nc
