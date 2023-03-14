@@ -144,7 +144,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx, mlin_grid_size
       character*1024 mlmodel_name
-      logical post_bounce, first_bounce
+      logical add_pturb, first_bounce, track_shock
 
       parameter (idim=10000) 
       parameter (idim1 = idim+1) 
@@ -188,7 +188,8 @@
       common /mlmod/ mlmodel_name
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
       common /interp/ mlin_grid_size
       common /mlout/ pr_turb(idim1), output_preserve(idim) 
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
@@ -196,7 +197,7 @@
 !
 !--resize grid based on the shock position (not done)
 !     
-    !   if (post_bounce.eqv..true.) then
+    !   if (add_pturb.eqv..true.) then
     !     if (print_endstep.eqv..true.) then
     !             call shock_radius(ncell,x,v,vsound,print_endstep)
     !             call resize_grid(ncell,x,v,u,rho,ye,f,du,dye,q,                 &
@@ -318,16 +319,19 @@
 !         
       call artvis(ncell,x,rho,v,q)
 !     
-      if (post_bounce.eqv..true.) first_bounce=.true.
       if (first_bounce.eqv..true.) then
-        !--calculate PNS & shock radius, only in post-bounce stage        
-        call pns_radius(ncell,x,rho,ntstep,print_endstep)
+        !--calculate PNS, only in post-bounce stage        
+        call pns_radius(ncell,x,rho,ntstep,print_endstep)        
+      endif
+
+      if (track_shock.eqv..true.) then
+        !--calculate shock radius, only in post-bounce stage after the bounce_delay   
         call shock_radius(ncell,x,v,vsound,ntstep,print_endstep)
       endif
 
       pr_turb(:) = 0
-      !post_bounce = .true.
-      if (post_bounce.eqv..true.) then                       
+      !add_pturb = .true.
+      if (add_pturb.eqv..true.) then                       
         !--turbulence contribution to pressure via ML in post-bounce regime
         if (mlmodel_name=='None'.or.mlmodel_name=='none') then
             continue
@@ -1051,10 +1055,11 @@
       parameter (idim=10000)   
       dimension rho(idim)
 
-      logical :: post_bounce, first_bounce
+      logical :: add_pturb, first_bounce, track_shock
       real    :: bounce_delay      
   
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
       common /timej / time, dt! 
       common /units/ umass, udist, udens, utime, uergg, uergcc
       common /carac/ deltam(idim), abar(idim)
@@ -1065,9 +1070,13 @@
 
       if (maxval(rho)*udens.gt.2.d14) then
         if (bounce_time.eq.0) bounce_time = time
-        if (first_bounce.eqv..false.) first_bounce = .true.
+        if (first_bounce.eqv..false.) then
+            first_bounce = .true.
+        elseif (time.ge.(bounce_time+bounce_delay)) then
+            track_shock = .true.
+        endif
         if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
-            post_bounce   = .true.
+            add_pturb   = .true.
             bounce_ntstep = ntstep            
           endif
         
@@ -1991,7 +2000,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !             
-      logical post_bounce, first_bounce
+      logical add_pturb, first_bounce, track_shock
       double precision pr_turb
       parameter (idim=10000) 
       parameter (idim1 = idim+1) 
@@ -2003,7 +2012,8 @@
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /carac/ deltam(idim), abar(idim) 
       common /damping/ damp, dcell 
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
       common /mlout/ pr_turb(idim1), output_preserve(idim)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
@@ -2030,7 +2040,7 @@
 !        
          pressp = pr(kp05) + prnu(kp05)          
          pressm = pr(km05) + prnu(km05)
-         if (post_bounce.eqv..true.) then
+         if (add_pturb.eqv..true.) then
              pressp = pressp+pr_turb(kp05)
              pressm = pressm+pr_turb(km05)
          endif
@@ -5578,7 +5588,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx,mlin_grid_size,idump,skip_dump
-      logical from_dump, post_bounce, first_bounce      
+      logical from_dump, add_pturb, first_bounce, track_shock      
 !                                                                       
       parameter (idim=10000) 
       parameter (idim1 = idim+1) 
@@ -5633,7 +5643,8 @@
       common /dump/ from_dump
       common /idump/ idump
       common /interp/ mlin_grid_size
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
       common /mlout/ pr_turb(idim1), output_preserve(idim)
       common /cpturb/ constant_pturb
 !                                                                       
@@ -5764,9 +5775,11 @@
       print*, 'idump as read =        ', idump
       
       first_bounce = .false.            
-      post_bounce  = .false.
+      track_shock  = .false.
+      add_pturb    = .false.
       if (bounce_time.gt.0)       first_bounce = .true.
-      if (maxval(pr_turb).gt.0.0) post_bounce  = .true.
+      if (shock_ind.gt.0)         track_shock  = .true.
+      if (maxval(pr_turb).gt.0.0) add_pturb    = .true.
       
       ncell = nc
       time = t       
@@ -5853,7 +5866,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
       real    ycc,yccave 
-      logical from_dump, post_bounce, first_bounce      
+      logical from_dump, add_pturb, first_bounce, track_shock      
       logical trapnue, trapnueb, trapnux 
 !                                                                       
       parameter (idim=10000) 
@@ -5890,7 +5903,8 @@
       common /cent/ dj(idim)
       common /dump/ from_dump
       common /idump/ idump
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
       common /mlout/ pr_turb(idim1), output_preserve(idim)
       common /eosnu / prnu(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
@@ -6125,7 +6139,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx, ntstep, ind, mlin_grid_size
-      logical from_dump, post_bounce, first_bounce
+      logical from_dump, add_pturb, first_bounce, track_shock
       character*1024 mlmodel_name, rho_file, x_file      
       character*10 frmtx
       character*11 frmtrho
@@ -6195,7 +6209,8 @@
       common /outp/ rout, p1out, p2out
       common /mlmod/ mlmodel_name
       common /dump/ from_dump
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
       common /interp/ mlin_grid_size
 
       save ifirst
@@ -6209,7 +6224,7 @@
 
       ! if below 150 ms, write output only every 10 ms
       ! pre-bounce stage is not as important to track
-      if (post_bounce) then
+      if (first_bounce) then
         tnext = time+dtime 
       elseif (time.lt.0.150/utime) then
         tnext = time+0.01/utime
@@ -6622,7 +6637,7 @@
                   write(*,500)'[    time/tmax, dt (s) ]',                     &
                               time*utime,' /',tmax*utime,steps(1)*utime                                    
       
-                  if (post_bounce.eqv..true.) then
+                  if (first_bounce.eqv..true.) then
                       write(*,501)'[    bounce time (s)   ]', bounce_time*utime                                          
                   endif            
             end if 
