@@ -11,7 +11,7 @@ jobs:
       matrix:
         python-version: ['3.10']
         gcc_v: [11]
-        torch_v: ['1.11.0']
+        torch_v: ['1.13.1']
 
     steps:
     - uses: actions/checkout@v1
@@ -44,9 +44,9 @@ jobs:
     - name: Env vars
       run: |
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
-    - name: Download EOS tables
-      run: |
-        wget https://su.drive.sunet.se/index.php/s/FQkikyGcRnHTZNL/download/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5 -P ./project/1dmlmix/        
+    # - name: Download EOS tables
+    #   run: |
+    #     wget https://su.drive.sunet.se/index.php/s/FQkikyGcRnHTZNL/download/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5 -P ./project/1dmlmix/        
     - name: Test compilation
       run: |
         make test
