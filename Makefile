@@ -1,6 +1,5 @@
-#If 'cmake' is not found automatically, enter its location manually below
-PYPATH := $(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')
-# PYPATH=/home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages
+#If 'cmake' is not found automatically, enter PYPATH location manually below
+PYPATH := $(shell python -c 'import site; print(site.getsitepackages()[0])')
 CMAKE_PREFIX_PATH="${PYPATH}/torch/share/cmake;${PYPATH}/pybind11/share/cmake"
 
 # if using default `gfortran`
