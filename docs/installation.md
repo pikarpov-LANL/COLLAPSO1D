@@ -13,17 +13,19 @@ conda create -n py310 python=3.10
 conda activate py310
 
 # check the pytorch installation instructions!
-pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+pip install torch==1.13.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 ```
 !!! Warning
-    `torch>=1.12.0` will work for inferencing, hence for the CCSN code will be fine, but loading and training the model will fail. Thus, `resnet_forward` will still work, but `polynomial` example will fail.
+    `torch>=1.13.1` will work for inferencing, hence for the CCSN code will be fine, but loading and training the model will fail. Thus, `resnet_forward` will still work, but `polynomial` example will fail.
 
-!!! Tip "Speed-up `make` commands"
-    `CMAKE_PREFIX_PATH` is a variable set in `Makefile` pointing to the location of Torch cmake config files. By default, it is determined by importing torch which is fairly slow, but it can also be set explicitely. To get the torch `{Location}`:
-    ```bash
-    pip show torch
-    ```
-    Then set `CMAKE_PREFIX_PATH={Locaton}/torch/share/cmake` in `Makefile`.
+
+### pybind11
+
+Python bindings for C++, which are necessary for the PyTorch wrapper.
+
+```bash
+pip install pybind11
+```
 
 ### CMake
 Make sure you have `cmake` or install it by (tested on `cmake==3.22.1`)

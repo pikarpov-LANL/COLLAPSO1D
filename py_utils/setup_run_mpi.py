@@ -16,9 +16,9 @@ class multirun:
     def __init__(self, suffixs, masses, enclmass_conv_cutoff,pns_cutoff,
                  dataset,base_path,template_path,output_path, eos_table_path, 
                  pns_grid_goals, conv_grid_goals, grid_goals,
-                 maxrads, mlmodel='None',
+                 maxrads, mlmodels=['None'],
                  read_dump=0, dump_interval=1e-3, restart=False,
-                 data_names=None, maxtime=0.5, eos=5):
+                 data_names=None, maxtime=0.5, eos=5, pturb=0):
         
         self.suffixs         = suffixs
         self.masses          = masses
@@ -32,7 +32,7 @@ class multirun:
         self.data_path       = self.template_path#f'{self.base_path}/template'#produce_data'
         self.eos_table_path  = eos_table_path
         self.maxrads         = maxrads
-        self.mlmodel         = mlmodel
+        self.mlmodels        = mlmodels
         self.pns_grid_goals  = pns_grid_goals
         self.conv_grid_goals = conv_grid_goals
         self.grid_goals      = grid_goals
@@ -41,6 +41,7 @@ class multirun:
         self.maxtime         = maxtime
         self.restart         = restart
         self.eos             = eos
+        self.pturb           = pturb
         
     def setup_pars(self, i):
         self.mass          = self.masses[i]
@@ -52,6 +53,7 @@ class multirun:
         self.grid_goal      = self.grid_goals[i]
         self.maxrad         = self.maxrads[i]
         self.suffix         = self.suffixs[i]
+        self.mlmodel        = self.mlmodels[i]
         
         if self.data_names != None: self.data_in = self.data_names[i]
         
@@ -268,6 +270,8 @@ class multirun:
                     data[i+1] = f'{self.eos_table_path}\n' 
                 elif 'EOS option' in line: 
                     data[i+1] = f'{self.eos}\n'                                                                          
+                elif 'Constant Pturb' in line: 
+                    data[i+1] = f'{self.pturb}\n' 
                     
         self.write_data(filepath, data)            
             

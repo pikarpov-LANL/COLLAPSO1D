@@ -20,6 +20,9 @@ import time
 import shutil
 from subprocess import Popen, PIPE
 from mpi4py import MPI
+import warnings
+
+warnings.filterwarnings('ignore')
 
 sys.path.append("/home/pkarpov/Sapsan")
 
@@ -31,20 +34,21 @@ from sapsan.utils import line_plot, plot_params
 def main():
     # --- Datasets and values to plot ---
     vals             = [
-                        # 'p_turb',
-                        'entropy',
-                        'velocity',
-                        'ye',
-                        'rho',
-                        'pressure',
-                        'temperature',
-                        'encm',
-                        'sound',
-                        'mach',
-                        'abar',
-                        'u_int',
-                        'u_nu', # neutrino energies
+                        'pturb',
+                        # 'entropy',
+                        # 'velocity',
+                        # 'ye',
+                        # 'rho',
+                        # 'pressure',
+                        # 'temperature',
+                        # 'encm',
+                        # 'sound',
+                        # 'mach',
+                        # 'abar',
+                        # 'u_int',
+                        # 'u_nu', # neutrino energies
                         # 'y_nu',
+                        # 'pturb_pgas'
                        ]
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
@@ -53,7 +57,8 @@ def main():
     # masses           = [13.0,15.0] # for ye
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
     # masses = [12.0,12.0,12.0,12.0,12.0,12.0]
-    # masses = [16.0,17.0,18.0,19.0]
+    masses           = [12.0,14.0,15.0,16.0,18.0,19.0] 
+    masses           = [12.0]
 
     # --- Paths & Names ---        
     # base            = 'g9k_c8.4k_p_0.3k'
@@ -88,24 +93,25 @@ def main():
     #base_path        = '/home/pkarpov/scratch/1dccsn/sleos/funiek/'
     #base_path        = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/output/'
     
-    #base_path = '/home/pkarpov/scratch/1dccsn/sleos/rcrit/'
+    # base_path = '/scratch/pkarpov/1dccsn/baseline/'
     #base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/rcrit/entropy_test/'
     #base_path = '/home/pkarpov/scratch/1dccsn/presn/input_grid/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sleos/dupp0/rcrit10/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/fleos5/rcrit10/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/baseline/'
-    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/constant10p/'
+    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/constant_rhov2/3e9/'
+    base_path = '/scratch/pkarpov/1dccsn/ml/'
     
     base_file        = f'DataOut_read'
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = True   # convert binary to readable (really only needed to be done once) 
+    convert2read     = False#True   # convert binary to readable (really only needed to be done once) 
     only_last        = False#True   # only convert from the latest binary file (e.g., latest *_restart_*)
     only_post_bounce = True   # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
-    compute          = False#True
+    compute          = False
     rho_threshold    = 1e12    # for the PNS radius - above density is considered a part of the Proto-Neutron Star
 
     # --- Plots & Movie Parameters ---
@@ -157,7 +163,7 @@ def main():
 
         if rank == 0: 
             rd.clean(); print()
-                  
+
     # calculate metrics and produce plots
     for dataset in datasets:
         
@@ -620,9 +626,19 @@ class Profiles:
             if bounce_time == 0.0: colored.warn('Bounce has not occured yet'); return -1            
             ps, time1d, dummy = self.open_checkpoint(self.numfiles-2, fullout=False)
             
-            dt              = time1d_last-time1d
-            anchor_index    = int(bounce_time/dt)+1
-            self.bounce_ind = anchor_index             
+            ps, time1d_0, dummy = self.open_checkpoint(0, fullout=False)
+            ps, time1d_1, dummy = self.open_checkpoint(1, fullout=False)
+            
+            dt  = time1d_last-time1d
+            dt0 = time1d_1-time1d_0             
+            
+            if np.rint(np.log10(dt)) != np.rint(np.log10(dt0)): 
+                # assuming first 150ms output only every 10ms
+                adjust = 0.150/dt-15
+            else: adjust = 0
+                
+            anchor_index    = int(bounce_time/dt-adjust)+1
+            self.bounce_ind = anchor_index                          
             
             for i in range(anchor_index,0,-1):
                 ps, time1d, bounce_time = self.open_checkpoint(i, fullout=False)
@@ -917,12 +933,13 @@ class Profiles:
         for h in self.header:            
             if '[' in h: continue  
             valname = h.lower()
+            if valname == 'p_turb': valname = 'pturb'
             if '\n' in valname: valname = valname.split('\n')[0]
             valmap[valname] = ps[index]            
             index            += 1
             
         if 'sound' not in valmap.keys(): valmap['sound'] = np.ones(valmap[list(valmap.keys())[0]].shape)
-        if 'p_turb' not in valmap.keys(): valmap['p_turb'] = np.zeros(valmap[list(valmap.keys())[0]].shape)
+        if 'pturb' not in valmap.keys(): valmap['pturb'] = np.zeros(valmap[list(valmap.keys())[0]].shape)
         
         encm = valmap['m_enclosed']
         r    = valmap['radius']
@@ -940,7 +957,8 @@ class Profiles:
             label     = [f'ind     {i+1}']
             loc       = 4
             ylim      = None
-            unlogy    = False            
+            unlogy    = False  
+            linestyle = ['-','--',':']          
             
             if versus=='encm':
                 if val == 'encm': continue
@@ -982,9 +1000,15 @@ class Profiles:
                 ylabel  = r'$P_{gas} \; [\frac{g}{cm\;s^2}]$'
                 ylim    = [1e20,1e36]
                 loc     = 1
-            elif val == 'p_turb':                
+            elif val == 'pturb':  
+                linestyle = ['None','--',':']              
                 ylabel  = r'$P_{turb} \; [\frac{g}{cm\;s^2}]$'
                 ylim    = [1e20,1e36]
+                loc     = 1
+            elif val == 'pturb_pgas':
+                to_plot = np.array([[x*unit, abs(valmap['pturb']/valmap['pressure'])]], dtype=object)
+                ylabel  = r'$P_{turb}/P_{gas}$'
+                ylim    = [1e-3,1e1]                
                 loc     = 1
             elif val == 'temperature':                
                 ylabel  = r'Temperature $[K]$'
@@ -1050,14 +1074,18 @@ class Profiles:
             if unlogy: 
                 if   versus == 'r':    plot_type = 'semilogx'
                 elif versus == 'encm': plot_type = 'plot'          
-                     
+            
+            if val=='pturb':      ylim = [1e20,1e30]
+            if val=='pturb_pgas': ylim = [1e-3,1e1]
+            
             ax = line_plot(to_plot,
                            plot_type = plot_type,
                            label     = label,
-                           linestyle = ['-','--',':'],               
+                           linestyle = linestyle,               
                            figsize   = (10,6), 
                            dpi       = self.dpi
-                           )    
+                           )                   
+            if val=='pturb': ax.plot(to_plot[0,0],to_plot[0,1], linestyle='None',marker='.',c='tab:blue') 
             
             # check if after bounce                
             if i >= self.bounce_ind:                
@@ -1073,19 +1101,19 @@ class Profiles:
                     pns_ind,   pns_x   = rt.pns_radius(rho_threshold = rho_threshold)   
                                     
                 pns_edge    = x[int(pns_ind)]*unit
-                if int(shock_ind)==len(x): shock_front = x[-1]*unit
-                else: shock_front = x[int(shock_ind)]*unit
+                if int(shock_ind)==len(x): shock_ind = -1                
+                shock_front = x[int(shock_ind)]*unit
                 if versus == 'r'   : line_label = '%.2e km'          
                 if versus == 'encm': line_label = '%.3f $M_{\odot}$'      
                          
                 ax.axvline(x=pns_edge,linestyle='-',color='r',linewidth=1,
                            label=f'PNS    {line_label%pns_edge}')
                 ax.axvline(x=shock_front,linestyle='--',color='r',linewidth=1,
-                           label=f'shock {line_label%shock_front}')                
+                           label=f'shock {line_label%shock_front}')                                            
                             
             if self.only_post_bounce: ax.set_title('$t-t_{bounce}$ = %.2f ms'%((float(time1d)-float(bounce_time))*1e3))
-            else: ax.set_title('$t$ = %.2f ms'%(float(time1d)*1e3))
-                
+            else: ax.set_title('$t$ = %.2f ms'%(float(time1d)*1e3))                        
+            
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
             ax.set_xlim(xlim)            

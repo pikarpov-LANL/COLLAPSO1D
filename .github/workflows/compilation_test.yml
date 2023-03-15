@@ -11,7 +11,7 @@ jobs:
       matrix:
         python-version: ['3.10']
         gcc_v: [11]
-        torch_v: ['1.11.0']
+        torch_v: ['1.13.1']
 
     steps:
     - uses: actions/checkout@v1
@@ -38,6 +38,9 @@ jobs:
       run: |
         sudo apt install -y python3-pip
         pip3 install torch==${{ matrix.torch_v }}+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+    - name: Install pybind11
+      run: |
+        pip3 install pybind11
     - name: Env vars
       run: |
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.

@@ -15,6 +15,7 @@ Parameters in the `project/1dmlmix/setup`
 | :------------- | :-------------------------------------------------------------- |
 | `None`         | sets turbulent pressure to 0 and doesn't use any ML subroutines |
 | `ModelName.pt` | uses ML subroutines (model name can be anything)                |
+| `Constant` | uses `subroutine turbpress_contant` to apply `<Constant Pturb>` defined to setup. Two mode ['mach', 'rhov2'] are available that need to be specified in `subroutine turbpress_constant`. Recompilation is required.            |
 
 #### [EOS options](#__codelineno-0-22)
 

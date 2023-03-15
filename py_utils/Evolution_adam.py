@@ -49,26 +49,25 @@ from sapsan.utils import line_plot, plot_params
 def main():
     # --- Datasets and values to plot ---
     vals             = [
-                        'u1',
-                        'u2',
-                        'u3',
-                        'rho',
-                        'ye',
-                        'pressure',
-                        'sound',
-                        'temperature',
-                        'entropy',                        
-                        'u_int',
-                        'pturb',
-                        'mach'
+                        # 'pturb',
+                        # 'u1',                                               
+                        # 'rho',
+                        # 'sound',                        
+                        'vturb',    
+                        # 'vturb2',                                             
+                        # 'u2',
+                        # 'u3',                        
+                        # 'ye',
+                        # 'pressure',                        
+                        # 'temperature',
+                        # 'entropy',                        
+                        # 'u_int',                        
+                        # 'mach',
+                        # 'pturb_pgas'
                        ]
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
-    # masses           = [11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] # for 1.5k and 2k 
-    masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
-    # masses           = [13.0,15.0] # for ye
-    # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
-    # masses = [9.0,10.0,20.0]
+    masses           = [9.0,10.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] # for g9k and g2k 
 
     # --- Paths & Names ---        
     base             = 'swbj15.horo.3d'
@@ -211,60 +210,61 @@ def main():
         time.sleep(0.1)
         if rank == 0: colored.subhead( '\n-------- Progress ---------')
 
-        # --- Main Parallel Loop ---
-        for i in range(interval[0], interval[1]):  
-            pf.plot_profile(i             = i, 
-                            vals          = vals, 
-                            versus        = versus, 
-                            show_plot     = False, 
-                            save_plot     = save_plot,
-                            compute       = compute,
-                            rho_threshold = rho_threshold
-                           )     
+        if not make_movies:
+            # --- Main Parallel Loop ---
+            for i in range(interval[0], interval[1]):  
+                pf.plot_profile(i             = i, 
+                                vals          = vals, 
+                                versus        = versus, 
+                                show_plot     = False, 
+                                save_plot     = save_plot,
+                                compute       = compute,
+                                rho_threshold = rho_threshold
+                            )     
 
-        pf.progress_bar(i+1, 'Done!', done = True)           
-        
-        gather_pns_ind    = comm.gather(pf.pns_ind_ar,    root=0)
-        gather_pns_x      = comm.gather(pf.pns_x_ar,      root=0)
-        gather_pns_encm   = comm.gather(pf.pns_encm_ar,   root=0)
-        gather_shock_ind  = comm.gather(pf.shock_ind_ar,  root=0)
-        gather_shock_x    = comm.gather(pf.shock_x_ar,    root=0)
-        gather_shock_encm = comm.gather(pf.shock_encm_ar, root=0)
-        gather_lumnue     = comm.gather(pf.lumnue,        root=0)
-        gather_lumnueb    = comm.gather(pf.lumnueb,       root=0)
-        gather_lumnux     = comm.gather(pf.lumnux,        root=0)        
-        gather_shell      = comm.gather(pf.shell_ar,      root=0)
-        gather_time       = comm.gather(pf.time_ar,       root=0)        
-        
-        # --- Back to Rank 0 to produce Summary Plots ---
-        if rank == 0: 
-            colored.subhead( '\n----------- Plots ----------')
-            print(f'{pf.base_save_path}\n') 
-                    
-            pf.pns_ind_ar    = sum(gather_pns_ind)
-            pf.pns_x_ar      = sum(gather_pns_x)
-            pf.pns_encm_ar   = sum(gather_pns_encm)
-            pf.shock_ind_ar  = sum(gather_shock_ind)
-            pf.shock_x_ar    = sum(gather_shock_x)
-            pf.shock_encm_ar = sum(gather_shock_encm)
-            pf.lumnue        = sum(gather_lumnue)
-            pf.lumnueb       = sum(gather_lumnueb)
-            pf.lumnux        = sum(gather_lumnux)  
-            pf.shell_ar      = sum(gather_shell)
-            pf.time_ar       = sum(gather_time)          
-            # pf.bounce_ind    = shift
+            pf.progress_bar(i+1, 'Done!', done = True)           
             
-            if versus == 'r': 
-                pf.save_evolution()
-                if pf.bounce_ind > 0:
-                    pf.plot_convection()
-                    pf.plot_pns_shock()
-                    # pf.plot_shells()                
+            gather_pns_ind    = comm.gather(pf.pns_ind_ar,    root=0)
+            gather_pns_x      = comm.gather(pf.pns_x_ar,      root=0)
+            gather_pns_encm   = comm.gather(pf.pns_encm_ar,   root=0)
+            gather_shock_ind  = comm.gather(pf.shock_ind_ar,  root=0)
+            gather_shock_x    = comm.gather(pf.shock_x_ar,    root=0)
+            gather_shock_encm = comm.gather(pf.shock_encm_ar, root=0)
+            gather_lumnue     = comm.gather(pf.lumnue,        root=0)
+            gather_lumnueb    = comm.gather(pf.lumnueb,       root=0)
+            gather_lumnux     = comm.gather(pf.lumnux,        root=0)        
+            gather_shell      = comm.gather(pf.shell_ar,      root=0)
+            gather_time       = comm.gather(pf.time_ar,       root=0)        
+            
+            # --- Back to Rank 0 to produce Summary Plots ---
+            if rank == 0: 
+                colored.subhead( '\n----------- Plots ----------')
+                print(f'{pf.base_save_path}\n') 
                         
-            # pf.plot_lumnue()                                    
-        
-        # --- Movies are produced in parallel ---            
-        if make_movies:            
+                pf.pns_ind_ar    = sum(gather_pns_ind)
+                pf.pns_x_ar      = sum(gather_pns_x)
+                pf.pns_encm_ar   = sum(gather_pns_encm)
+                pf.shock_ind_ar  = sum(gather_shock_ind)
+                pf.shock_x_ar    = sum(gather_shock_x)
+                pf.shock_encm_ar = sum(gather_shock_encm)
+                pf.lumnue        = sum(gather_lumnue)
+                pf.lumnueb       = sum(gather_lumnueb)
+                pf.lumnux        = sum(gather_lumnux)  
+                pf.shell_ar      = sum(gather_shell)
+                pf.time_ar       = sum(gather_time)          
+                # pf.bounce_ind    = shift
+                
+                if versus == 'r': 
+                    pf.save_evolution()
+                    if pf.bounce_ind > 0:
+                        pf.plot_convection()
+                        pf.plot_pns_shock()
+                        # pf.plot_shells()                
+                            
+                # pf.plot_lumnue()                                    
+                
+        else:            
+            # --- Movies are produced in parallel ---            
             if rank == 0: 
                 colored.subhead('\n---------- Movies ----------')
                 if not os.path.exists(pf.movie_save_path): os.makedirs(pf.movie_save_path)
@@ -561,6 +561,7 @@ class Profiles:
             if not os.path.exists(self.plot_path): os.makedirs(self.plot_path)
             
         if   versus == 'r'   : self.versus_name = '_r'
+        elif versus == 'rho' : self.versus_name = '_rho'
         elif versus == 'encm': self.versus_name = '_encm'    
         
         self.plot_file = f'{self.plot_path}/{val}{self.versus_name}'
@@ -885,29 +886,33 @@ class Profiles:
     def open_hdf5(self,i,vals):
         file   = self.base_file+'_%05d.h5'%(i)
         
-        file1d = f'{self.base_path}{self.dataset}/{file}'                 
+        file1d = f'{self.base_path}{self.dataset}/{file}'      
+        
+        if not os.path.exists(file1d): return None, None
                 
-        valnames = {'u1'         :'u1',
-                    'u2'         :'u2',
-                    'u3'         :'u3',
-                    'u_int'      :'u',
-                    'rho'        :'rho',
-                    'ye'         :'comp0',
-                    'pressure'   :'eos0',
-                    'sound'      :'eos1',
-                    'temperature':'eos2',
-                    'entropy'    :'eos3',
-                    'pturb'      :'Pturb_s2'}
+        valnames = {'u1'      : 'u1'           ,
+                    'u2'      : 'u2'           ,
+                    'u3'      : 'u3'           ,
+                    'u'       : 'u_int'        ,
+                    'rho'     : 'rho'          , 
+                    'comp0'   : 'ye'           ,
+                    'eos0'    : 'pressure'     ,
+                    'eos1'    : 'sound'        ,
+                    'eos2'    : 'temperature'  ,
+                    'eos3'    : 'entropy'      ,
+                    'Pturb_s2': 'pturb'}
         
         valmap = {}
         
         with h5.File(file1d, 'r') as hf:
             time1d = np.array(hf['Time'])[0]
-            for j,val in enumerate(vals):
-                if val == 'mach': 
-                    valmap[val] = valmap['u1']/valmap['sound']
-                    continue
-                valmap[val] = np.array(hf[valnames[val]])
+            for j,val in enumerate(valnames.keys()):                
+                valmap[valnames[val]] = np.array(hf[val])
+                
+        valmap['mach']       = np.absolute(valmap['u1']/valmap['sound'])
+        valmap['vturb']      = np.sqrt(valmap['pturb']/valmap['rho'])
+        valmap['vturb2']     = valmap['vturb']**2
+        valmap['pturb_pgas'] = valmap['pturb']/valmap['pressure']
                 
         grid = f'{self.base_path}{self.dataset}/grid.h5'
         with h5.File(grid, 'r') as hf:
@@ -921,6 +926,8 @@ class Profiles:
                      compute=False, rho_threshold = 2e11):        
 
         valmap, time1d    = self.open_hdf5(i, vals)
+        if valmap == None: return
+        
         self.times[i] = time1d    
         bounce_time = 0
                                 
@@ -932,11 +939,18 @@ class Profiles:
             loc       = 4
             ylim      = None
             unlogy    = False            
-                 
+                        
             if versus=='r':
                 x         = r
                 xlabel    = r'$Radius \; [km]$'
                 xlim      = [1e0,1e5]
+                plot_type = 'loglog'
+                unit      = 1#self.cm2km
+            elif versus=='rho':
+                if val in [versus, 'u1', 'sound']: continue
+                x         = valmap['rho']
+                xlabel    = r'Density $[g/cm^3]$'
+                xlim      = [1e4,1e15]
                 plot_type = 'loglog'
                 unit      = 1#self.cm2km
             else: colored.error("unknown 'versus' {versus}, trying to exit")
@@ -953,12 +967,13 @@ class Profiles:
                 ylim    = [-1.5e10, 3e9]
                 unlogy  = True        
             elif val == 'u2':                
+                # print('%.2e, %.2e'%(np.amax(valmap[val]), np.amin(valmap[val])))
                 ylabel  = r'Velocity_$\theta$ $[cm/s]$'
-                ylim    = [-1.5e10, 3e9]
+                ylim    = [-1e8, 1e8]
                 unlogy  = True        
             elif val == 'u3':                
                 ylabel  = r'Velocity_$\phi$ $[cm/s]$'
-                ylim    = [-1.5e10, 3e9]
+                ylim    = [-1e8, 1e8]
                 unlogy  = True                        
             elif val == 'sound':                
                 ylabel  = r'$V_{sound}$ $[cm/s]$'
@@ -967,19 +982,30 @@ class Profiles:
                 unlogy  = True  
             elif val == 'mach':                
                 ylabel  = 'Mach'
-                ylim    = [0,11]
-                loc     = 1
-                unlogy  = True                                               
+                ylim    = [3e-7,1.1e1]
+                loc     = 4
             elif val == 'pressure':                
                 ylabel  = r'$P_{gas} \; [\frac{g}{cm\;s^2}]$'
                 ylim    = [1e20,1e36]
                 loc     = 1
             elif val == 'pturb':                
                 ylabel  = r'$P_{turb} \; [\frac{g}{cm\;s^2}]$'
-                ylim    = [1e20,1e36]
-                loc     = 1                                
+                ylim    = [1e20,1e30]
+                loc     = 1             
+            elif val == 'pturb_pgas':
+                ylabel  = r'$P_{turb}/P_{gas}$'
+                ylim    = [1e-3,1e1]                
+                loc     = 1
+            elif val == 'vturb':                
+                ylabel  = r'$Velocity_{turb} \; [cm/s]$'
+                ylim    = [1e4,1e10]
+                loc     = 2
+            elif val == 'vturb2':              
+                ylabel  = r'$Velocity_{turb}^2 \; [cm^2/s^2]$'
+                ylim    = [1e8,1e20]
+                loc     = 2                
             elif val == 'temperature':          
-                to_plot = np.array([[x*unit, valmap[val]*1e9]], dtype=object)      
+                to_plot = np.array([[x*unit, valmap[val]*1e10]], dtype=object)      
                 ylabel  = r'Temperature $[K]$'
                 ylim    = [1e7,4e11]
                 loc     = 1
@@ -1042,7 +1068,10 @@ class Profiles:
             
             if unlogy: 
                 if   versus == 'r':    plot_type = 'semilogx'
-                elif versus == 'encm': plot_type = 'plot'          
+                elif versus == 'encm': plot_type = 'plot'  
+                
+            if val=='pturb':      ylim = [1e20,1e30]
+            if val=='pturb_pgas': ylim = [1e-3,1e1]
                      
             ax = line_plot(to_plot,
                            plot_type = plot_type,
@@ -1050,7 +1079,7 @@ class Profiles:
                            linestyle = ['-','--',':'],               
                            figsize   = (10,6), 
                            dpi       = self.dpi
-                           )    
+                           )                            
             
             # check if after bounce                
             if i >= self.bounce_ind:                
@@ -1063,12 +1092,13 @@ class Profiles:
                     elif self.dataset=='s12.0_g9k_c8.4k_p_0.3k' and i<=670: self.old_shock_ind = -1
                     shock_ind, shock_x = rt.shock_radius(bump          = self.shock_region.get(i+1,0), 
                                                          old_shock_ind = self.old_shock_ind)
-                    pns_ind,   pns_x   = rt.pns_radius(rho_threshold = rho_threshold)   
-                                    
+                    pns_ind,   pns_x   = rt.pns_radius(rho_threshold = rho_threshold)                                             
+                    
                 pns_edge    = x[int(pns_ind)]*unit
                 shock_front = x[int(shock_ind)]*unit
-                if versus == 'r'   : line_label = '%.2e km'          
-                if versus == 'encm': line_label = '%.3f $M_{\odot}$'      
+                if   versus == 'r'   : line_label = '%.2e km'          
+                elif versus == 'rho' : line_label = '%.2e $g/cm^3$'   
+                elif versus == 'encm': line_label = '%.3f $M_{\odot}$'      
                          
                 ax.axvline(x=pns_edge,linestyle='-',color='r',linewidth=1,
                            label=f'PNS    {line_label%pns_edge}')
@@ -1084,6 +1114,8 @@ class Profiles:
             ax.set_ylim(ylim) 
             
             self.sim_label(ax)
+            
+            if versus == 'rho': ax.invert_xaxis()
 
             plt.legend(loc=loc)
             plt.tight_layout()
@@ -1154,7 +1186,7 @@ class Profiles:
                         f' -vcodec libx264 {movie_name}{name_amend}.mp4 -y'),
                         shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)           
         output, error = result.communicate()   
-
+        
         if printout: print(output, error)  
         
         print(f'{val}{padding_val}: {val}{self.versus_name}{self.save_name_amend}{name_amend}.mp4')

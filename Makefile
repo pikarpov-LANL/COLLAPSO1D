@@ -1,6 +1,6 @@
-#If 'cmake' is not found automatically, enter its location manually below
-CMAKE_PREFIX_PATH := $(shell python -c "import torch; print(torch.__file__)" | sed -n 's/.torch\/__init__.py//p')/torch/share/cmake
-# CMAKE_PREFIX_PATH := /home/pkarpov/anaconda3/envs/py310/lib/python3.10/site-packages/torch/share/cmake
+#If 'cmake' is not found automatically, enter PYPATH location manually below
+PYPATH := $(shell python -c 'import site; print(site.getsitepackages()[0])')
+CMAKE_PREFIX_PATH="${PYPATH}/torch/share/cmake;${PYPATH}/pybind11/share/cmake"
 
 # if using default `gfortran`
 # HDF5PATH =   /usr/lib/x86_64-linux-gnu/hdf5/serial
@@ -15,7 +15,7 @@ COMPILER = ifort
 # List CUDA compute capabilities
 # TORCH_CUDA_ARCH_LIST := 7.0
 
-CONFIG	 	  = Debug
+CONFIG	 	  = Release #Debug
 OPENACC	 	  = 0
 
 PROJECT_NAME  = 1dmlmix

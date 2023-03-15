@@ -144,7 +144,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx, mlin_grid_size
       character*1024 mlmodel_name
-      logical post_bounce, first_bounce
+      logical add_pturb, first_bounce, track_shock
 
       parameter (idim=10000) 
       parameter (idim1 = idim+1) 
@@ -188,15 +188,16 @@
       common /mlmod/ mlmodel_name
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
       common /interp/ mlin_grid_size
-      common /mlout/ pr_turb(idim1)  
+      common /mlout/ pr_turb(idim1), output_preserve(idim) 
 !      common /nuout/ rlumnue, rlumnueb, rlumnux,                       
 !     1               enue, enueb, enux, e2nue, e2nueb, e2nux           
 !
 !--resize grid based on the shock position (not done)
 !     
-    !   if (post_bounce.eqv..true.) then
+    !   if (add_pturb.eqv..true.) then
     !     if (print_endstep.eqv..true.) then
     !             call shock_radius(ncell,x,v,vsound,print_endstep)
     !             call resize_grid(ncell,x,v,u,rho,ye,f,du,dye,q,                 &
@@ -318,22 +319,32 @@
 !         
       call artvis(ncell,x,rho,v,q)
 !     
-      !post_bounce = .true.
-      if (post_bounce.eqv..true.) then
-        !--calculate PNS & shock radii, only in post-bounce stage
+      if (first_bounce.eqv..true.) then
+        !--calculate PNS, only in post-bounce stage        
+        call pns_radius(ncell,x,rho,ntstep,print_endstep)        
+      endif
+
+      if (track_shock.eqv..true.) then
+        !--calculate shock radius, only in post-bounce stage after the bounce_delay   
         call shock_radius(ncell,x,v,vsound,ntstep,print_endstep)
-        call pns_radius(ncell,x,rho,ntstep,print_endstep)
-        
+      endif
+
+      pr_turb(:) = 0
+      !add_pturb = .true.
+      if (add_pturb.eqv..true.) then                       
         !--turbulence contribution to pressure via ML in post-bounce regime
         if (mlmodel_name=='None'.or.mlmodel_name=='none') then
-            pr_turb(:) = 0
+            continue
         elseif (mlmodel_name=='Constant'.or.mlmodel_name=='constant') then
             call turbpress_constant(ncell,v,vsound,pr,rho,x) 
         else
-            call turbpress(ncell,rho,x,v,temp)
+            call turbpress(ncell,rho,x,v,temp,u,ntstep,print_endstep)
         endif
       else
-          !--check if bounced
+          !--check if: 
+          !--1. bounced 
+          !--2. convective region is in the high resolution region
+          !     (turbulent pressure won't be added before that)
           call bounce(ntstep,rho)
       endif
 !
@@ -756,7 +767,7 @@
       end
 !
 !
-      subroutine turbpress(ncell,rho,x,v,temp) 
+      subroutine turbpress(ncell,rho,x,v,temp,u,ntstep,print_endstep) 
 !*********************************************************               
 !                                                        *               
 ! This subroutine passes the grid to a trained           *
@@ -771,12 +782,13 @@
       character*1024 :: mlmodel_name
       integer mlin_grid_size
       real scale_pr, scale_pr_relative
-      double precision pr_turb
+      double precision pr_turb,output_preserve
 !
       parameter(idim=10000) 
-      parameter(idim1 = idim+1) 
+      parameter(idim1=idim+1) 
+      parameter (avokb=6.02e23*1.381e-16)
 !                                                                       
-      dimension rho(idim), temp(idim) 
+      dimension rho(idim), temp(idim), u(idim)
       dimension x(0:idim), v(0:idim)
       dimension unue(idim),unueb(idim),unux(idim)       
 !                                                                       
@@ -786,61 +798,98 @@
       common /etnus/ etanue(idim),etanueb(idim),etanux(idim) 
       common /eosnu/ prnu(idim1) 
       common /units/ umass, udist, udens, utime, uergg, uergcc
+      common /unit2/ utemp, utmev, ufoe, umevnuc, umeverg
       common /mlmod/ mlmodel_name               
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /rshock/ shock_ind, shock_x
-      common /pns/ pns_ind, pns_x       
+      common /pns/ pns_ind, pns_x
+      common /nuprint/ nups,nupk,tacr       
       common /interp/ mlin_grid_size
-      common /mlout/ pr_turb(idim1)
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
                                     
       ! The tensor shape is exactly backwards from python: (Length,Channels,N batches)
-      real(real32) :: input(mlin_grid_size, 4, 1)
+      real(real32)              :: input(mlin_grid_size, 5, 1)
       real(real32), allocatable :: output_h(:,:,:)    
-      double precision pr_relative(idim1)
-      double precision interp_x(mlin_grid_size)         
+      double precision          :: pr_relative(idim1)
+      double precision          :: interp_x(mlin_grid_size)
+      logical                   :: print_endstep   
+      integer                   :: shock_offset   
       
+      !--entropy conversion factor                                            
+      sfac=avokb*utemp/uergg
+
+      !--don't inject right below the shock
+      shock_offset = int(shock_ind)-2
+            
       ! Scale Pressure to fit into single precission (taken from ML training)
-      scale_u    = udist/utime*1e-8
-      scale_rho  = 2.d6*2e-13
-      scale_pr   = 2.d22*2e-32
-      scale_temp = 1
-      scale_pr_relative = 1.d-1
+      scale_v           = udist/utime*1e-8
+      scale_rho         = 4.d-6   ! 2.d6*2e-12      
+      scale_pr          = 4.d-9   ! 2.d22*2e-31
+      scale_vsound      = 1       ! 1.d8*1.d-8
+      scale_temp        = 1.d-1   ! 1.d9*1.d-10
+      scale_entropy     = 1./sfac*1.d-1 
+      scale_pr_relative = 3.
 
-      input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *  scale_u
-      input(:,2,1) = interpolate(x(1:),rho,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *    scale_rho
-      input(:,3,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),int(shock_ind),mlin_grid_size) * scale_pr
-      input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),int(shock_ind),mlin_grid_size) *   scale_temp
+      !   For model_s12_old.pt
+      !   scale_v           = udist/utime*1e-8
+      !   scale_rho         = 4.d-7   ! 2.d6*2e-13      
+      !   scale_pr          = 4.d-10  ! 2.d22*2e-32
+      !   scale_vsound      = 1       ! 1.d8*1.d-8
+      !   scale_temp        = 1.d-1   ! 1.d9*1.d-10
+      !   scale_entropy     = 1./sfac
+      !   scale_pr_relative = 1.
 
-      print*, 'max u', maxval(abs(input(:,1,1)))
-      print*, 'max rho', maxval(input(:,2,1))
-      print*, 'max T', maxval(input(:,3,1))
-      print*, 'max P', maxval(input(:,4,1))
+      ! only inference once every # timesteps
+      if (mod(ntstep,5).eq.0) then
+        if (print_endstep.eqv..false.) then
 
+            !   input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),shock_offset,mlin_grid_size) *  scale_v
+            input(:,1,1) = interpolate(x(1:),rho,ncell,int(pns_ind),shock_offset,mlin_grid_size) *        scale_rho
+            input(:,2,1) = interpolate(x(1:),pr(1:),ncell,int(pns_ind),shock_offset,mlin_grid_size) *     scale_pr
+            input(:,3,1) = interpolate(x(1:),vsound(1:),ncell,int(pns_ind),shock_offset,mlin_grid_size) * scale_vsound      
+            input(:,4,1) = interpolate(x(1:),temp,ncell,int(pns_ind),shock_offset,mlin_grid_size) *       scale_temp
+            input(:,5,1) = interpolate(x(1:),u,ncell,int(pns_ind),shock_offset,mlin_grid_size) *          scale_entropy
+            
+        !   948 format(A, 1pe12.4, 1pe12.4)
+        !       write(*,948), 'range rho    ', minval(input(:,1,1)), maxval(input(:,1,1))
+        !       write(*,948), 'range P      ', minval(input(:,2,1)), maxval(input(:,2,1))
+        !       write(*,948), 'range vsound ', minval(input(:,3,1)), maxval(abs(input(:,3,1)))      
+        !       write(*,948), 'range T      ', minval(input(:,4,1)), maxval(input(:,4,1))
+        !       write(*,948), 'range entropy', minval(input(:,5,1)), maxval(input(:,5,1))
+            
+            ! ML model (reverse the order for fortran data)
+            ! Input: ['rho','Pgas', 'vsound', 'T', 'entropy'] (1, 5, 200)
+            ! Output: [pr_relative = P_turb/P_gas] (1, 1, 200)
 
-      ! ML model (reverse the order for fortran data)
-      ! Input: ['u1','rho','Pgas', 'T'] (1, 4, 200)
-      ! Output: [pr_relative = P_turb/P_gas] (1, 1, 200)
+            output_h = mlmodel(input, trim(mlmodel_name))   
+            
+            output_preserve(:) = 0
+            output_preserve(:mlin_grid_size) = output_h(:,1,1)
+        endif
+      endif
 
-      output_h = mlmodel(input, trim(mlmodel_name))      
-      print*, output_h
       ! Re-shape output into code-shape mlout:
-      pr_turb(:)     = 0   
-      pr_relative(:) = 0
-      interp_x = linspace(x(int(pns_ind)), x(int(shock_ind)), mlin_grid_size)   
-      pr_relative(pns_ind:shock_ind) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
-                                                   mlin_grid_size,1,mlin_grid_size,           &
-                                                   int(shock_ind-pns_ind))*scale_pr_relative
-      !pr_relative(pns_ind:shock_ind) = 0.3
-      !print*, pr_relative(int(pns_ind):int(shock_ind))
-      print*, 'pr_relative', maxval(pr_relative), size(pr_relative)
-      pr_turb = pr_relative*pr
-    !   print*, 'ML prediction'      
-    !   print*, size(output_h), shape(output_h), shock_ind-pns_ind
-    !   print*, '-- pr_relative --'
-    !   print*, pr_relative(shock_ind-5:shock_ind)
-    !   print*, '-- pr_turb --'
-    !   print*, pr_turb(shock_ind-5:shock_ind)
-      call exit(0)
+      pr_turb(:)     = 0.   
+      pr_relative(:) = 0.
+
+      if (.not.allocated(output_h)) allocate(output_h(mlin_grid_size,1,1))
+      output_h(:,1,1) = output_preserve(:mlin_grid_size)
+      
+      interp_x        = linspace(x(int(pns_ind)), x(int(shock_offset)), mlin_grid_size)   
+      pr_relative(int(pns_ind):shock_offset) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),            &
+                                                           mlin_grid_size,1,mlin_grid_size,                 &
+                                                           int(shock_offset-int(pns_ind)+1))
+      pr_relative = scale_pr_relative*pr_relative                                                           
+      pr_turb     = pr_relative*pr
+      
+511   format(A,1p,I5,A,E10.3)
+      if (mod(ntstep,nups).eq.0) then        
+        if (print_endstep .eqv. .true.) then    
+            write(*,511)'[ max(ML predict)(i,#) ]', maxloc(pr_relative),     & 
+            '                    ',  maxval(pr_relative)
+        end if 
+      endif
+        
       return 
       END       
 
@@ -865,7 +914,7 @@
       common /units/ umass, udist, udens, utime, uergg, uergcc                                                                                                                 
       common /rshock/ shock_ind, shock_x
       common /pns/ pns_ind, pns_x       
-      common /mlout/ pr_turb(idim1)
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
       common /cpturb/ constant_pturb
                                           
       dimension v(0:ncell),vsound(0:ncell),mach(0:ncell-1)      
@@ -995,38 +1044,43 @@
 !
 !
       subroutine bounce(ntstep,rho)
-!***********************************************************            
-!                                                          *            
-!  This subroutine identifies if the bounce has occured    *            
-!                                                          *            
-!***********************************************************            
+!***********************************************************
+!                                                          *
+!  This subroutine identifies if the bounce has occured    *
+!                                                          *
+!***********************************************************
 !            
       implicit double precision (a-h,o-z) 
           
       parameter (idim=10000)   
       dimension rho(idim)
 
-      logical :: post_bounce, first_bounce
+      logical :: add_pturb, first_bounce, track_shock
       real    :: bounce_delay      
   
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
       common /timej / time, dt! 
-      common /units/ umass, udist, udens, utime, uergg, uergcc               
+      common /units/ umass, udist, udens, utime, uergg, uergcc
+      common /carac/ deltam(idim), abar(idim)
+      common /numb / ncell, ncell1 
+      common /pns/ pns_ind, pns_x
 
-      first_bounce = .false.
-      post_bounce  = .false.
       bounce_delay = 2.d-3/utime !delay of 2 ms
-      
+
       if (maxval(rho)*udens.gt.2.d14) then
-          first_bounce = .true.
-          if (bounce_time.eq.0) bounce_time=time
-          if (time-bounce_time.ge.bounce_delay) then
-            post_bounce   = .true.
-            bounce_ntstep = ntstep
-            bounce_time   = time
+        if (bounce_time.eq.0) bounce_time = time
+        if (first_bounce.eqv..false.) then
+            first_bounce = .true.
+        elseif (time.ge.(bounce_time+bounce_delay)) then
+            track_shock = .true.
+        endif
+        if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
+            add_pturb   = .true.
+            bounce_ntstep = ntstep            
           endif
-      endif                
-      
+        
+      endif
       end
 !
       subroutine artvis(ncell,x,rho,v,q) 
@@ -1946,7 +2000,7 @@
 !                                                                       
       implicit double precision (a-h,o-z) 
 !             
-      logical post_bounce, first_bounce
+      logical add_pturb, first_bounce, track_shock
       double precision pr_turb
       parameter (idim=10000) 
       parameter (idim1 = idim+1) 
@@ -1958,8 +2012,9 @@
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /carac/ deltam(idim), abar(idim) 
       common /damping/ damp, dcell 
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
-      common /mlout/ pr_turb(idim1)
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
 !                                                                       
       data pi4/12.56637d0/ 
@@ -1985,7 +2040,7 @@
 !        
          pressp = pr(kp05) + prnu(kp05)          
          pressm = pr(km05) + prnu(km05)
-         if (post_bounce.eqv..true.) then
+         if (add_pturb.eqv..true.) then
              pressp = pressp+pr_turb(kp05)
              pressm = pressm+pr_turb(km05)
          endif
@@ -5533,7 +5588,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx,mlin_grid_size,idump,skip_dump
-      logical from_dump, post_bounce, first_bounce      
+      logical from_dump, add_pturb, first_bounce, track_shock      
 !                                                                       
       parameter (idim=10000) 
       parameter (idim1 = idim+1) 
@@ -5588,8 +5643,9 @@
       common /dump/ from_dump
       common /idump/ idump
       common /interp/ mlin_grid_size
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
-      common /mlout/ pr_turb(idim1)
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
       common /cpturb/ constant_pturb
 !                                                                       
       character*1024 filin,filout,outpath,eos_table   
@@ -5718,12 +5774,13 @@
 !      
       print*, 'idump as read =        ', idump
       
-      if (shock_ind.ne.0) then
-            post_bounce = .true.
-      else
-            post_bounce = .false.
-      endif
-
+      first_bounce = .false.            
+      track_shock  = .false.
+      add_pturb    = .false.
+      if (bounce_time.gt.0)       first_bounce = .true.
+      if (shock_ind.gt.0)         track_shock  = .true.
+      if (maxval(pr_turb).gt.0.0) add_pturb    = .true.
+      
       ncell = nc
       time = t       
 !                                                                       
@@ -5809,7 +5866,7 @@
 !                                                                       
       integer jtrape,jtrapb,jtrapx 
       real    ycc,yccave 
-      logical from_dump, post_bounce, first_bounce      
+      logical from_dump, add_pturb, first_bounce, track_shock      
       logical trapnue, trapnueb, trapnux 
 !                                                                       
       parameter (idim=10000) 
@@ -5846,8 +5903,9 @@
       common /cent/ dj(idim)
       common /dump/ from_dump
       common /idump/ idump
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
-      common /mlout/ pr_turb(idim1)
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
+      common /mlout/ pr_turb(idim1), output_preserve(idim)
       common /eosnu / prnu(idim1)
       !common /turb/ vturb2(idim),dmix(idim),alpha(4),bvf(idim) 
       logical te(idim), teb(idim), tx(idim) 
@@ -6081,7 +6139,7 @@
       implicit double precision (a-h,o-z) 
 !                                                                       
       integer jtrape,jtrapb,jtrapx, ntstep, ind, mlin_grid_size
-      logical from_dump, post_bounce, first_bounce
+      logical from_dump, add_pturb, first_bounce, track_shock
       character*1024 mlmodel_name, rho_file, x_file      
       character*10 frmtx
       character*11 frmtrho
@@ -6151,7 +6209,8 @@
       common /outp/ rout, p1out, p2out
       common /mlmod/ mlmodel_name
       common /dump/ from_dump
-      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, post_bounce, first_bounce
+      common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
+                   add_pturb, first_bounce, track_shock
       common /interp/ mlin_grid_size
 
       save ifirst
@@ -6165,7 +6224,7 @@
 
       ! if below 150 ms, write output only every 10 ms
       ! pre-bounce stage is not as important to track
-      if (post_bounce) then
+      if (first_bounce) then
         tnext = time+dtime 
       elseif (time.lt.0.150/utime) then
         tnext = time+0.01/utime
@@ -6567,7 +6626,7 @@
 !                                                                       
 !--start new time step                                                  
 !        
-        !  if (ntstep.eq.1) stop
+        !  if (ntstep.eq.500) stop
          if(time.lt.tnext)then 
             if (mod(ntstep,nups).eq.0) then 
       520         format(A,I12,A) 
@@ -6578,7 +6637,7 @@
                   write(*,500)'[    time/tmax, dt (s) ]',                     &
                               time*utime,' /',tmax*utime,steps(1)*utime                                    
       
-                  if (post_bounce.eqv..true.) then
+                  if (first_bounce.eqv..true.) then
                       write(*,501)'[    bounce time (s)   ]', bounce_time*utime                                          
                   endif            
             end if 

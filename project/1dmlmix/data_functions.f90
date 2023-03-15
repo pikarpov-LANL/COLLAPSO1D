@@ -79,7 +79,7 @@ module data_functions
                 
         type(linear_interp_1d) :: s1array
 
-        print*, istart, iend, interp_grid_size        
+        ! print*, istart, iend, interp_grid_size        
         interp_x = linspace(x(istart), x(iend), interp_grid_size)
         
         call s1array%initialize(x,y,iflag)
