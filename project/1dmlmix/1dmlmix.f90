@@ -802,7 +802,8 @@
       common /mlmod/ mlmodel_name               
       common /eosq / pr(idim1), vsound(idim), u2(idim), vsmax 
       common /rshock/ shock_ind, shock_x
-      common /pns/ pns_ind, pns_x       
+      common /pns/ pns_ind, pns_x
+      common /nuprint/ nups,nupk,tacr       
       common /interp/ mlin_grid_size
       common /mlout/ pr_turb(idim1), output_preserve(idim)
                                     
@@ -821,21 +822,21 @@
       shock_offset = int(shock_ind)-5 
             
       ! Scale Pressure to fit into single precission (taken from ML training)
-      scale_v       = udist/utime*1e-8
-      scale_rho     = 4.d-6   ! 2.d6*2e-12      
-      scale_pr      = 4.d-9   ! 2.d22*2e-31
-      scale_vsound  = 1       ! 1.d8*1.d-8
-      scale_temp    = 1.d-1   ! 1.d9*1.d-10
-      scale_entropy = 1./sfac*1.d-1 
-      scale_pr_relative = 1.
+      scale_v           = udist/utime*1e-8
+      scale_rho         = 4.d-6   ! 2.d6*2e-12      
+      scale_pr          = 4.d-9   ! 2.d22*2e-31
+      scale_vsound      = 1       ! 1.d8*1.d-8
+      scale_temp        = 1.d-1   ! 1.d9*1.d-10
+      scale_entropy     = 1./sfac*1.d-1 
+      scale_pr_relative = 3.
 
       !   For model_s12_old.pt
-      !   scale_v       = udist/utime*1e-8
-      !   scale_rho     = 4.d-7   ! 2.d6*2e-13      
-      !   scale_pr      = 4.d-10  ! 2.d22*2e-32
-      !   scale_vsound  = 1       ! 1.d8*1.d-8
-      !   scale_temp    = 1.d-1   ! 1.d9*1.d-10
-      !   scale_entropy = 1./sfac
+      !   scale_v           = udist/utime*1e-8
+      !   scale_rho         = 4.d-7   ! 2.d6*2e-13      
+      !   scale_pr          = 4.d-10  ! 2.d22*2e-32
+      !   scale_vsound      = 1       ! 1.d8*1.d-8
+      !   scale_temp        = 1.d-1   ! 1.d9*1.d-10
+      !   scale_entropy     = 1./sfac
       !   scale_pr_relative = 1.
 
       ! only inference once every # timesteps
@@ -875,21 +876,20 @@
       output_h(:,1,1) = output_preserve(:mlin_grid_size)
       
       interp_x        = linspace(x(int(pns_ind)), x(int(shock_offset)), mlin_grid_size)   
-      pr_relative(int(pns_ind):shock_offset) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),      &
-                                                  mlin_grid_size,1,mlin_grid_size,           &
-                                                  int(shock_offset-int(pns_ind)+1))*scale_pr_relative
-    !   print*, 'output', maxval(output_h), maxval(pr_relative)
-      ! remove the points right before the shock
-    !   pr_relative(shock_offset) = 0.
-      pr_turb = pr_relative*pr
-
-    !   print*, 'output h ', maxval(output_h(:,1,1))
-    !   print*, 'pr_relative ', ntstep, maxval(pr_relative)
-    !   print*, output_preserve(mlin_grid_size-5:mlin_grid_size)
-    !   print*, 'ntstep, max(pturb)', ntstep, maxval(pr_turb), maxval(output_preserve)
-    !   667   format(A,1p,I6,11(E10.3)) 
-    !   write(*,667), 'ntstep, max(pturb)', ntstep, pr_relative(shock_offset-10:shock_offset)
-   
+      pr_relative(int(pns_ind):shock_offset) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),            &
+                                                           mlin_grid_size,1,mlin_grid_size,                 &
+                                                           int(shock_offset-int(pns_ind)+1))
+      pr_relative = scale_pr_relative*pr_relative                                                           
+      pr_turb     = pr_relative*pr
+      
+511   format(A,1p,I5,A,E10.3)
+      if (mod(ntstep,nups).eq.0) then        
+        if (print_endstep .eqv. .true.) then    
+            write(*,511)'[ max(ML predict)(i,#) ]', maxloc(pr_relative),     & 
+            '                    ',  maxval(pr_relative)
+        end if 
+      endif
+        
       return 
       END       
 

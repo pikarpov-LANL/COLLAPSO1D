@@ -23,8 +23,9 @@ module pytorch
     use torch_ftn
     use iso_fortran_env
     type(torch_module) :: torch_mod
-    type(torch_tensor) :: in_tensor, out_tensor
-
+    ! type(torch_tensor) :: in_tensor, out_tensor
+    type(torch_tensor_wrap) :: input_tensors
+    type(torch_tensor) :: out_tensor
 
     contains
     function mlmodel(input, filename) result(output)
@@ -44,9 +45,12 @@ module pytorch
 
         !print*, 'input size ', size(input), shape(input), filename, len(filename)    
 
-        call in_tensor%from_array(input_h)                 
+        ! call in_tensor%from_array(input_h)   
+        call input_tensors%create
+        call input_tensors%add_array(input)              
         call torch_mod%load(filename)
-        call torch_mod%forward(in_tensor, out_tensor)
+        call torch_mod%forward(input_tensors, out_tensor)
+        ! call torch_mod%forward(in_tensor, out_tensor)
         call out_tensor%to_array(output)
 
         ! print*, 'Input for Pytorch 1', input2(1:10,1,1)
