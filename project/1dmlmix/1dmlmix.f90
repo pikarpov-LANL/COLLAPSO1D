@@ -819,7 +819,7 @@
       sfac=avokb*utemp/uergg
 
       !--don't inject right below the shock
-      shock_offset = int(shock_ind)-5 
+      shock_offset = int(shock_ind)-2
             
       ! Scale Pressure to fit into single precission (taken from ML training)
       scale_v           = udist/utime*1e-8
