@@ -1075,7 +1075,9 @@
         elseif (time.ge.(bounce_time+bounce_delay)) then
             track_shock = .true.
         endif
-        if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
+        ! uncomment the 'if' below to add Pturb once the WHOLE convective bubble is in high-res zone
+        ! if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
+        if (time .ge.bounce_time+15.d-3/utime) then
             add_pturb   = .true.
             bounce_ntstep = ntstep            
           endif
@@ -2624,17 +2626,17 @@
          jtrape = 1 
 !         print*,'nuabs: nue absorption/emission=',                     
 !     1              denue/rlumnue                                      
-      elseif (denue.lt.0.05*rlumnue.or.denue.lt.1.d-8) then 
+      elseif (denue.lt.0.25*rlumnue.or.denue.lt.1.d-8) then 
          jtrape =-1 
       else 
          jtrape = 0 
       endif 
 !                                                                       
-      if (denueb.gt.0.50*rlumnueb) then 
+      if (denueb.gt.0.75*rlumnueb) then 
          jtrapb = 1 
 !         print*,'nuabs: nueb absorption/emission=',                    
 !     1            denueb/rlumnueb                                      
-      elseif (denueb.lt.0.05*rlumnueb.or.denueb.lt.1.d-8) then 
+      elseif (denueb.lt.0.40*rlumnueb.or.denueb.lt.1.d-8) then 
          jtrapb =-1 
       else 
          jtrapb = 0 
@@ -3954,6 +3956,7 @@
          opacnh  = struct*alphanh*ediff2 
          opac    = alphann*ediff2+alphane*ediff*yemean 
          dnux(i) = 1./(opac+opacnh) 
+         if (udens*rho(i).lt.1.e11) dnux(i) = 1.d20
       enddo 
 !                                                                       
 !--set neutrino luminosities to zero.                                   
@@ -4065,12 +4068,12 @@
 !-- artificially soften neutrinos by .5                                 
 !                                                                       
       if (rlumnue.ne.0.) then 
-         enue  = 0.8*enue/rlumnue 
-         e2nue = 0.64*e2nue/rlumnue 
+         enue  = enue/rlumnue 
+         e2nue = e2nue/rlumnue 
       endif 
       if (rlumnueb.ne.0.) then 
-         enueb  = 0.8*enueb/rlumnueb 
-         e2nueb = 0.64*e2nueb/rlumnueb 
+         enueb  = enueb/rlumnueb 
+         e2nueb = e2nueb/rlumnueb 
       endif 
       if (rlumnux.ne.0.) then 
          enux  = enux/rlumnux 
@@ -4526,11 +4529,11 @@
 !                                                                       
 !--check if dex larger than 0.25*rlumnux                                
 !                                                                       
-      if (dex.gt.0.25*rlumnux) then 
+      if (dex.gt.0.08*rlumnux) then 
          jtrapx=1 
 !         print*,'nuscat: nux scattering=',                             
 !     1              dex/rlumnux                                        
-      elseif (dex.lt.0.05*rlumnux.or.dex.lt.1.d-8) then 
+      elseif (dex.lt.0.04*rlumnux.or.dex.lt.1.d-8) then 
          jtrapx=-1 
       else 
          jtrapx=0 

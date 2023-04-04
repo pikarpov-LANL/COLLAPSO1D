@@ -34,7 +34,8 @@ from sapsan.utils import line_plot, plot_params
 def main():
     # --- Datasets and values to plot ---
     vals             = [
-                        'pturb',
+                        # 'pturb',
+                        # 'pturb_pgas',
                         # 'entropy',
                         # 'velocity',
                         # 'ye',
@@ -46,30 +47,31 @@ def main():
                         # 'mach',
                         # 'abar',
                         # 'u_int',
-                        # 'u_nu', # neutrino energies
-                        # 'y_nu',
-                        # 'pturb_pgas'
+                        'u_nu', # neutrino energies
+                        # 'y_nu',                        
                        ]
     versus           = 'r'   # options are either 'r' or 'encm' for enclosed mass
     
     # masses           = [11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0] # for 1.5k and 2k 
-    masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
-    # masses           = [13.0,15.0] # for ye
+    # masses           = [12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0] # for g9k and g2k 
+    # masses           = [12.0,18.0,19.0]
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
     # masses = [12.0,12.0,12.0,12.0,12.0,12.0]
-    masses           = [12.0,14.0,15.0,16.0,18.0,19.0] 
+    masses           = [12.0,13.0,16.0,17.0,18.0,19.0] 
     masses           = [12.0]
 
     # --- Paths & Names ---        
-    # base            = 'g9k_c8.4k_p_0.3k'
-    # base            = 'g9k_c8.4k_p0.3k'
+    
+    base            = 'g9k_c8.4k_p0.3k'
+    # base            = 'g2k_c1.4k_p0.3k'
     # base            = 'g1.5k_c0.5k_p0.3k'
-    base            = 'g2k_c1.4k_p0.3k'
     # base            = 'g6k_c5k_p0.3k'
     # base            = 'g4k_c3k_p0.3k'
+    # base            = 'g9k_c8.4k_p_0.3k'
     # base            = 'g2k_rcrit1.0_eosflg5'
     # base            = 'legacy_grid_ieos4'
     # base            = 'g2k_denue0.75'
+    # base              = 'tmp'
     
     end             = ''
     # end             = '_ye'
@@ -98,16 +100,18 @@ def main():
     #base_path = '/home/pkarpov/scratch/1dccsn/presn/input_grid/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sleos/dupp0/rcrit10/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/encm_tuned/fleos5/rcrit10/'
-    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/baseline/'
+    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/nodamp/ml/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/constant_rhov2/3e9/'
-    base_path = '/scratch/pkarpov/1dccsn/ml/'
+    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/ml/angav/limited/'
+    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/stan_fix/baseline/'
+    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/stan_fix/ml/'
     
     base_file        = f'DataOut_read'
     save_name_amend  = ''      # add a custom index to the saved plot names
     
     # --- Extra ---
-    convert2read     = False#True   # convert binary to readable (really only needed to be done once) 
-    only_last        = False#True   # only convert from the latest binary file (e.g., latest *_restart_*)
+    convert2read     = True   # convert binary to readable (really only needed to be done once) 
+    only_last        = True   # only convert from the latest binary file (e.g., latest *_restart_*)
     only_post_bounce = True   # only produce plots after the bounce    
     
     # --- Compute Bounce Time, PNS & Shock Positions ---
@@ -186,7 +190,8 @@ def main():
                      
             # bounce_delay is in [s]         
             bounce_files = pf.check_bounce(compute=compute, bounce_delay=2e-3)
-            bounce       = pf.bounce_ind      
+            bounce       = pf.bounce_ind
+
             if only_post_bounce:                   
                 shift        = bounce
                 numfiles     = bounce_files                                                          
@@ -637,9 +642,9 @@ class Profiles:
                 adjust = 0.150/dt-15
             else: adjust = 0
                 
-            anchor_index    = int(bounce_time/dt-adjust)+1
-            self.bounce_ind = anchor_index                          
-            
+            anchor_index    = int(bounce_time/dt-adjust)
+            self.bounce_ind = anchor_index
+
             for i in range(anchor_index,0,-1):
                 ps, time1d, bounce_time = self.open_checkpoint(i, fullout=False)
                 if bounce_time != 0.0: self.bounce_ind = i
@@ -655,10 +660,16 @@ class Profiles:
         with open(file1d, "r") as file:
             line = file.readline()                                                                                                      
             header_vals = file.readline()
-            vals_strip  = header_vals[:-1].split(' ')        
-            try: time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue, rlumnueb, rlumnux = [float(x) for x in vals_strip if x!='']        
-            except:
-                time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = [float(x) for x in vals_strip if x!='']
+            vals_strip  = header_vals[:-1].split(' ')                           
+             
+            vals_float = []
+            for x in vals_strip:
+                if x!='': 
+                    try: vals_float.append(float(x))
+                    except: vals_float.append(0.0)
+            if len(vals_float)==9: time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue, rlumnueb, rlumnux = vals_float
+            else:
+                time1d, bounce_time, pns_ind, pns_x, shock_ind, shock_x, rlumnue = vals_float
                 rlumnueb = 0
                 rlumnux  = 0
                 sys.exit()
@@ -830,13 +841,13 @@ class Profiles:
         
         ax = self.plot_format(series     = [[x, self.lumnue[start:]],
                                             [x, self.lumnueb[start:]],
-                                            [x, self.lumnux[start:]]],
+                                            [x, self.lumnux[start:]/4]],
                               xlabel     = r'$t-t_{bounce}$ [ms]', 
                               ylabel     = r'$F_{\nu_{e}} \; [foe/s]$', 
                               title      = f'Bounce index = {self.bounce_ind+1}', 
                               plot_style = 'semilogy',                              
-                              label      = ['nue', 'nueb', 'nux']) 
-        
+                              label      = ['nue', 'nueb', 'nux/4']) 
+        ax.set_ylim(1e0,1e3)
         plt.savefig(save_path)        
         if not show_plot: plt.close() 
         
@@ -1088,7 +1099,7 @@ class Profiles:
             if val=='pturb': ax.plot(to_plot[0,0],to_plot[0,1], linestyle='None',marker='.',c='tab:blue') 
             
             # check if after bounce                
-            if i >= self.bounce_ind:                
+            if i >= self.bounce_ind:  
                 if compute and vals.index(val)==0:
                     rt = ComputeRoutines(x, rho    = valmap['rho'], 
                                             v      = valmap['velocity'], 
@@ -1099,9 +1110,17 @@ class Profiles:
                     shock_ind, shock_x = rt.shock_radius(bump          = self.shock_region.get(i+1,0), 
                                                          old_shock_ind = self.old_shock_ind)
                     pns_ind,   pns_x   = rt.pns_radius(rho_threshold = rho_threshold)   
-                                    
+                # --- temp compute of rshock
+                elif shock_ind<=0 and vals.index(val)==0:
+                    rt = ComputeRoutines(x, rho    = valmap['rho'], 
+                                            v      = valmap['velocity'], 
+                                            vsound = valmap['sound'])
+                    shock_ind, shock_x = rt.shock_radius(bump          = self.shock_region.get(i+1,0), 
+                                                         old_shock_ind = self.old_shock_ind)
+                
+                # --- end ---            
                 pns_edge    = x[int(pns_ind)]*unit
-                if int(shock_ind)==len(x): shock_ind = -1                
+                if abs(int(shock_ind))>=len(x): shock_ind = -1                
                 shock_front = x[int(shock_ind)]*unit
                 if versus == 'r'   : line_label = '%.2e km'          
                 if versus == 'encm': line_label = '%.3f $M_{\odot}$'      

@@ -26,17 +26,17 @@ def main():
     grid_goals           = [9000 for i in masses]
     maxrads              = [1.5e9 for i in masses] # 1e9 for 9.0 and 10.0
     suffixs              = ['_g9k_c8.4k_p0.3k' for i in masses]
-    # suffixs              = ['_g2k_c1.4k_p0.3k' for i in masses]
-    
+        
     dataset         = 'sukhbold2016'
-    # base_path       = '/home/pkarpov/production/nodamp/baseline'
-    # template_path   = '/home/pkarpov/production/nodamp/template'
-    # output_path     = '/home/pkarpov/scratch/1dccsn/sfho_s/production/nodamp/baseline'
-    base_path       = '/home/pkarpov/production/stan_fix/baseline'
+    # base_path       = '/home/pkarpov/production/ml/angav/limited/'
+    # template_path   = '/home/pkarpov/production/ml/template_ml'
+    # output_path     = '/home/pkarpov/scratch/1dccsn/sfho_s/production/ml/angav/limited/'
+    base_path       = '/home/pkarpov/production/stan_fix/ml'
     template_path   = '/home/pkarpov/production/stan_fix/template'
-    output_path     = '/home/pkarpov/scratch/1dccsn/sfho_s/production/stan_fix/baseline'    
+    output_path     = '/home/pkarpov/scratch/1dccsn/sfho_s/production/stan_fix/ml'
     eos_table_path  = '/home/pkarpov/COLLAPSO1D/project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5'
-    mlmodels        = ['None' for i in masses]
+    # mlmodels        = [f'mlmodels/s{i}/angav/model_script.pt' for i in masses]
+    mlmodels        = [f'mlmodels/limited/model_s{i}_angav.pt' for i in masses]
     constant_Pturb  = 0.0
     read_dump       = 0
     dump_interval   = 5e-4
@@ -48,7 +48,8 @@ def main():
                   dataset,base_path,template_path,output_path,eos_table_path,
                   pns_grid_goals, conv_grid_goals, grid_goals,maxrads, 
                   mlmodels, read_dump, dump_interval, restart, 
-                  maxtime=maxtime, eos=eos, pturb=constant_Pturb)    
+                  maxtime=maxtime, eos=eos, pturb=constant_Pturb)
+        
     if rank == 0:        
         if len(mr.masses) != size:
             print(f'Ranks are not distributed well!\nRank size {size} for {len(mr.masses)} datasets')

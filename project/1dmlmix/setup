@@ -3,19 +3,19 @@ Data
 <Output File>
 DataOut
 <Input PyTorch Model>
-constant
+mlmodels/limited/model_s12.0_angav.pt
 <Input Grid Size to interpolate for PyTorch Model>
 200
 <Dump # to read>
 0
 <Dump time intervals [s]>
-5.d-4
+0.0005
 <Max time [s]>
-0.5
+0.7
 <Artifiicqial Viscocity #1>
 1.0
 <Artificial Viscocity #2>
-.25
+1.0
 <External Force (not default)>
 1
 <EOS option>
@@ -41,4 +41,4 @@ Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5
 <yefact (not used)>
 1.0
 <Constant Pturb>
-0.3
+0.0
