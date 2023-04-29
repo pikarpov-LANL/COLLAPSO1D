@@ -5,19 +5,19 @@ sukhbold2016/s12.0_presn
 Data
 
 <Goal Size of the PNS>
-300
+600
 
 <Goal Size of Convective Grid>
-1400
+7000
 
 <Goal Total Resolution>
-2000
+8000
 
 <Enclosed Mass Cutoff for the PNS (Msol)>
-1.25
+1.1
 
 <Enclosed Mass Cutoff for Convective Region (Msol)>
-1.67415
+1.7
 
 <Initial Cell Mass>
 4e-4
@@ -26,7 +26,7 @@ Data
 1e-3
 
 <Maximum Radius of the Grid (cm)>
-1.5e9
+1500000000.0
 
 <EOS option>
 5
