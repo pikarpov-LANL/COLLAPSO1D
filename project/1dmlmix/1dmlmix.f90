@@ -1074,13 +1074,14 @@
             first_bounce = .true.
         elseif (time.ge.(bounce_time+bounce_delay)) then
             track_shock = .true.
-        endif
-        ! uncomment the 'if' below to add Pturb once the WHOLE convective bubble is in high-res zone
-        ! if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
-        if (time .ge.bounce_time+15.d-3/utime) then
             add_pturb   = .true.
-            bounce_ntstep = ntstep            
-          endif
+            bounce_ntstep = ntstep 
+        endif
+        !if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
+      !   if (time .ge.bounce_time+15.d-3/utime) then
+      !       add_pturb   = .true.
+      !       bounce_ntstep = ntstep            
+      !   endif
         
       endif
       end
@@ -1111,13 +1112,14 @@
 !--update q value                                                       
 !                                                                       
       do kp05=1,ncell 
-         k       = kp05 - 1 
-         k1      = kp05 
-         q(kp05) = 0.d0 
-         akp1    = pi4*x(k1)*x(k1) 
-         ak      = pi4*x(k)*x(k) 
-         akp05   = 0.5d0*(ak+akp1) 
-         gradv   = v(k1)*(3.d0*akp05-akp1) - v(k)*(3.d0*akp05-ak) 
+         k        = kp05 - 1 
+         k1       = kp05 
+         q(kp05)  = 0.d0 
+         dq(kp05) = 0.d0
+         akp1     = pi4*x(k1)*x(k1) 
+         ak       = pi4*x(k)*x(k) 
+         akp05    = 0.5d0*(ak+akp1) 
+         gradv    = v(k1)*(3.d0*akp05-akp1) - v(k)*(3.d0*akp05-ak) 
 
          if(gradv.lt.0.d0)then 
 !                                                                       
@@ -2622,26 +2624,22 @@
 !                                                                       
 !--check if denue larger than 0.25*rlumnue                              
 !                                                                       
-      if (denue.gt.0.50*rlumnue) then 
-         jtrape = 1 
-!         print*,'nuabs: nue absorption/emission=',                     
-!     1              denue/rlumnue                                      
-      elseif (denue.lt.0.25*rlumnue.or.denue.lt.1.d-8) then 
-         jtrape =-1 
-      else 
-         jtrape = 0 
-      endif 
-!                                                                       
-      if (denueb.gt.0.75*rlumnueb) then 
-         jtrapb = 1 
-!         print*,'nuabs: nueb absorption/emission=',                    
-!     1            denueb/rlumnueb                                      
-      elseif (denueb.lt.0.40*rlumnueb.or.denueb.lt.1.d-8) then 
-         jtrapb =-1 
-      else 
-         jtrapb = 0 
-      endif 
-      return 
+      if (denue.gt.1.00*rlumnue) then 
+            jtrape = 1 
+         elseif (denue.lt.0.5*rlumnue.or.denue.lt.1.d-8) then 
+            jtrape =-1 
+         else 
+            jtrape = 0 
+         endif 
+   !                                                                       
+         if (denueb.gt.1.00*rlumnueb) then 
+            jtrapb = 1 
+         elseif (denueb.lt.0.5*rlumnueb.or.denueb.lt.1.d-8) then 
+            jtrapb =-1 
+         else 
+            jtrapb = 0 
+         endif 
+         return 
       END                                           
 !                                                                       
       subroutine nuann(ncell,x,rho,ynue,ynueb,ynux,                     &
@@ -4082,9 +4080,9 @@
 !                                                                       
 ! divide by the mass fraction                                           
 !--this should be 1.                                                    
-      rlumnue  = 0.8*rlumnue 
-      rlumnueb = 0.8*rlumnueb 
-      rlumnux  = rlumnux 
+      ! rlumnue  = 0.8*rlumnue 
+      ! rlumnueb = 0.8*rlumnueb 
+      ! rlumnux  = rlumnux 
 !                                                                       
       unitf=ufoe/utime
       if (mod(ntstep,nups).eq.0) then 
@@ -4529,14 +4527,12 @@
 !                                                                       
 !--check if dex larger than 0.25*rlumnux                                
 !                                                                       
-      if (dex.gt.0.08*rlumnux) then 
-         jtrapx=1 
-!         print*,'nuscat: nux scattering=',                             
-!     1              dex/rlumnux                                        
-      elseif (dex.lt.0.04*rlumnux.or.dex.lt.1.d-8) then 
-         jtrapx=-1 
+      if (dex.gt.0.06*rlumnux) then 
+            jtrapx=1                                       
+      elseif (dex.lt.0.03*rlumnux.or.dex.lt.1.d-8) then 
+            jtrapx=-1 
       else 
-         jtrapx=0 
+            jtrapx=0 
       endif 
 !                                                                       
       return 
@@ -6311,7 +6307,10 @@
             !dumvt2(i)   = vturb2(i) + dtf11*fmix1(i) 
             reset(i)=.false. 
             if (dumye(i).lt.0.02) then 
-               dumye(i)=.02 
+               dumye(i)=.02
+            end if
+            if (dumye(i).gt.0.40  .and. rho(i)*udens .gt. 1.e12) then   
+               dumye(i)=.40                
             end if 
          enddo 
 !                                                                       
@@ -6347,7 +6346,10 @@
             dumunux(i)  = unux(i) + dtf21*f1unux(i) + dtf22*f2unux(i) 
             !dumvt2(i)=vturb2(i) + dtf21*fmix1(i) + dtf22*fmix2(i) 
             if (dumye(i).lt.0.02) then 
-               dumye(i)=.02 
+                  dumye(i)=.02 
+            end if
+            if (dumye(i).gt.0.40  .and. rho(i)*udens .gt. 1.e12) then
+                  dumye(i)=.40               
             end if 
          enddo        
 !                                                                       
