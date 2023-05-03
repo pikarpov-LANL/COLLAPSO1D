@@ -2845,7 +2845,7 @@
 
       ! rcrit=0.1: things go very south
       ! rcrit=1.0: ieos=5 -> explodes, ieos=4 -> behaves OK
-      parameter (rcrit=1.0) 
+      parameter (rcrit=3.0) 
 !                                                                       
       dimension x(0:idim), ye(idim) 
       dimension ynue(idim),ynueb(idim),ynux(idim),                      &
@@ -3726,7 +3726,7 @@
 !                                                                       
       parameter (idim=10000) 
       parameter (small=1d-20) 
-      parameter (rcrit=1.0) 
+      parameter (rcrit=3.0) 
 !                                                                       
 !--so that we don't have to go double precision:                        
 !--avo*1e-44=6.02e-20                                                   
