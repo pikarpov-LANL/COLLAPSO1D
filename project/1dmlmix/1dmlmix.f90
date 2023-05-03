@@ -1074,14 +1074,12 @@
             first_bounce = .true.
         elseif (time.ge.(bounce_time+bounce_delay)) then
             track_shock = .true.
-            add_pturb   = .true.
-            bounce_ntstep = ntstep 
         endif
         !if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
-      !   if (time .ge.bounce_time+15.d-3/utime) then
-      !       add_pturb   = .true.
-      !       bounce_ntstep = ntstep            
-      !   endif
+        if (time .ge.bounce_time+15.d-3/utime) then
+            add_pturb   = .true.
+            bounce_ntstep = ntstep            
+        endif
         
       endif
       end
