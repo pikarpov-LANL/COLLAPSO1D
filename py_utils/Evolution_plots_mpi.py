@@ -34,18 +34,18 @@ from sapsan.utils import line_plot, plot_params
 def main():
     # --- Datasets and values to plot ---
     vals             = [
-                        # 'pturb',
-                        # 'pturb_pgas',
-                        # 'entropy',
-                        # 'velocity',
-                        # 'ye',
-                        # 'rho',
-                        # 'pressure',
-                        # 'temperature',
-                        # 'encm',
-                        # 'sound',
-                        # 'mach',
-                        # 'abar',
+                        'pturb',
+                        'pturb_pgas',
+                        'entropy',
+                        'velocity',
+                        'ye',
+                        'rho',
+                        'pressure',
+                        'temperature',
+                        'encm',
+                        'sound',
+                        'mach',
+                        'abar',
                         # 'u_int',
                         'u_nu', # neutrino energies
                         # 'y_nu',                        
@@ -57,12 +57,15 @@ def main():
     # masses           = [12.0,18.0,19.0]
     # masses           = [12.0,16.0,17.0,18.0,19.0] # for 1.3P
     # masses = [12.0,12.0,12.0,12.0,12.0,12.0]
-    masses           = [12.0,13.0,16.0,17.0,18.0,19.0] 
-    masses           = [12.0]
+    masses           = [12.0,13.0,16.0,
+                        17.0,18.0,19.0] 
+    # masses           = [12.0]
 
     # --- Paths & Names ---        
     
-    base            = 'g9k_c8.4k_p0.3k'
+    # base            = 'g9k_c8.4k_p0.3k'
+    base            = 'g8k_c7k_p0.6k'
+    # base            = 'g8k_c7k_p0.6k'
     # base            = 'g2k_c1.4k_p0.3k'
     # base            = 'g1.5k_c0.5k_p0.3k'
     # base            = 'g6k_c5k_p0.3k'
@@ -103,8 +106,11 @@ def main():
     # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/nodamp/ml/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/constant_rhov2/3e9/'
     # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/ml/angav/limited/'
-    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/stan_fix/baseline/'
-    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/stan_fix/ml/'
+    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/stan_fix/baseline/'    
+    # base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/stan_fix/ml/'
+    base_path = '/home/pkarpov/scratch/1dccsn/sfho_s/production/8k_runs/ml_delay15ms/'
+    # base_path = '/home/pkarpov/scratch/stan/'
+    # base_path = '/home/pkarpov/scratch/stan/s12.0_g8k_c7k_p0.6k/comparison_mlnone/'    
     
     base_file        = f'DataOut_read'
     save_name_amend  = ''      # add a custom index to the saved plot names
@@ -253,42 +259,46 @@ def main():
 
         pf.progress_bar(i+1, 'Done!', done = True)           
         
-        gather_pns_ind    = comm.gather(pf.pns_ind_ar,    root=0)
-        gather_pns_x      = comm.gather(pf.pns_x_ar,      root=0)
-        gather_pns_encm   = comm.gather(pf.pns_encm_ar,   root=0)
-        gather_shock_ind  = comm.gather(pf.shock_ind_ar,  root=0)
-        gather_shock_x    = comm.gather(pf.shock_x_ar,    root=0)
-        gather_shock_encm = comm.gather(pf.shock_encm_ar, root=0)
-        gather_lumnue     = comm.gather(pf.lumnue,        root=0)
-        gather_lumnueb    = comm.gather(pf.lumnueb,       root=0)
-        gather_lumnux     = comm.gather(pf.lumnux,        root=0)        
-        gather_shell      = comm.gather(pf.shell_ar,      root=0)
-        gather_time       = comm.gather(pf.time_ar,       root=0)        
+        gather_pns_ind        = comm.gather(pf.pns_ind_ar,     root=0)
+        gather_pns_x          = comm.gather(pf.pns_x_ar,       root=0)
+        gather_pns_encm       = comm.gather(pf.pns_encm_ar,    root=0)
+        gather_shock_ind      = comm.gather(pf.shock_ind_ar,   root=0)
+        gather_shock_x        = comm.gather(pf.shock_x_ar,     root=0)
+        gather_shock_encm     = comm.gather(pf.shock_encm_ar,  root=0)
+        gather_lumnue         = comm.gather(pf.lumnue,         root=0)
+        gather_lumnueb        = comm.gather(pf.lumnueb,        root=0)
+        gather_lumnux         = comm.gather(pf.lumnux,         root=0)        
+        gather_max_pturb_pgas = comm.gather(pf.max_pturb_pgas, root=0)
+        gather_shell          = comm.gather(pf.shell_ar,       root=0)
+        gather_time           = comm.gather(pf.time_ar,        root=0)        
         
         # --- Back to Rank 0 to produce Summary Plots ---
         if rank == 0: 
             colored.subhead( '\n----------- Plots ----------')
             print(f'{pf.base_save_path}\n') 
                     
-            pf.pns_ind_ar    = sum(gather_pns_ind)
-            pf.pns_x_ar      = sum(gather_pns_x)
-            pf.pns_encm_ar   = sum(gather_pns_encm)
-            pf.shock_ind_ar  = sum(gather_shock_ind)
-            pf.shock_x_ar    = sum(gather_shock_x)
-            pf.shock_encm_ar = sum(gather_shock_encm)
-            pf.lumnue        = sum(gather_lumnue)
-            pf.lumnueb       = sum(gather_lumnueb)
-            pf.lumnux        = sum(gather_lumnux)  
-            pf.shell_ar      = sum(gather_shell)
-            pf.time_ar       = sum(gather_time)          
-            # pf.bounce_ind    = shift
-            
+            pf.pns_ind_ar     = sum(gather_pns_ind)
+            pf.pns_x_ar       = sum(gather_pns_x)
+            pf.pns_encm_ar    = sum(gather_pns_encm)
+            pf.shock_ind_ar   = sum(gather_shock_ind)
+            pf.shock_x_ar     = sum(gather_shock_x)
+            pf.shock_encm_ar  = sum(gather_shock_encm)
+            pf.lumnue         = sum(gather_lumnue)
+            pf.lumnueb        = sum(gather_lumnueb)
+            pf.lumnux         = sum(gather_lumnux)
+            pf.max_pturb_pgas = sum(gather_max_pturb_pgas)   
+            pf.shell_ar       = sum(gather_shell)
+            pf.time_ar        = sum(gather_time)          
+            # pf.bounce_ind            = shift
+                        
             if versus == 'r': 
                 pf.save_evolution()
                 if pf.bounce_ind > 0:
-                    pf.plot_convection()
-                    pf.plot_pns_shock()
-                    pf.plot_shells()                
+                    try:
+                        pf.plot_convection()
+                        pf.plot_pns_shock()
+                        pf.plot_shells()                
+                    except: pass
                         
             pf.plot_lumnue()                                    
         
@@ -545,6 +555,7 @@ class Profiles:
         self.shock_ind_ar     = np.zeros(self.numfiles)
         self.shock_x_ar       = np.zeros(self.numfiles)
         self.shock_encm_ar    = np.zeros(self.numfiles)
+        self.max_pturb_pgas   = np.zeros(self.numfiles)
         self.time_ar          = np.zeros(self.numfiles)
         self.shell_ar         = np.array([])
         self.shell_index      = np.array([])
@@ -602,8 +613,7 @@ class Profiles:
         # if compute, then the bounce time is unknown: 
         # need to go through each file from the beginning
         if compute:                                     
-            for i in range(self.numfiles):
-                
+            for i in range(self.numfiles):                
                 ps, time1d, bounce_time = self.open_checkpoint(i, fullout=False)
 
                 index  = 0
@@ -637,14 +647,14 @@ class Profiles:
             dt  = time1d_last-time1d
             dt0 = time1d_1-time1d_0             
             
-            if np.rint(np.log10(dt)) != np.rint(np.log10(dt0)): 
+            if np.around(np.log10(dt), decimals=2) != np.around(np.log10(dt0), decimals=2): 
                 # assuming first 150ms output only every 10ms
                 adjust = 0.150/dt-15
             else: adjust = 0
-                
+            
             anchor_index    = int(bounce_time/dt-adjust)
             self.bounce_ind = anchor_index
-
+            
             for i in range(anchor_index,0,-1):
                 ps, time1d, bounce_time = self.open_checkpoint(i, fullout=False)
                 if bounce_time != 0.0: self.bounce_ind = i
@@ -689,13 +699,17 @@ class Profiles:
     def save_evolution(self):
         evolution_path = f'{self.base_save_path}{self.save_name_amend}evolution.txt'        
         header         = ('Time [s] \t PNS Index \t PNS Radius [cm] \t PNS Encm [Msol] \t' +
-                                    'Shock Index \t Shock Radius [cm] \t Shock Encm [Msol]')
+                                    'Shock Index \t Shock Radius [cm] \t Shock Encm [Msol] \t' +
+                                    'lumnue [foe/s] \t lumnueb [foe/s] \t lumnux [foe/s] \t' +
+                                    'Max(Pturb/Pgas)')
+
         evolution      = np.array([                                            
                                    self.time_ar,
                                    self.pns_ind_ar,self.pns_x_ar,self.pns_encm_ar,
                                    self.shock_ind_ar, self.shock_x_ar, self.shock_encm_ar,
-                                   self.lumnue, self.lumnueb, self.lumnux                                                                                               
+                                   self.lumnue, self.lumnueb, self.lumnux, self.max_pturb_pgas                                                                                             
                                   ])
+        
         evolution      = np.moveaxis(evolution, -1, 0)
                          
         np.savetxt(evolution_path, evolution, header = header)
@@ -770,8 +784,7 @@ class Profiles:
         dm[0]   = rho[0]*4/3*np.pi*r[0]**3/self.msol
 
         for i in range(1,len(r)):
-            dm[i] = 4/3*np.pi*rho[i]*(r[i]**3-r[i-1]**3)/self.msol
-            
+            dm[i] = 4/3*np.pi*rho[i]*(r[i]**3-r[i-1]**3)/self.msol            
             
         save_path = f'{self.base_save_path}{self.save_name_amend}grid.png'
         
@@ -1152,16 +1165,17 @@ class Profiles:
             if vals.index(val)==0:                
                 
                 if pns_x!=0:
-                    self.pns_ind_ar[i]    = pns_ind
-                    self.pns_x_ar[i]      = pns_x
-                    self.pns_encm_ar[i]   = encm[pns_ind]                
-                    self.shock_ind_ar[i]  = shock_ind
-                    self.shock_x_ar[i]    = shock_x
-                    self.shock_encm_ar[i] = encm[shock_ind]
-                    self.time_ar[i]       = time1d   
+                    self.pns_ind_ar[i]     = pns_ind
+                    self.pns_x_ar[i]       = pns_x
+                    self.pns_encm_ar[i]    = encm[pns_ind]                
+                    self.shock_ind_ar[i]   = shock_ind
+                    self.shock_x_ar[i]     = shock_x
+                    self.shock_encm_ar[i]  = encm[shock_ind]
+                    self.max_pturb_pgas[i] = np.amax(abs(valmap['pturb']/valmap['pressure']))
+                    self.time_ar[i]        = time1d   
                     
-                    self.old_shock_ind    = shock_ind                                                              
-                
+                    self.old_shock_ind    = shock_ind       
+                                    
                 # Find mass shell indexes (initializes only once)
                 if self.shell_ar.size == 0: 
                     shell_old        = 0

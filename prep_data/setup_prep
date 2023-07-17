@@ -1,5 +1,5 @@
 <Input File>
-sukhbold2016/s12.0_presn
+sukhbold2016/s19.0_presn
 
 <Output File>
 Data
@@ -33,4 +33,3 @@ Data
 
 <EOS Table Path>
 ../project/1dmlmix/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5
-

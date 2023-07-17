@@ -284,7 +284,7 @@
 !                                                                       
 !--neutrino depletion from thin regions                                 
 !            
-      call nusphere(ncell,x,                                            &
+      call nusphere(ntstep,ncell,x,                                            &
                     ynue,ynueb,ynux,dynue,dynueb,dynux,                 &
                     unue,unueb,unux,dunue,dunueb,dunux)
 !                                                                       
@@ -840,7 +840,7 @@
       !   scale_pr_relative = 1.
 
       ! only inference once every # timesteps
-      if (mod(ntstep,5).eq.0) then
+      if (mod(ntstep,1).eq.0) then
         if (print_endstep.eqv..false.) then
 
             !   input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),shock_offset,mlin_grid_size) *  scale_v
@@ -1069,19 +1069,19 @@
       bounce_delay = 2.d-3/utime !delay of 2 ms
 
       if (maxval(rho)*udens.gt.2.d14) then
-        if (bounce_time.eq.0) bounce_time = time
-        if (first_bounce.eqv..false.) then
-            first_bounce = .true.
-        elseif (time.ge.(bounce_time+bounce_delay)) then
-            track_shock = .true.
-            add_pturb   = .true.
-            bounce_ntstep = ntstep 
-        endif
-        !if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
-      !   if (time .ge.bounce_time+15.d-3/utime) then
-      !       add_pturb   = .true.
-      !       bounce_ntstep = ntstep            
-      !   endif
+            if (bounce_time.eq.0) bounce_time = time
+            if (first_bounce.eqv..false.) then
+                first_bounce = .true.
+            elseif (time.ge.(bounce_time+bounce_delay)) then
+                track_shock = .true.
+            !     add_pturb   = .true.
+            !     bounce_ntstep = ntstep 
+            endif
+            !if (deltam(pns_ind).gt.0.and.deltam(pns_ind).le.1.1*minval(deltam(:ncell))) then
+            if (time.ge.bounce_time+15.d-3/utime) then
+                add_pturb   = .true.
+                bounce_ntstep = ntstep            
+            endif
         
       endif
       end
@@ -1863,7 +1863,7 @@
          
             ! set upper and lower bounds based on SFHo table limits
             if (xye  .gt.eos_yemax)  then
-                print*, 'xye hit max', k, xye
+!                if (xye.gt.1.0) print*, 'xye hit max', k, xye
                 xye   = eos_yemax
             endif
             if (xrho .lt.eos_rhomin)  then
@@ -2624,22 +2624,22 @@
 !                                                                       
 !--check if denue larger than 0.25*rlumnue                              
 !                                                                       
-      if (denue.gt.1.00*rlumnue) then 
+      if (denue.gt.0.50*rlumnue) then 
             jtrape = 1 
-         elseif (denue.lt.0.5*rlumnue.or.denue.lt.1.d-8) then 
+         elseif (denue.lt.0.25*rlumnue.or.denue.lt.1.d-8) then 
             jtrape =-1 
          else 
             jtrape = 0 
          endif 
    !                                                                       
-         if (denueb.gt.1.00*rlumnueb) then 
+         if (denueb.gt.0.50*rlumnueb) then 
             jtrapb = 1 
-         elseif (denueb.lt.0.5*rlumnueb.or.denueb.lt.1.d-8) then 
+         elseif (denueb.lt.0.25*rlumnueb.or.denueb.lt.1.d-8) then 
             jtrapb =-1 
          else 
             jtrapb = 0 
          endif 
-         return 
+         return  
       END                                           
 !                                                                       
       subroutine nuann(ncell,x,rho,ynue,ynueb,ynux,                     &
@@ -2823,8 +2823,8 @@
       return 
       END                                           
 !                                                                       
-      subroutine nucheck(ncell,x,ye,                                    &
-     &            ynue,ynueb,ynux,unue,unueb,unux)                      
+      subroutine nucheck(rho,ncell,x,ye,                                    &
+            &            ynue,ynueb,ynux,unue,unueb,unux)                      
 !*************************************************************          
 !                                                                       
 !                                                                       
@@ -2843,11 +2843,9 @@
       parameter (idim=10000) 
       parameter (tiny=1d-15) 
 
-      ! rcrit=0.1: things go very south
-      ! rcrit=1.0: ieos=5 -> explodes, ieos=4 -> behaves OK
       parameter (rcrit=1.0) 
 !                                                                       
-      dimension x(0:idim), ye(idim) 
+      dimension x(0:idim), ye(idim),rho(idim)
       dimension ynue(idim),ynueb(idim),ynux(idim),                      &
      &          unue(idim),unueb(idim),unux(idim)                       
 !                                                                       
@@ -2918,7 +2916,9 @@
             trapnueb(k)=.true. 
             cmaxnueb=dmax1(ak,cmaxnueb) 
          endif 
-         if (rnux.lt.rcrit) then 
+! KLUDGE on
+         if (rho(k)*udens.lt.1.e12.and.rnux.lt.rcrit) then 
+!         if (rnux.lt.rcrit) then 
             trapnux(k)=.false. 
          else 
             kountnux=kountnux+1 
@@ -3525,6 +3525,9 @@
       if (dble(knesat)/dble(max(1,knetot)).gt.0.3.or.                   &
      &     dble(knebsat)/dble(max(1,knebtot)).gt.0.3.or.                &
      &     dble(knxsat)/dble(max(1,knxtot)).gt.0.3) satc=satc+1.d0      
+      if (dble(knesat)/dble(max(1,knetot)).lt.0.01.and.                   &
+     &     dble(knebsat)/dble(max(1,knebtot)).lt.0.01.and.                &
+     &     dble(knxsat)/dble(max(1,knxtot)).lt.0.01) satc=satc-0.50     
 !      if (dble(knesat+knebsat+knxsat).lt.1) satc=satc-.5d0             
       !print *, 'isat=',satc                                            
       return 
@@ -4527,20 +4530,20 @@
 !                                                                       
 !--check if dex larger than 0.25*rlumnux                                
 !                                                                       
-      if (dex.gt.0.06*rlumnux) then 
+      if (dex.gt.0.25*rlumnux) then 
             jtrapx=1                                       
-      elseif (dex.lt.0.03*rlumnux.or.dex.lt.1.d-8) then 
+      elseif (dex.lt.0.125*rlumnux.or.dex.lt.1.d-8) then 
             jtrapx=-1 
       else 
             jtrapx=0 
-      endif 
+      endif
 !                                                                       
       return 
       END                                           
                                                                         
-      subroutine nusphere(ncell,x,                                      &
-     &                  ynue,ynueb,ynux,dynue,dynueb,dynux,             &
-     &                  unue,unueb,unux,dunue,dunueb,dunux)             
+      subroutine nusphere(ntstep,ncell,x,                                      &
+      &                  ynue,ynueb,ynux,dynue,dynueb,dynux,             &
+      &                  unue,unueb,unux,dunue,dunueb,dunux)             
 !************************************************************           
 !                                                                       
 !  This subroutine takes care of neutrino depletion from                
@@ -4640,7 +4643,9 @@
             e2nuebs=e2nuebs+faceeb*enuebt(i)*enuebt(i)*shift*shift 
          endif 
          if (.not.trapnux(i).and.ynux(i).ge.tiny) then 
+! KLUDGE1 off
             tdif=(dx)**2/(cthird*dnux(i)) 
+!            tdif=(1000.0d0*dx)**2/(cthird*dnux(i)) 
             ttran=dmax1(tdif,twave) 
             if (ttran.lt.t3step) ttran=t3step 
             fac=1./ttran 
@@ -4649,11 +4654,16 @@
             facux=fac*unux(i) 
             dunux(i)=dunux(i)-facux 
             facex=facux*deltam(i)*shift 
+!KLUDGE2 off
             rlumnux=rlumnux+facex 
             dex=dex+facex 
             enuxs=enuxs+facex*enuxt(i)*shift 
             e2nuxs=e2nuxs+facex*enuxt(i)*enuxt(i)*shift*shift 
-         endif 
+         endif
+
+!      if (ntstep.ge.1985.and.i.lt.2000) write (6,998) i,rlumnux*ufoe/utime,facex,facux,fac,unux(i),dnux(i),trapnux(i)
+998   format (i8,1pe15.2,5e15.2,l4)
+
       enddo 
       enue=enue+enues 
       e2nue=e2nue+e2nues 
@@ -6211,6 +6221,7 @@
       common /bnc/ rlumnue_max, bounce_ntstep, bounce_time, &
                    add_pturb, first_bounce, track_shock
       common /interp/ mlin_grid_size
+      common /dnus/ dnue(idim),dnueb(idim),dnux(idim)
 
       save ifirst
       data ifirst/.true./      
@@ -6307,10 +6318,10 @@
             !dumvt2(i)   = vturb2(i) + dtf11*fmix1(i) 
             reset(i)=.false. 
             if (dumye(i).lt.0.02) then 
-               dumye(i)=.02
+                  dumye(i)=.02
             end if
             if (dumye(i).gt.0.40  .and. rho(i)*udens .gt. 1.e12) then   
-               dumye(i)=.40                
+                  dumye(i)=.40                
             end if 
          enddo 
 !                                                                       
@@ -6350,7 +6361,7 @@
             end if
             if (dumye(i).gt.0.40  .and. rho(i)*udens .gt. 1.e12) then
                   dumye(i)=.40               
-            end if 
+            end if
          enddo        
 !                                                                       
 !     set saturation const=0                                            
@@ -6485,11 +6496,13 @@
          xtime=xtime*0.8d0**satc 
          !print *,'xtime=',xtime,'satc=',satc                           
          do i=1,ncell 
-            steps(i)=min(dtmin,xtime) 
+!            steps(i)=min(dtmin,xtime) 
+            steps(i)=dtmin 
+!            if (time*10.0.gt.0.225d0) steps(i) = min(steps(i),5.d-8/10.d0)
             if (time.lt.1.d-7) then 
-               steps(i) = min(steps(i),1.d-9) 
+                  steps(i) = min(steps(i),1.d-9) 
             end if 
-         enddo 
+         enddo
 !         write(*,110)'step:t,dt,rapmax,nreset', tfull,dtmin,rapmax,    
 !     1             nreset                                              
   110    format(A30,3(1g12.5,1x),I3) 
@@ -6587,8 +6600,8 @@
 !                                                                       
 !--do various neutrino flagging and checking                            
 !--skip neutrino                                                        
-         call nucheck(ncell,x,ye,                                       &
-                      ynue,ynueb,ynux,unue,unueb,unux)                      
+         call nucheck(rho,ncell,x,ye,                                       &
+                      ynue,ynueb,ynux,unue,unueb,unux)                     
 !                                                                       
          do i=1,ncell 
             tempold(i) = temp(i) 
@@ -6603,6 +6616,16 @@
          if(ntstep.eq.1) then
              write(59,"(A)") "Time [s]  rlumnue [foe/s]  enue [MeV] &
                 & rlumnueb [foe/s]  enueb [MeV]  rlumnux [foe/s]  enux [MeV]"
+         endif         
+
+         if (convf*rlumnux.gt.1.d4.and.convf*rlumnux.le.1.d7) then
+            write (6,999) time*utime,ntstep,rlumnux*convf,ftrape,ftrapb,ftrapx
+  999       format (1pe14.7,i8,'   rlumnux > 1.e4 !',4e12.2)
+         endif
+         if (convf*rlumnux.gt.1.d7) then 
+           write (6,9999) time*utime,ntstep,rlumnux*convf,ftrape,ftrapb,ftrapx
+  9999     format (1pe14.7,i8,'   rlumnux > 1.e7 !',4e12.2)
+         STOP
          endif         
 
          if (mod(ntstep,nups).eq.0) then 
@@ -6632,7 +6655,7 @@
 !--start new time step                                                  
 !        
         !  if (ntstep.eq.500) stop
-         if(time.lt.tnext)then 
+      if(time.lt.tnext)then 
             if (mod(ntstep,nups).eq.0) then 
       520         format(A,I12,A) 
       501         format(A,1p,E10.3)
@@ -6641,18 +6664,35 @@
                   '          > ----------------------------------'            
                   write(*,500)'[    time/tmax, dt (s) ]',                     &
                               time*utime,' /',tmax*utime,steps(1)*utime                                    
-      
+
                   if (first_bounce.eqv..true.) then
-                      write(*,501)'[    bounce time (s)   ]', bounce_time*utime                                          
+                  write(*,501)'[    bounce time (s)   ]', bounce_time*utime                                          
                   endif            
-            end if 
+!KLUDGE on
+            sumgrav =0.0d0
+            sumint = 0.0d0
+            xmint = 0.0d0
+            xketot  = 0.0d0
+            do i = 1,ncell
+                  sumint = sumint+u(i)*deltam(i)
+                  xmint = xmint+deltam(i)
+                  sumgrav = sumgrav+gg*xmint*deltam(i)/x(i)
+                  xketot =  xketot+deltam(i)*v(i)**2
+            end do
+            sumgrav = -sumgrav
+            etotal = sumgrav+sumint+ketot
+            factor = umass*(udist/utime)**2
+            write (*,997) sumgrav*factor,sumint*factor,xketot*factor,etotal*factor
+997     format ('Grav, Int, KE, Tot',1pe12.3,3e12.3)
+            end if
+
             ntstep=ntstep+1 
             go to 99 
-         end if 
-         return 
+            end if 
+            return 
       end if 
-!                                                                       
-      END  
+      !                                                                       
+      END 
 
 
       subroutine write_value(ncell,a,b,c,d,xfile)

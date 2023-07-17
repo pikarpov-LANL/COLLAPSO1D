@@ -3,13 +3,13 @@ Data
 <Output File>
 DataOut
 <Input PyTorch Model>
-mlmodels/limited/model_s12.0_angav.pt
+None
 <Input Grid Size to interpolate for PyTorch Model>
 200
 <Dump # to read>
 0
 <Dump time intervals [s]>
-0.0005
+5.d-4
 <Max time [s]>
 0.7
 <Artifiicqial Viscocity #1>
