@@ -108,10 +108,13 @@ nav:
     - Overview:
       - installation.md
       - quick_start.md
-      - setup.md
-      - eosdriver.md
-      - units.md
-      - api.md
+      - research.md
+
+    - Technical Details:
+      - details/setup.md
+      - details/eosdriver.md
+      - details/units.md
+      - details/api.md
     - Legacy:
       - legacy/legacy.md
       - legacy/data_prep.md
