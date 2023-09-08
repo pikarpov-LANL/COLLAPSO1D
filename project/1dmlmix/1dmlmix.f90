@@ -840,7 +840,7 @@
       !   scale_pr_relative = 1.
 
       ! only inference once every # timesteps
-      if (mod(ntstep,1).eq.0) then
+      if (mod(ntstep,5).eq.0) then
         if (print_endstep.eqv..false.) then
 
             !   input(:,1,1) = interpolate(x(1:),v(1:),ncell,int(pns_ind),shock_offset,mlin_grid_size) *  scale_v
@@ -873,14 +873,15 @@
       pr_relative(:) = 0.
 
       if (.not.allocated(output_h)) allocate(output_h(mlin_grid_size,1,1))
-      output_h(:,1,1) = output_preserve(:mlin_grid_size)
+      output_h(:,1,1) = output_preserve(:mlin_grid_size)      
       
       interp_x        = linspace(x(int(pns_ind)), x(int(shock_offset)), mlin_grid_size)   
       pr_relative(int(pns_ind):shock_offset) = interpolate(DBLE(interp_x),DBLE(output_h(:,1,1)),            &
                                                            mlin_grid_size,1,mlin_grid_size,                 &
-                                                           int(shock_offset-int(pns_ind)+1))
+                                                           int(shock_offset-int(pns_ind)+1))      
       pr_relative = scale_pr_relative*pr_relative                                                           
       pr_turb     = pr_relative*pr
+
       
 511   format(A,1p,I5,A,E10.3)
       if (mod(ntstep,nups).eq.0) then        
@@ -6682,8 +6683,8 @@
             sumgrav = -sumgrav
             etotal = sumgrav+sumint+ketot
             factor = umass*(udist/utime)**2
-            write (*,997) sumgrav*factor,sumint*factor,xketot*factor,etotal*factor
-997     format ('Grav, Int, KE, Tot',1pe12.3,3e12.3)
+            ! write (*,997) sumgrav*factor,sumint*factor,xketot*factor,etotal*factor
+! 997     format ('Grav, Int, KE, Tot',1pe12.3,3e12.3)
             end if
 
             ntstep=ntstep+1 

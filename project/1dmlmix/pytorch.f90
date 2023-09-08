@@ -43,7 +43,7 @@ module pytorch
         input_h = input    
 
         call input_tensors%create
-        call input_tensors%add_array(input)              
+        call input_tensors%add_array(input_h)              
         call torch_mod%load(filename)
         call torch_mod%forward(input_tensors, out_tensor)
         call out_tensor%to_array(output)

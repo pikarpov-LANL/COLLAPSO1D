@@ -1,23 +1,8 @@
 # Installation
 
-COLLAPSO1D supports `gfortran` and Intel's Classic Fortran `ifort`. The latter runs ~70% faster, but requires a more involved installation.
+COLLAPSO1D supports `gfortran` and Intel's Classic Fortran `ifort`. The latter runs ~70% faster, but requires a more involved installation. Instruction are given for Linux (tested on Ubuntu 20.04 and 22.04), with Mac specific commands in spoilers.
 
 ## Defendencies
-
-### PyTorch
-!!! Warning "PyTorch 2.X has <ins>not</ins> been tested."
-    
-To install the latest PyTorch 1.X for <ins>CPU</ins>, follow the official [instructions](https://pytorch.org/get-started/locally/). I would highly recommend installing it in a dedicated conda environemnt. As an example, here is how to create one and install PyTorch:
-```
-conda create -n py310 python=3.10
-conda activate py310
-
-# check the pytorch installation instructions!
-pip install torch==1.13.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
-```
-!!! Warning
-    `torch>=1.13.1` will work for inferencing, hence for the CCSN code will be fine, but loading and training the model will fail. Thus, `resnet_forward` will still work, but `polynomial` example will fail.
-
 
 ### pybind11
 
@@ -32,10 +17,34 @@ Make sure you have `cmake` or install it by (tested on `cmake==3.22.1`)
 ```bash
 sudo apt install cmake
 ```
+??? note "Mac OS"
+    ```bash
+    brew install cmake
+    ```
+
+### PyTorch
+    
+To install the latest PyTorch 1.X or 2.X for <ins>CPU</ins>, follow the official [instructions](https://pytorch.org/get-started/locally/). Explicitly, the code has been tested with `torch==1.13.1` and `2.0.1`. I would highly recommend installing it in a dedicated conda environemnt. As an example, here is how to create one and install PyTorch:
+```
+conda create -n py310 python=3.10
+conda activate py310
+
+# check the pytorch installation instructions!
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
+!!! Warning
+    `torch>=1.13.1` will work for inferencing, hence for the CCSN code will be fine, but loading and training the model will fail. Thus, `resnet_forward` will still work, but `polynomial` example will fail.
+
 
 ### EOS Tables
 
 You will also need to download the SFHo EOS Table and put it in the executable directory.
+
+??? note "Mac OS"
+    ```
+    brew install wget
+    ```
+
 ```bash
 cd project/1dmlmix
 wget https://su.drive.sunet.se/index.php/s/FQkikyGcRnHTZNL/download/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.3_20190605.h5
@@ -50,6 +59,11 @@ Both the main CCSN code and the PyTorch wrapper can be compiled with `gfortran >
 sudo apt install gfortran
 ```
 
+??? note "Mac OS"
+    ```
+    brew install gfortran
+    ```
+
 In the `Makefile`, set
 ```
 COMPILER=gfortran
@@ -62,18 +76,32 @@ sudo apt-get install libhdf5-dev
 ```
 Then you need to provide paths to the `hdf5` libraries in the `Makefile`. If yours differ from default, edit:
 ```
-HDF5PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial
-HDF5INCS=-I/usr/include/hdf5/serial
+HDF5PATH = /usr/lib/x86_64-linux-gnu/hdf5/serial
+HDF5INCS = -I/usr/include/hdf5/serial
 ```
+
+??? note "Mac OS"
+    ```bash
+    brew install hdf5
+    ```
+    The paths will most likely be as follows:
+    ```
+    HDF5PATH = /opt/homebrew/lib
+    HDF5INCS = -I/opt/homebrew/include
+    ```    
+
+
 Add the following to you `~/.bashrc` and then `source ~/.bashrc`:
 ```bash
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
 ```
+??? note "Mac OS"
+    You should add the above line to `.bash_profile` instead. Create it if it doesn't exist.
 
 ### Test Installation
-Run the following to test your installation with `gfortran`.
+Run the following to test your installation
 ```bash
-make test
+make
 ```
 
 ---
