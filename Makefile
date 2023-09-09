@@ -3,14 +3,14 @@ PYPATH := $(shell python -c 'import site; print(site.getsitepackages()[0])')
 CMAKE_PREFIX_PATH="${PYPATH}/torch/share/cmake;${PYPATH}/pybind11/share/cmake"
 
 # if using default `gfortran`
-# HDF5PATH =   /usr/lib/x86_64-linux-gnu/hdf5/serial
-# HDF5INCS = -I/usr/include/hdf5/serial
-# COMPILER = gfortran
+HDF5PATH =   /usr/lib/x86_64-linux-gnu/hdf5/serial
+HDF5INCS = -I/usr/include/hdf5/serial
+COMPILER = gfortran
 
 # if using 'ifort'
-HDF5PATH =   /home/$(USER)/Downloads/hdf5-1.12.2/hdf5/lib
-HDF5INCS = -I/home/$(USER)/Downloads/hdf5-1.12.2/hdf5/include
-COMPILER = ifort
+# HDF5PATH =   /home/$(USER)/Downloads/hdf5-1.12.2/hdf5/lib
+# HDF5INCS = -I/home/$(USER)/Downloads/hdf5-1.12.2/hdf5/include
+# COMPILER = ifort
 
 # List CUDA compute capabilities
 # TORCH_CUDA_ARCH_LIST := 7.0
@@ -97,9 +97,6 @@ examples:
 	@for f in $(shell cd ${EXAMPLES_DIR} && ls -d */); do cp -r $(INST)/lib/libpytorch_proxy.* $(EXAMPLES_DIR)/$${f}; done
 	@echo "=== Prepared examples ==="
 
-data: HDF5PATH = /usr/lib/x86_64-linux-gnu/hdf5/serial
-data: HDF5INCS = -I/usr/include/hdf5/serial
-data: COMPILER = gfortran
 data: eos_data
 	@echo "=== Using prep_data/setup ==="
 	cd prep_data && \
