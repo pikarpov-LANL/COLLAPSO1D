@@ -55,12 +55,24 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
 # We need libtorch_python library for integration with pybind11
 # This library is not included in TORCH_LIBRARIES, so we need to manually include it
 set(filtered_lib ${TORCH_LIBRARIES})
-list(FILTER filtered_lib INCLUDE REGEX ".*libc10.so$")
-string(REPLACE "libc10.so" "" torch_lib_dir ${filtered_lib})
+
+# Library extensions are different on Linux vs macOS
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    set(lib_extension "so")
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(lib_extension "dylib")
+else()
+    message(FATAL_ERROR "${CMAKE_SYSTEM_NAME} is not supported. Only Linux and Darwin (macOS)." )
+endif()
+
+message("${CMAKE_SYSTEM_NAME}, ${lib_extension}")
+
+list(FILTER filtered_lib INCLUDE REGEX ".*libc10.${lib_extension}$")
+string(REPLACE "libc10.${lib_extension}" "" torch_lib_dir ${filtered_lib})
 
 # Includes
 target_link_libraries(pytorch_proxy PRIVATE Python3::Python)
-target_link_libraries(pytorch_proxy PRIVATE "${torch_lib_dir}/libtorch_python.so")
+target_link_libraries(pytorch_proxy PRIVATE "${torch_lib_dir}/libtorch_python.${lib_extension}")
 target_link_libraries(pytorch_proxy PRIVATE "${TORCH_LIBRARIES}")
 target_include_directories(pytorch_proxy PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../common")
 
